@@ -38,7 +38,7 @@ How Recon gets built, in order. Behaviour is defined in `docs/SPEC.md`; engineer
     - Ask Tyler once whether he wants SSH commit signing; set it up only if he says yes.
     - Create issues for the remaining Phase 0 tasks.
 - [x] **0.2 Project scaffold.** `uv init`, pin Python 3.13 (`.python-version`), `pyproject.toml` with ruff, mypy and pytest config, the folder layout from CLAUDE.md with empty packages, `.gitignore` (venv, caches, `tests/screenshots/`, any `*.db`). Agree the app ID with Tyler (reverse-DNS, e.g. `io.github.<github-user>.Recon`) and record it in `recon/config.py`; every later task uses that constant.
-- [ ] **0.3 Quality tooling and docs.** Everything in CLAUDE.md's Engineering standards, Security and privacy, and Testing sections is wired up before any feature code:
+- [x] **0.3 Quality tooling and docs.** Everything in CLAUDE.md's Engineering standards, Security and privacy, and Testing sections is wired up before any feature code:
     - `ruff` (full rule set), `mypy --strict`, `pytest` with `pytest-cov` (branch coverage gates), `hypothesis`, `mutmut` 3.x config for the safety-critical modules.
     - GitHub files: `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/` (`task.yml`, `bug.yml`, `audit-finding.yml`), `.github/dependabot.yml`, `.github/workflows/release.yml`, `SECURITY.md`, `.editorconfig`, `.gitattributes`.
     - `.pre-commit-config.yaml`: ruff, ruff format, mypy, fast tests, gitleaks, plus the `commit-msg` Conventional Commits check. The gitleaks hook needs either the Go toolchain or the system `gitleaks` package; ask Tyler which before installing anything.
