@@ -1,0 +1,31 @@
+name: Task
+description: A task from docs/BUILD_PLAN.md
+title: "<task id> <short name>"
+labels: []
+body:
+  - type: input
+    id: task
+    attributes:
+      label: Build plan task
+      description: Phase and task number, e.g. "Phase 1, task 1.9".
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What this task delivers, in a few lines. The build plan is the source.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Acceptance checks that close this issue.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Dependencies, risks, decisions to raise with Tyler.

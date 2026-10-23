@@ -1,0 +1,57 @@
+name: Audit finding
+description: A finding from a phase or release audit (docs/audits/)
+title: "audit: "
+labels: ["audit-finding"]
+body:
+  - type: input
+    id: audit
+    attributes:
+      label: Audit
+      description: Report file and finding ID, e.g. "docs/audits/phase-1.md, F-07".
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Critical, High and Medium are fixed before the gate.
+      options: [Critical, High, Medium, Low]
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Checklist area
+      options:
+        - Correctness
+        - Hard rules
+        - Security and privacy
+        - Error handling
+        - Tests and coverage
+        - Performance budgets
+        - Accessibility
+        - ADHD rules
+        - Copy
+        - Docs
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: File and line, e.g. recon/engine/stage.py:120.
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: Finding
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Fix
+      description: The proposed fix, or for Low findings left open, the reason.
+    validations:
+      required: true

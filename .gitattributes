@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+# Binaries
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.wav binary
+*.flac binary
+*.sqlite binary
+*.db binary
+
+# Generated
+uv.lock linguist-generated=true

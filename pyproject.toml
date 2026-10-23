@@ -7,7 +7,15 @@ requires-python = ">=3.13,<3.14"
 dependencies = []
 
 [dependency-groups]
-dev = []
+dev = [
+    "hypothesis>=6.170.8",
+    "mutmut>=3.8,<4",
+    "mypy>=2.4.0",
+    "pre-commit>=4.7.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.2",
+]
 
 [tool.uv]
 package = false
@@ -18,11 +26,11 @@ package = false
 [tool.ruff]
 target-version = "py313"
 line-length = 100
-src = ["recon", "tests", "scripts"]
+src = ["."]
 
 [tool.ruff.lint]
 select = [
-    "E", "F", "W", "I", "N", "UP", "B", "S", "A", "C4", "SIM", "PL", "PT",
+    "E", "F", "W", "I", "N", "UP", "B", "S", "A", "C4", "SIM", "PL", "PT", "G", "LOG", "T20",
     "RET", "ARG", "PTH", "TRY", "RUF", "ANN", "D",
 ]
 
@@ -45,7 +53,7 @@ docstring-code-format = true
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["recon"]
+files = ["recon", "scripts"]
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 
@@ -54,6 +62,7 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 # --------------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
 markers = [
@@ -74,3 +83,18 @@ exclude_also = [
     "if TYPE_CHECKING:",
     "if __name__ == .__main__.:",
 ]
+
+# --------------------------------------------------------------------------
+# mutmut (3.x): safety-critical modules only. Paths that don't exist yet are
+# picked up automatically as the modules land (flags filter: Phase 1;
+# stage and sanitise: Phase 2; factcheck: Phase 3).
+# --------------------------------------------------------------------------
+[tool.mutmut]
+source_paths = ["recon/"]
+only_mutate = [
+    "recon/engine/flags_filter.py",
+    "recon/engine/stage.py",
+    "recon/engine/sanitise.py",
+    "recon/engine/factcheck/*",
+]
+pytest_add_cli_args = ["-m", "not ollama and not gpu"]

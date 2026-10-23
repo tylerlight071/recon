@@ -1,0 +1,79 @@
+# Install once per clone:  uv run pre-commit install
+# Run everything by hand:  uv run pre-commit run --all-files
+# Never bypass with --no-verify.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+minimum_pre_commit_version: "4.0.0"
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: 91ab4bf57e58b32adf1a122681f6ebe164d081c8 # v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [--strict, feat, fix, refactor, test, docs, chore, ci, build, perf]
+
+  - repo: local
+    hooks:
+      - id: uv-lock-check
+        name: uv lock --check
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+
+      - id: ruff-format
+        name: ruff format --check
+        entry: uv run --frozen ruff format --check --force-exclude
+        language: system
+        types_or: [python, pyi]
+
+      - id: mypy
+        name: mypy --strict
+        entry: uv run --frozen mypy
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false
+
+      - id: pytest-fast
+        name: fast tests
+        entry: uv run --frozen pytest -q -x -m "not ollama and not gpu and not slow"
+        language: system
+        types_or: [python, pyi, toml, json, yaml, markdown]
+        pass_filenames: false
+
+      # System package (pacman -S gitleaks); see README.
+      - id: gitleaks
+        name: gitleaks (staged changes)
+        entry: gitleaks git --pre-commit --redact --staged --verbose
+        language: system
+        pass_filenames: false
+
+      # GitHub Free has no rulesets on private repos, so main is protected here.
+      - id: no-push-to-main
+        name: refuse pushes to main
+        entry: scripts/hooks/no-push-to-main
+        language: script
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false

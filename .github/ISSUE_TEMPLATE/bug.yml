@@ -1,0 +1,39 @@
+name: Bug
+description: Something in Recon isn't working as SPEC.md says
+title: "bug: "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Don't paste real notes or flags. Describe them instead.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "critical: data loss, a hard rule broken, or the app won't start"
+        - "high: a main flow is blocked"
+        - "medium: a flow works with a workaround"
+        - "low: cosmetic or minor"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit

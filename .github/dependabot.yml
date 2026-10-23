@@ -1,0 +1,33 @@
+# Dependabot's uv support raises lower bounds in pyproject.toml on every
+# update, so CI runs `uv lock --check` and these PRs are reviewed by hand,
+# never auto-merged.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels: [dependencies, "type:chore", "area:infra"]
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels: [dependencies, "type:chore", "area:infra"]
+    commit-message:
+      prefix: ci
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
