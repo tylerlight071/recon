@@ -15,3 +15,4 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `ReconError` hierarchy with plain user-facing messages; XDG paths with private permissions; rotating logging that redacts note content.
 - Tests for the network-import rule and for keeping content out of `app.log`.
 - README, SECURITY, architecture, threat model, audit checklist and the stack ADR.
+- `scripts/check_env.py`: read-only environment check for Ollama, GPU, desktop portal, audio, Obsidian and disk space.

@@ -47,7 +47,7 @@ How Recon gets built, in order. Behaviour is defined in `docs/SPEC.md`; engineer
     - The network test: fails if any module other than `services/ollama.py` imports networking libraries.
     - Docs: `README.md` skeleton, `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md` (assets, entry points, threats and mitigations, matching CLAUDE.md), `docs/AUDIT_CHECKLIST.md`, `docs/adr/0001-stack.md`, `CHANGELOG.md` (Keep a Changelog format).
     - *Done when:* a deliberately bad commit (type error, failing test, fake secret, non-conventional message) is blocked by the hooks; CI is green on the empty skeleton; and a test pull request goes from issue to branch to green CI to squash merge, proving the workflow end to end.
-- [ ] **0.4 Environment check script** (`scripts/check_env.py`, run with `uv run`). Reports, in plain English, each with OK / needs attention:
+- [x] **0.4 Environment check script** (`scripts/check_env.py`, run with `uv run`). Reports, in plain English, each with OK / needs attention:
     - Ollama: binary location, how it was installed (`pacman -Qo` on the binary; `ollama` vs `ollama-cuda` package, or the official script), version, whether the service is running, whether it uses the GPU.
     - NVIDIA driver version and CUDA version from `nvidia-smi`; confirm compute capability 12.0.
     - Session type (`XDG_SESSION_TYPE` = wayland), Plasma version, `xdg-desktop-portal` version (≥ 1.20 needed for the host app Registry) and whether the GlobalShortcuts portal is available.
