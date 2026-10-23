@@ -11,8 +11,19 @@ The machine Recon is built and tested on, as reported by `scripts/check_env.py`,
 | GPU | NVIDIA RTX 5070 Ti, 16 GB; driver 615.78.08; CUDA 13.4 driver API; compute capability 12.0 (Blackwell) |
 | Desktop | KDE Plasma 6.8.1 on Wayland; xdg-desktop-portal 1.22.1 with the host Registry and GlobalShortcuts portals |
 | Audio | PortAudio installed. **Default input not set yet** (see below) |
+| Models pulled | See below (15 GB in `/data/models/ollama`) |
 | Obsidian | 1.14.4 from pacman (Arch `extra`); `obsidian://` handler registered |
 | Disk | About 1 TB free in home |
+
+## Models (task 0.6, pulled 2026-10-24)
+
+| Model | Role | Ollama ID | Size | Details from `ollama show` |
+| --- | --- | --- | --- | --- |
+| `qwen3.5:9b` | Default text and vision | `56671c2ab938` | 6.6 GB | 9.0B, Q4_K_M, 262K context; completion, vision, tools, thinking |
+| `gemma4:12b` | Bake-off candidate (Phase 2) | `6114515d63c1` | 8.0 GB | 11.9B, Q4_K_M, 262K context; completion, vision, audio, tools, thinking |
+| `qwen3-embedding:0.6b` | Embeddings | `ac6da0dfba84` | 639 MB | 596M, Q8_0, 32K context, 1024-dimension vectors |
+
+Both text models support thinking. The 0.7 smoke test checks how that interacts with structured output.
 
 ## Fixes made in task 0.5
 

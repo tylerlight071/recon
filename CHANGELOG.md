@@ -16,4 +16,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Tests for the network-import rule and for keeping content out of `app.log`.
 - README, SECURITY, architecture, threat model, audit checklist and the stack ADR.
 - `docs/environment.md`: the development machine's state and the fixes agreed in task 0.5.
+- Pulled the default models (`qwen3.5:9b`, `gemma4:12b`, `qwen3-embedding:0.6b`), recorded in `docs/environment.md`; the Ollama registry is listed as a download source.
 - `scripts/check_env.py`: read-only environment check for Ollama, GPU, desktop portal, audio, Obsidian and disk space.

@@ -64,9 +64,10 @@ Recon never contacts tryhackme.com. These are the only places anything is downlo
 | PyPI (`pypi.org`, `files.pythonhosted.org`) | Python packages in `uv.lock` | `uv sync` |
 | Astral python-build-standalone (`github.com/astral-sh`) | CPython 3.13 | first `uv sync` |
 | GitHub: `pre-commit/pre-commit-hooks`, `compilerla/conventional-pre-commit` | Commit hook code, pinned by commit | `pre-commit install` |
-| CachyOS/Arch repos | `gitleaks` | once, by hand |
+| CachyOS/Arch repos | `gitleaks`, `obsidian` | once, by hand |
+| Ollama registry (`registry.ollama.ai`) | `qwen3.5:9b`, `gemma4:12b`, `qwen3-embedding:0.6b` | `ollama pull`, once (task 0.6) |
 
-More sources (Ollama models, fonts, the Whisper model from Hugging Face) are added here before their first download.
+More sources (fonts, the Whisper model from Hugging Face) are added here before their first download.
 
 ## Troubleshooting
 

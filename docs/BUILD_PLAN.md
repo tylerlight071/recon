@@ -55,7 +55,7 @@ How Recon gets built, in order. Behaviour is defined in `docs/SPEC.md`; engineer
     - Obsidian: installed or not, how (pacman, Flatpak or AppImage), and whether the `obsidian://` link handler is registered.
     - Free disk space in home (models + vault).
 - [x] **0.5 Report and agree fixes.** Show Tyler the check output. Propose fixes for anything flagged (e.g. Ollama too old for the Qwen 3.5 family, CPU-only Ollama) and **ask before running anything with `sudo`**.
-- [ ] **0.6 Pull models** (ask first; several GB): `qwen3.5:9b`, `gemma4:12b`, `qwen3-embedding:0.6b`. If a tag doesn't exist or needs a newer Ollama, say so and propose the nearest alternative.
+- [x] **0.6 Pull models** (ask first; several GB): `qwen3.5:9b`, `gemma4:12b`, `qwen3-embedding:0.6b`. If a tag doesn't exist or needs a newer Ollama, say so and propose the nearest alternative.
 - [ ] **0.7 Smoke tests** (`scripts/smoke/`), each a tiny script that passes or fails clearly:
     - Structured output: one call with a pydantic schema; response validates.
     - Embeddings: two related and one unrelated sentence; related pair scores higher.
