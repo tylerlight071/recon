@@ -35,6 +35,14 @@ uv run pre-commit install
 
 Not yet. From Phase 1, `./packaging/recon-launch` starts the app, and an app-menu entry is installed by `scripts/install_desktop.py`.
 
+## Check your machine
+
+```fish
+uv run python scripts/check_env.py
+```
+
+Reports, in plain English, whether Ollama (install, version, service, GPU), the NVIDIA driver and CUDA, the Plasma Wayland session and desktop portal, the default microphone and PortAudio, Obsidian, and free disk space are ready for Recon. It only reads; it changes nothing and makes no network calls. Exit code 1 means something needs attention.
+
 ## Develop
 
 ```fish
