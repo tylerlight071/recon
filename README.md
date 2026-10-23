@@ -41,7 +41,7 @@ Not yet. From Phase 1, `./packaging/recon-launch` starts the app, and an app-men
 uv run python scripts/check_env.py
 ```
 
-Reports, in plain English, whether Ollama (install, version, service, GPU), the NVIDIA driver and CUDA, the Plasma Wayland session and desktop portal, the default microphone and PortAudio, Obsidian, and free disk space are ready for Recon. It only reads; it changes nothing and makes no network calls. Exit code 1 means something needs attention.
+Reports, in plain English, whether Ollama (install, version, service, GPU), the NVIDIA driver and CUDA, the Plasma Wayland session and desktop portal, the default microphone and PortAudio, Obsidian, and free disk space are ready for Recon. It only reads; it changes nothing and makes no network calls. Exit code 1 means something needs attention. The latest results for the development machine are in [`docs/environment.md`](docs/environment.md).
 
 ## Develop
 
