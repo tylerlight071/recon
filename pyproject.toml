@@ -1,0 +1,76 @@
+[project]
+name = "recon"
+version = "0.0.0"
+description = "Local-first TryHackMe study companion: capture panel, Obsidian vault, flashcards."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = []
+
+[dependency-groups]
+dev = []
+
+[tool.uv]
+package = false
+
+# --------------------------------------------------------------------------
+# Ruff
+# --------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["recon", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W", "I", "N", "UP", "B", "S", "A", "C4", "SIM", "PL", "PT",
+    "RET", "ARG", "PTH", "TRY", "RUF", "ANN", "D",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# S101: pytest's assert is the test mechanism.
+# PLR2004: literal expected values are the point of a test.
+# D1: test functions are named for what they check; docstrings would repeat the name.
+"tests/**" = ["S101", "PLR2004", "D1"]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+# --------------------------------------------------------------------------
+# mypy
+# --------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["recon"]
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+# --------------------------------------------------------------------------
+# pytest and coverage
+# --------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+markers = [
+    "ollama: needs a running local Ollama with the configured models",
+    "gpu: needs the NVIDIA GPU (CUDA)",
+    "slow: takes more than a few seconds; skipped by the pre-commit hook",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["recon"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 80
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]

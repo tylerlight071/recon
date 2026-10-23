@@ -1,0 +1,35 @@
+# Python and tooling
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+mutants/
+*.egg-info/
+dist/
+build/
+
+# Test output
+tests/screenshots/
+
+# Never commit real data: databases, vaults, recordings
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.wav
+*.flac
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
