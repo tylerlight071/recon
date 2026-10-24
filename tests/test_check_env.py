@@ -2,6 +2,7 @@
 
 import stat
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,10 @@ HEALTHY: dict[tuple[str, ...], Output] = {
     ("pacman", "-Q", "ollama-cuda"): Output(0, "ollama-cuda 0.40.8-1.1\n"),
     ("ollama", "--version"): Output(0, "ollama version is 0.40.8\n"),
     ("systemctl", "is-active", "ollama"): Output(0, "active\n"),
-    ("journalctl", "-u", "ollama", "-b", "--no-pager", "-o", "cat"): Output(0, JOURNAL_OK),
+    ("systemctl", "show", "ollama", "-p", "InvocationID", "--value"): Output(0, "abc123\n"),
+    ("journalctl", "_SYSTEMD_INVOCATION_ID=abc123", "--no-pager", "-o", "cat"): Output(
+        0, JOURNAL_OK
+    ),
     (
         "nvidia-smi",
         "--query-gpu=name,driver_version,compute_cap,memory.total",
@@ -222,7 +226,11 @@ def test_service_down_without_logs() -> None:
 
 def test_gpu_unknown_when_never_started() -> None:
     probe = make_probe(
-        {("journalctl", "-u", "ollama", "-b", "--no-pager", "-o", "cat"): Output(0, JOURNAL_FAILED)}
+        {
+            ("journalctl", "_SYSTEMD_INVOCATION_ID=abc123", "--no-pager", "-o", "cat"): Output(
+                0, JOURNAL_FAILED
+            )
+        }
     )
 
     check = check_env.check_ollama_gpu(probe)
@@ -241,7 +249,11 @@ def test_gpu_detected_as_cuda() -> None:
 def test_gpu_on_cpu_library() -> None:
     line = 'msg="inference compute" id=cpu library=cpu'
     probe = make_probe(
-        {("journalctl", "-u", "ollama", "-b", "--no-pager", "-o", "cat"): Output(0, line)}
+        {
+            ("journalctl", "_SYSTEMD_INVOCATION_ID=abc123", "--no-pager", "-o", "cat"): Output(
+                0, line
+            )
+        }
     )
 
     check = check_env.check_ollama_gpu(probe)
@@ -525,3 +537,129 @@ def test_default_file_and_program_lookups(tmp_path: Path) -> None:
     assert check_env.glob_files(tmp_path / "missing", "*") == []
     assert check_env.glob_files(tmp_path, "*AppImage") == [tmp_path / "Obsidian-1.AppImage"]
     assert check_env.find_program("definitely-not-a-program-xyz") is None
+
+
+# Audit F-07 and F-16 -------------------------------------------------------------
+
+_INACTIVE: dict[tuple[str, ...], Output | None] = {
+    ("systemctl", "is-active", "ollama"): Output(3, "failed\n")
+}
+
+
+@pytest.mark.parametrize(
+    ("version", "summary"),
+    [
+        (Output(124, "", "ollama timed out"), "didn't answer within 15 s"),
+        (Output(1, "", "Error: something broke"), "Not running"),
+        (Output(0, "Warning: client version is 0.40.8"), "Not running"),
+        (Output(126, "", "ollama couldn't be run: Permission denied"), "Not running"),
+    ],
+)
+def test_service_is_not_ok_unless_a_server_really_answers(version: Output, summary: str) -> None:
+    check = check_env.check_ollama_service(
+        make_probe({**_INACTIVE, ("ollama", "--version"): version})
+    )
+
+    assert check.status is Status.ATTENTION
+    assert summary in check.summary
+
+
+def test_server_answered_needs_a_clean_server_version() -> None:
+    assert check_env.server_answered(Output(0, "ollama version is 0.40.8\n"))
+    assert not check_env.server_answered(Output(1, "ollama version is 0.40.8\n"))
+    assert not check_env.server_answered(
+        Output(
+            0,
+            "Warning: could not connect to a running Ollama instance\n"
+            "Warning: client version is 0.40.8",
+        )
+    )
+
+
+def test_gpu_check_ignores_earlier_runs_without_an_invocation() -> None:
+    probe = make_probe(
+        {("systemctl", "show", "ollama", "-p", "InvocationID", "--value"): Output(0, "\n")}
+    )
+
+    check = check_env.check_ollama_gpu(probe)
+
+    assert check.status is Status.ATTENTION
+    assert "current run" in check.summary
+
+
+@pytest.mark.parametrize("stdout", ["", "\n", "NVIDIA GeForce RTX 5070 Ti, 615.78.08\n"])
+def test_nvidia_unreadable_output_is_reported_not_raised(stdout: str) -> None:
+    check = check_env.check_nvidia(make_probe({NVIDIA_QUERY: Output(0, stdout)}))
+
+    assert check.status is Status.ATTENTION
+    assert check.summary == "Couldn't read nvidia-smi's output."
+
+
+def test_runner_reports_a_program_it_cannot_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = tmp_path / "ollama"
+    fake.write_text("#!/bin/sh\n")
+    fake.chmod(0o644)  # found but not executable
+    monkeypatch.setattr(check_env.shutil, "which", lambda *_a, **_k: str(fake))
+
+    output = check_env.run_command(["ollama", "--version"])
+
+    assert output is not None
+    assert output.code == 126
+    assert "couldn't be run" in output.stderr
+
+
+def test_runner_replaces_undecodable_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = tmp_path / "ollama"
+    fake.write_bytes(b"#!/bin/sh\nprintf 'caf\\377'\n")
+    fake.chmod(0o755)
+    monkeypatch.setattr(check_env.shutil, "which", lambda *_a, **_k: str(fake))
+
+    output = check_env.run_command(["ollama"])
+
+    assert output is not None
+    assert output.stdout == "caf\ufffd"
+
+
+def test_busctl_is_no_longer_allowlisted() -> None:
+    assert "busctl" not in check_env.ALLOWED_COMMANDS
+
+
+_NO_MODELS_ENV: dict[tuple[str, ...], Output | None] = {
+    ("systemctl", "show", "ollama", "-p", "Environment", "--value"): Output(
+        0, "HOME=/var/lib/ollama\n"
+    ),
+}
+
+
+def test_models_folder_defaults_to_the_service_users_home() -> None:
+    probe = make_probe(
+        {
+            **_NO_MODELS_ENV,
+            ("systemctl", "show", "ollama", "-p", "User", "--value"): Output(0, "ollama\n"),
+        }
+    )
+    probe = replace(probe, home_of=lambda user: Path(f"/var/lib/{user}"))
+
+    assert check_env._models_folder(probe) == Path("/var/lib/ollama/.ollama/models")
+
+
+def test_unknown_service_user_makes_the_models_folder_unknown() -> None:
+    probe = make_probe(
+        {
+            **_NO_MODELS_ENV,
+            ("systemctl", "show", "ollama", "-p", "User", "--value"): Output(0, "ghost\n"),
+        }
+    )
+    probe = replace(probe, home_of=lambda _user: None)
+
+    check = check_env.check_disk(probe)
+
+    assert check.status is Status.ATTENTION
+    assert "Ollama models: folder unknown" in check.details
+
+
+def test_user_home_lookup() -> None:
+    assert check_env.user_home("root") == Path("/root")
+    assert check_env.user_home("no-such-user-recon-test") is None

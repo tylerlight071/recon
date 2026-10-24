@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- `check_env` no longer reports Ollama as running when `ollama --version` times out or fails, and the GPU check reads only the service's current run (audit F-07). It also reports unreadable `nvidia-smi` output, unrunnable programs and an unknown models folder instead of crashing or guessing (F-16).
 - `recon-launch` installs the voice extra before building the CUDA library path, so the first launch after a plain `uv sync` or a fresh clone finds cuBLAS (audit F-06).
 - The per-package coverage gate prints what it checked, normalises absolute and `./` report paths, and fails on code the report never measured (audit F-05). `scripts/check_env.py` and `scripts/coverage_gates.py` are now measured too (F-08).
 - The network guard for hard rule 1 now also catches stdlib network clients, `asyncio`, `webbrowser`, Qt web modules, Hugging Face downloads, `subprocess` and `QDesktopServices` outside named modules, dynamic imports, and remote URLs or network APIs in QML (audit F-04).

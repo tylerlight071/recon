@@ -12,6 +12,7 @@ Exit code: 0 when everything is OK, 1 when anything needs attention.
 """
 
 import os
+import pwd
 import re
 import shutil
 import subprocess
@@ -36,7 +37,6 @@ MIN_HOME_FREE_GB = 10
 
 ALLOWED_COMMANDS = frozenset(
     {
-        "busctl",
         "flatpak",
         "gdbus",
         "journalctl",
@@ -52,6 +52,8 @@ ALLOWED_COMMANDS = frozenset(
 )
 _SEARCH_PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 _TIMEOUT_S = 15
+_TIMED_OUT = 124
+_NVIDIA_FIELDS = 4
 _GB = 1024**3
 
 
@@ -116,12 +118,15 @@ def run_command(args: Sequence[str]) -> Output | None:
             [program, *rest],
             capture_output=True,
             text=True,
+            errors="replace",
             timeout=_TIMEOUT_S,
             env=env,
             check=False,
         )
     except subprocess.TimeoutExpired:
-        return Output(code=124, stdout="", stderr=f"{name} timed out")
+        return Output(code=_TIMED_OUT, stdout="", stderr=f"{name} timed out")
+    except OSError as exc:
+        return Output(code=126, stdout="", stderr=f"{name} couldn't be run: {exc.strerror}")
     return Output(code=done.returncode, stdout=done.stdout, stderr=done.stderr)
 
 
@@ -141,6 +146,14 @@ def find_program(name: str) -> str | None:
     return shutil.which(name, path=_SEARCH_PATH)
 
 
+def user_home(user: str) -> Path | None:
+    """Home folder of a system user, or None if there's no such user."""
+    try:
+        return Path(pwd.getpwnam(user).pw_dir)
+    except KeyError:
+        return None
+
+
 @dataclass(frozen=True, slots=True)
 class Probe:
     """Everything the checks read from the machine, injectable for tests."""
@@ -151,6 +164,7 @@ class Probe:
     free_bytes: Callable[[Path], int]
     which: Callable[[str], str | None] = field(default=find_program)
     find_files: Callable[[Path, str], list[Path]] = field(default=glob_files)
+    home_of: Callable[[str], Path | None] = field(default=user_home)
 
 
 def parse_version(text: str) -> tuple[int, ...] | None:
@@ -235,6 +249,21 @@ def _service_error(probe: Probe) -> str:
     return errors[-1].strip() if errors else ""
 
 
+def server_answered(version: Output) -> bool:
+    """Whether `ollama --version` got a version from a running server.
+
+    With no server it exits 0 but prints "could not connect" and only the
+    client's version, so the exit code alone isn't enough.
+    """
+    text = version.text
+    return (
+        version.code == 0
+        and "ollama version is" in text
+        and "could not connect" not in text
+        and "client version" not in text
+    )
+
+
 def check_ollama_service(probe: Probe) -> Check:
     """The Ollama server is running, and if not, the last error it logged."""
     name = "Ollama service"
@@ -243,7 +272,14 @@ def check_ollama_service(probe: Probe) -> Check:
     if state == "active":
         return Check(name, Status.OK, "Running (systemd service ollama).")
     version = probe.run(["ollama", "--version"])
-    if version is not None and "could not connect" not in version.text:
+    if version is not None and version.code == _TIMED_OUT:
+        return Check(
+            name,
+            Status.ATTENTION,
+            f"Ollama didn't answer within {_TIMEOUT_S} s (systemd says: {state}).",
+            fix="Check it with: systemctl status ollama",
+        )
+    if version is not None and server_answered(version):
         return Check(name, Status.OK, "A server is answering, though not via the systemd service.")
     error = _service_error(probe)
     return Check(
@@ -258,7 +294,19 @@ def check_ollama_service(probe: Probe) -> Check:
 def check_ollama_gpu(probe: Probe) -> Check:
     """The running server found the GPU (from its start-up log)."""
     name = "Ollama on the GPU"
-    logs = _ok(probe.run(["journalctl", "-u", "ollama", "-b", "--no-pager", "-o", "cat"]))
+    # Only the service's current run counts: an earlier good start mustn't
+    # make a failed one look green.
+    shown = _ok(probe.run(["systemctl", "show", "ollama", "-p", "InvocationID", "--value"]))
+    invocation = shown.stdout.strip() if shown else ""
+    logs = (
+        _ok(
+            probe.run(
+                ["journalctl", f"_SYSTEMD_INVOCATION_ID={invocation}", "--no-pager", "-o", "cat"]
+            )
+        )
+        if invocation
+        else None
+    )
     lines = [
         line for line in (logs.stdout if logs else "").splitlines() if "inference compute" in line
     ]
@@ -266,7 +314,7 @@ def check_ollama_gpu(probe: Probe) -> Check:
         return Check(
             name,
             Status.ATTENTION,
-            "Can't tell yet: Ollama hasn't started successfully since boot.",
+            "Can't tell yet: the Ollama service's current run hasn't reported its GPU.",
             fix="Re-run this check once the Ollama service is running.",
         )
     last = lines[-1]
@@ -303,9 +351,11 @@ def check_nvidia(probe: Probe) -> Check:
     )
     if query is None:
         return Check(name, Status.ATTENTION, "nvidia-smi isn't available or found no GPU.")
-    gpu, driver, compute, memory = (
-        part.strip() for part in query.stdout.splitlines()[0].split(",")
-    )
+    first = query.stdout.splitlines()[0] if query.stdout.strip() else ""
+    fields = [part.strip() for part in first.split(",")]
+    if len(fields) < _NVIDIA_FIELDS:
+        return Check(name, Status.ATTENTION, "Couldn't read nvidia-smi's output.", (first,))
+    gpu, driver, compute, memory = fields[:_NVIDIA_FIELDS]
     banner = probe.run(["nvidia-smi"])
     cuda_match = re.search(r"CUDA (?:UMD )?Version:\s*([\d.]+)", banner.stdout if banner else "")
     cuda = parse_version(cuda_match.group(1)) if cuda_match else None
@@ -468,11 +518,17 @@ def check_obsidian(probe: Probe) -> Check:
 # --------------------------------------------------------------------------
 
 
-def _models_folder(probe: Probe) -> Path:
+def _models_folder(probe: Probe) -> Path | None:
     shown = _ok(probe.run(["systemctl", "show", "ollama", "-p", "Environment", "--value"]))
     matches = re.findall(r"OLLAMA_MODELS=(\S+)", shown.stdout if shown else "")
     # systemd applies Environment= lines in order, so the last one wins.
-    return Path(matches[-1]) if matches else probe.home / ".ollama/models"
+    if matches:
+        return Path(matches[-1])
+    # Otherwise Ollama uses ~/.ollama/models of the user the service runs as.
+    user_out = _ok(probe.run(["systemctl", "show", "ollama", "-p", "User", "--value"]))
+    user = user_out.stdout.strip() if user_out else ""
+    home = probe.home_of(user) if user else probe.home
+    return home / ".ollama/models" if home is not None else None
 
 
 def _existing(path: Path) -> Path:
@@ -484,13 +540,17 @@ def _existing(path: Path) -> Path:
 def check_disk(probe: Probe) -> Check:
     """Free space in home (Whisper, vault, data) and where Ollama keeps models."""
     name = "Free disk space"
-    models = _models_folder(probe)
     home_gb = probe.free_bytes(probe.home) / _GB
-    models_gb = probe.free_bytes(_existing(models)) / _GB
-    details = (f"Home: {home_gb:.0f} GB free", f"Ollama models ({models}): {models_gb:.0f} GB free")
     problems = []
     if home_gb < MIN_HOME_FREE_GB:
         problems.append(f"home has under {MIN_HOME_FREE_GB} GB free")
+    models = _models_folder(probe)
+    if models is None:
+        problems.append("couldn't tell where Ollama keeps its models")
+        details = (f"Home: {home_gb:.0f} GB free", "Ollama models: folder unknown")
+        return Check(name, Status.ATTENTION, _sentence(problems), details)
+    models_gb = probe.free_bytes(_existing(models)) / _GB
+    details = (f"Home: {home_gb:.0f} GB free", f"Ollama models ({models}): {models_gb:.0f} GB free")
     if models_gb < MIN_MODELS_FREE_GB:
         problems.append(f"the models folder has under {MIN_MODELS_FREE_GB} GB free")
     if problems:
