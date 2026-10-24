@@ -1,7 +1,7 @@
-# Install once per clone:  uv run pre-commit install
+# Install once per clone:  scripts/install-hooks   (pre-commit hooks + the main guard)
 # Run everything by hand:  uv run pre-commit run --all-files
 # Never bypass with --no-verify.
-default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_install_hook_types: [pre-commit, commit-msg]
 default_stages: [pre-commit]
 minimum_pre_commit_version: "4.0.0"
 
@@ -59,7 +59,8 @@ repos:
         name: fast tests
         entry: uv run --frozen pytest -q -x -m "not ollama and not gpu and not slow"
         language: system
-        types_or: [python, pyi, toml, json, yaml, markdown]
+        # Every commit: the suite takes ~2 s, and shell or QML changes need it too (audit F-17).
+        always_run: true
         pass_filenames: false
 
       # System package (pacman -S gitleaks); see README.
@@ -67,13 +68,4 @@ repos:
         name: gitleaks (staged changes)
         entry: gitleaks git --pre-commit --redact --staged --verbose
         language: system
-        pass_filenames: false
-
-      # GitHub Free has no rulesets on private repos, so main is protected here.
-      - id: no-push-to-main
-        name: refuse pushes to main
-        entry: scripts/hooks/no-push-to-main
-        language: script
-        stages: [pre-push]
-        always_run: true
         pass_filenames: false

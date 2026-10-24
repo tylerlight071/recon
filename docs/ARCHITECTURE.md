@@ -65,6 +65,6 @@ All deliberate errors derive from `ReconError` (`recon/errors.py`), each with a 
 
 ## Tooling and CI
 
-- Pre-commit: ruff, ruff format, mypy, fast tests, gitleaks, Conventional Commits, and a pre-push hook that blocks pushes to `main` (GitHub Free has no rulesets for private repos).
+- Pre-commit: ruff, ruff format, mypy, fast tests, gitleaks, Conventional Commits, and a git pre-push hook (`scripts/hooks/pre-push`, installed by `scripts/install-hooks`) that reads every ref being pushed and refuses any update or deletion of `main` (GitHub Free has no rulesets for private repos).
 - CI (`.github/workflows/ci.yml`): `uv lock --check`, ruff, mypy, tests with branch coverage, per-package gates (`scripts/coverage_gates.py`), `uv audit`, gitleaks over full history, PR title check.
 - Releases (`release.yml`): a `v*.*.*` tag publishes a GitHub Release from that version's `CHANGELOG.md` section.
