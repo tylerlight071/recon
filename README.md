@@ -41,7 +41,7 @@ Not yet. From Phase 1, `./packaging/recon-launch` starts the app, and an app-men
 uv run python scripts/check_env.py
 ```
 
-Reports, in plain English, whether Ollama (install, version, service, GPU), the NVIDIA driver and CUDA, the Plasma Wayland session and desktop portal, the default microphone and PortAudio, Obsidian, and free disk space are ready for Recon. It only reads; it changes nothing and makes no network calls. Exit code 1 means something needs attention. The latest results for the development machine are in [`docs/environment.md`](docs/environment.md).
+Reports, in plain English, whether Ollama (install, version, service, GPU), the NVIDIA driver and CUDA, the Plasma Wayland session and desktop portal, the default microphone and PortAudio, Obsidian, and free disk space are ready for Recon. It only reads and changes nothing; its only network contact is asking the local Ollama for its version. Exit code 1 means something needs attention. The latest results for the development machine are in [`docs/environment.md`](docs/environment.md).
 
 ## Smoke tests
 
@@ -61,7 +61,7 @@ uv run python -m scripts.smoke.kwin_rule apply                 # then: windows, 
 ## Develop
 
 ```fish
-uv run pytest -m "not ollama"            # fast tests
+uv run pytest -m "not ollama and not gpu"   # fast tests (what CI and the commit hook run)
 uv run pytest --cov --cov-branch         # with coverage
 uv run ruff check . ; uv run ruff format . ; uv run mypy
 uv run pre-commit run --all-files        # everything the commit hook runs
@@ -81,7 +81,7 @@ Recon never contacts tryhackme.com. These are the only places anything is downlo
 | GitHub: `pre-commit/pre-commit-hooks`, `compilerla/conventional-pre-commit` | Commit hook code, pinned by commit | `pre-commit install` |
 | CachyOS/Arch repos | `gitleaks`, `obsidian` | once, by hand |
 | PyPI: `nvidia-cublas-cu12` and other `voice` extra wheels | CUDA libraries for Whisper (~1.5 GB) | `uv sync --extra voice` |
-| Hugging Face (`mobiuslabsgmbh/faster-whisper-large-v3-turbo`) | Whisper model (~1.6 GB) into `~/.cache/huggingface` | first voice use or the Whisper smoke test |
+| Hugging Face (`mobiuslabsgmbh/faster-whisper-large-v3-turbo`) | Whisper model (~1.6 GB) into `~/.cache/huggingface` | the Whisper smoke test today; a pinned setup step in Phase 5 (#30) |
 | GitHub: `SYSTRAN/faster-whisper` test data, pinned commit, SHA-256 checked | Public-domain 11 s speech clip for the Whisper smoke test, cached in `~/.cache/recon/smoke` | Whisper smoke test |
 | GitHub: `rsms/inter` release v4.1 | Inter font (OFL), bundled in `recon/ui/theme/fonts/` | once, committed |
 | Ollama registry (`registry.ollama.ai`) | `qwen3.5:9b`, `gemma4:12b`, `qwen3-embedding:0.6b` | `ollama pull`, once (task 0.6) |

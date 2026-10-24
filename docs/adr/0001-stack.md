@@ -1,6 +1,6 @@
 # ADR 0001: Application stack
 
-- **Status:** Accepted
+- **Status:** Accepted; partly superseded by [ADR 0003](0003-desktop-integration.md) (the shortcut portal uses jeepney, not QtDBus)
 - **Date:** 2026-10-23
 
 ## Context
@@ -18,7 +18,7 @@ Recon is a single-user desktop app on CachyOS (KDE Plasma 6, Wayland) with an RT
 | Embeddings | Ollama `qwen3-embedding:0.6b`, numpy cosine similarity, vectors in SQLite |
 | Speech | faster-whisper `large-v3-turbo` on CUDA, started via `packaging/recon-launch` |
 | Storage | stdlib `sqlite3`, WAL mode, numbered migrations |
-| Desktop integration | XDG GlobalShortcuts portal and freedesktop Notifications over QtDBus |
+| Desktop integration | XDG GlobalShortcuts portal (jeepney since ADR 0003) and freedesktop Notifications over QtDBus |
 | Revision | `fsrs` (py-fsrs) |
 | Quality | ruff, mypy strict, pytest, pytest-cov, hypothesis, mutmut 3.x, pre-commit, gitleaks |
 

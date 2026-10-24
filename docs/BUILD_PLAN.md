@@ -5,7 +5,7 @@ How Recon gets built, in order. Behaviour is defined in `docs/SPEC.md`; engineer
 ## How to use this plan
 
 - Work through phases in order. Within a phase, tasks are in a sensible order but can be reordered if a dependency demands it.
-- At the start of each phase, create one GitHub issue per task (`task` template, labels, the phase's milestone). Each task is done on its own branch and pull request, as set out in CLAUDE.md (Git and GitHub). Tick the task here (`- [x]`) in that same pull request.
+- Create one GitHub issue per task (`task` template, labels, the phase's milestone) before the previous phase's gate handover, so Tyler can look over them at the gate. Phase 0's are created in task 0.1. Each task is done on its own branch and pull request, as set out in CLAUDE.md (Git and GitHub). Tick the task here (`- [x]`) in that same pull request.
 - Each phase ends at a **gate**. Before handing over: run the independent audit described in CLAUDE.md (Audits), fix every Critical, High and Medium finding, and confirm CI is green. Then stop, summarise what was built with the audit result, coverage, mutation score and dependency audit, hand Tyler the phase's manual test script, fix what he finds (each as an issue and PR), and wait for his go-ahead. Once he approves, tag `v0.<phase>.0` on `main` and publish the GitHub Release from `CHANGELOG.md`, then close the milestone.
 - Every task's tests are written alongside the code, in the same pull request. A task isn't ticked until its tests pass and coverage gates hold.
 - Every phase leaves Recon in a usable state. Never leave the app unlaunchable at a gate.
