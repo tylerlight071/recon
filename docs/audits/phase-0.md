@@ -244,9 +244,9 @@ Every finding became a GitHub issue (`audit-finding` label). All Critical, High 
 | F-10 | Low | #28 | Fixed in #52 |
 | F-11 | Low | #29 | Fixed in #52 |
 | F-12 | Low | #30 | **Open, Phase 5:** wording fixed in #52; the pinned, offline Whisper model needs the Phase 5 voice code |
-| F-13 | Low | #31 | Fixed in the hygiene PR: reasons on the `Any`, ignore and noqa comments |
+| F-13 | Low | #31 | Fixed in #59: reasons on the `Any`, ignore and noqa comments |
 | F-14 | Low | #32 | Fixed in #54: re-check after chmod; an existing `app.log` is locked to 0600 |
-| F-15 | Low | #33 | Fixed in the hygiene PR: CI keeps runs on `main`; releases need a tag on `main` with passing CI; literal CHANGELOG matching |
+| F-15 | Low | #33 | Fixed in #59: CI keeps runs on `main`; releases need a tag on `main` with passing CI; literal CHANGELOG matching |
 | F-16 | Low | #34 | Fixed in #58 |
 | F-17 | Low | #35 | Fixed in #53: the fast-test hook runs on every commit |
-| F-18 | Low | #36 | Fixed in the hygiene PR: headless QML tests skip the timing budget; the desktop run keeps it |
+| F-18 | Low | #36 | Fixed in #59: headless QML tests skip the timing budget; the desktop run keeps it |
