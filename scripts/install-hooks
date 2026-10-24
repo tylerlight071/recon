@@ -1,0 +1,13 @@
+#!/bin/sh
+# Install Recon's git hooks in this clone:
+#   pre-commit, commit-msg  -> pre-commit (see .pre-commit-config.yaml)
+#   pre-push                -> scripts/hooks/pre-push (refuses pushes to main)
+# pre-commit's own pre-push stage only sees the first changed ref and skips
+# deletions, so the main guard is a plain git hook instead (audit F-02).
+set -eu
+repo=$(git rev-parse --show-toplevel)
+cd "$repo"
+uv run pre-commit install --hook-type pre-commit --hook-type commit-msg
+hooks=$(git rev-parse --git-path hooks)
+ln -sf "$repo/scripts/hooks/pre-push" "$hooks/pre-push"
+echo "pre-push installed at $hooks/pre-push"

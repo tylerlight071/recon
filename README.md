@@ -26,10 +26,10 @@ git clone https://github.com/tylerlight071/recon.git
 cd recon
 set -x UV_MALWARE_CHECK 1
 uv sync --extra voice        # or plain `uv sync` to skip the ~1.5 GB of CUDA wheels for voice
-uv run pre-commit install
+scripts/install-hooks
 ```
 
-`pre-commit install` sets up three hooks: checks on commit, a Conventional Commits check on the message, and a pre-push hook that refuses pushes to `main`.
+`scripts/install-hooks` sets up three hooks: pre-commit checks on commit, a Conventional Commits check on the message, and a git pre-push hook that refuses any push that would update or delete `main` (including multi-ref pushes, `--all` and deletions).
 
 ## Run
 
