@@ -99,7 +99,12 @@ markers = [
 
 [tool.coverage.run]
 branch = true
-source = ["recon"]
+# Long-lived scripts are measured too (audit F-08); smoke scripts are one-off
+# Phase 0 probes of hardware and the desktop, exercised by hand at the gate.
+source = ["recon", "scripts"]
+omit = ["scripts/smoke/*"]
+# Report keys relative to the repo, so the per-package gates always match.
+relative_files = true
 
 [tool.coverage.report]
 show_missing = true
