@@ -4,7 +4,12 @@ version = "0.0.0"
 description = "Local-first TryHackMe study companion: capture panel, Obsidian vault, flashcards."
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
-dependencies = []
+dependencies = [
+    "numpy>=2.5",
+    "ollama>=0.6.3",
+    "pillow>=13",
+    "pydantic>=2.14",
+]
 
 [dependency-groups]
 dev = [

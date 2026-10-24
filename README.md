@@ -43,6 +43,17 @@ uv run python scripts/check_env.py
 
 Reports, in plain English, whether Ollama (install, version, service, GPU), the NVIDIA driver and CUDA, the Plasma Wayland session and desktop portal, the default microphone and PortAudio, Obsidian, and free disk space are ready for Recon. It only reads; it changes nothing and makes no network calls. Exit code 1 means something needs attention. The latest results for the development machine are in [`docs/environment.md`](docs/environment.md).
 
+## Smoke tests
+
+Phase 0 scripts that prove each risky dependency works on this machine. Each prints PASS or FAIL with a reason.
+
+```fish
+uv run python -m scripts.smoke.structured --model qwen3.5:9b   # add --think to test thinking mode
+uv run python -m scripts.smoke.embeddings
+uv run python -m scripts.smoke.vision --model qwen3.5:9b
+uv run pytest -m ollama                                        # all of them, against the real models
+```
+
 ## Develop
 
 ```fish

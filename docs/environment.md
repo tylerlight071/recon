@@ -25,6 +25,22 @@ The machine Recon is built and tested on, as reported by `scripts/check_env.py`,
 
 Both text models support thinking. The 0.7 smoke test checks how that interacts with structured output.
 
+## Smoke tests
+
+Run them again with `uv run pytest -m ollama`, or one at a time with `uv run python -m scripts.smoke.<name>`.
+
+**0.7a models, 2026-10-24: all pass.** Times include loading the model on the first call.
+
+| Test | `qwen3.5:9b` | `gemma4:12b` |
+| --- | --- | --- |
+| Structured output, thinking off | Pass, 2.1 s | Pass, 7.6 s (incl. load) |
+| Structured output, thinking on | Pass, 9.8 s (about 3.9k chars of thinking) | Pass, 1.8 s (about 1.1k chars) |
+| Vision: 3×3 table from a generated PNG | Pass, all 9 cells | Pass, all 9 cells |
+
+Embeddings (`qwen3-embedding:0.6b`): pass. The related pair scored 0.824 and the unrelated pair 0.253; vectors have 1024 dimensions.
+
+`format=<schema>` is respected with thinking on or off on both models. Whether Recon thinks before answering is left to the Phase 2 bake-off (it costs time, especially on Qwen). `ollama ps` showed every model at 100% GPU.
+
 ## Fixes made in task 0.5
 
 | Problem | Cause | Fix (run by Tyler) |
