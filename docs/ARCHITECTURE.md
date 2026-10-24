@@ -59,6 +59,10 @@ Folders are created `0700` and files `0600` (`recon/paths.py`).
 
 All deliberate errors derive from `ReconError` (`recon/errors.py`), each with a `user_message` in plain, kind copy. `except Exception` appears only at thread and process boundaries, where the error is logged (type only) and turned into that message.
 
+## Launching
+
+`packaging/recon-launch` is the only supported way to start the app (the desktop entry calls it). It puts the venv's `nvidia/*/lib` folders on `LD_LIBRARY_PATH` before Python starts, raises the CUDA JIT cache cap, and runs `uv run --frozen --extra voice python -m recon`. See [ADR 0002](adr/0002-voice-runtime.md).
+
 ## Tooling and CI
 
 - Pre-commit: ruff, ruff format, mypy, fast tests, gitleaks, Conventional Commits, and a pre-push hook that blocks pushes to `main` (GitHub Free has no rulesets for private repos).

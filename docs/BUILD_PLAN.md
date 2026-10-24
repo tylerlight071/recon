@@ -61,7 +61,7 @@ How Recon gets built, in order. Behaviour is defined in `docs/SPEC.md`; engineer
     - Structured output: one call with a pydantic schema; response validates.
     - Embeddings: two related and one unrelated sentence; related pair scores higher.
     - Vision: a generated test PNG containing a small table; the model returns the table's text.
-- [ ] **0.7b Whisper on Blackwell** and `packaging/recon-launch`:
+- [x] **0.7b Whisper on Blackwell** and `packaging/recon-launch` (passed on float16; cuDNN turned out unnecessary; see ADR 0002):
     - **Whisper on Blackwell:** `faster-whisper` `large-v3-turbo` on CUDA (`float16`) transcribes a 5-second test clip. This is the riskiest dependency: needs CTranslate2 ≥ 4.5 built for CUDA 12.8+, plus cuBLAS (CUDA 12) and cuDNN 9 from `nvidia-cublas-cu12` and `nvidia-cudnn-cu12==9.*`, with their folders on `LD_LIBRARY_PATH` before Python starts. Write `packaging/recon-launch` here and run the smoke test through it. If it fails, try `int8_float16`, then document the fallback options (whisper.cpp with CUDA, or openai-whisper on PyTorch cu128) and ask Tyler which to take. Don't block Phases 1–4 on this.
 - [ ] **0.7c Qt and desktop smoke tests** (PySide6 6.11, portal, KWin; needs Tyler at the keyboard):
     - QML window: a PySide6 6.11 Qt Quick window opens on Wayland with Inter rendering and a 200 ms animation.

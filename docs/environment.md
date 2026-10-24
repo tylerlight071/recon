@@ -41,6 +41,16 @@ Embeddings (`qwen3-embedding:0.6b`): pass. The related pair scored 0.824 and the
 
 `format=<schema>` is respected with thinking on or off on both models. Whether Recon thinks before answering is left to the Phase 2 bake-off (it costs time, especially on Qwen). `ollama ps` showed every model at 100% GPU.
 
+**0.7b Whisper, 2026-10-24: pass.** `large-v3-turbo` on CUDA through `packaging/recon-launch`, first 5 s of the JFK clip, heard "And so, my fellow Americans, ask not."
+
+| Compute type | Model load | Transcription (5 s clip) |
+| --- | --- | --- |
+| float16, first run | 1.1 s | 12.9 s (one-time kernel JIT for sm_120) |
+| float16, warm | 0.9 s | 0.25 s |
+| int8_float16, warm | 1.4 s | 0.63 s |
+
+Without the launcher it fails with "libcublas.so.12 is not found", as expected. cuDNN isn't needed. Details and decisions: [ADR 0002](adr/0002-voice-runtime.md).
+
 ## Fixes made in task 0.5
 
 | Problem | Cause | Fix (run by Tyler) |
