@@ -11,6 +11,7 @@ dependencies = [
     "pillow>=13",
     "pydantic>=2.14",
     "pyside6>=6.11.2,<6.12",
+    "tomli-w>=1.2",
 ]
 
 [project.optional-dependencies]

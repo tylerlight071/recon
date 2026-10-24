@@ -47,7 +47,14 @@ Every interactive component sets `Accessible.role` and `Accessible.name`, works 
 
 ## Two windows
 
-One `QQmlApplicationEngine` loads `PanelWindow.qml` (title "Recon Panel": room session and Finish, pinned to the right edge by an opt-in KWin rule) and `MainWindow.qml` (Home, Review, Cards, Revise, Ask, Library, Settings). Both bind to the same bridge objects. Wayland windows can't position themselves, and a pinned window can't resize freely, hence two windows.
+One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `PanelWindow.qml`, and both bind to the same bridge objects, which are attached as context properties per engine so tests stay independent. Wayland windows can't position themselves, and a pinned window can't resize freely, hence two windows.
+
+- **Main window** (title "Recon"; Home, Review, Cards, Revise, Ask, Library, Settings): shown at start at 960×640, which fits the 1280×720 logical desktop. Its position is left to KWin. A sidebar switches screens through `Navigation`.
+- **Panel** (title "Recon Panel", which the KWin rule matches; room session and Finish): hidden until a room opens (`Navigation.showPanel()`). Its width comes from `AppSettings.panelWidth`, limited to 360–520. Resizing it updates the setting, which `SettingsBridge` saves 500 ms after the last change and again at quit.
+- **Opening a full-view screen from the panel** (`Navigation.open(screen)`) shows or raises the main window, with a quick fade of its content (Wayland ignores window opacity). Closing the main window hides it and never closes the panel.
+- **Network:** the engine's network access manager (`services/qml_network.py`) refuses every URL scheme except `file:`, `qrc:` and `data:`.
+
+Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with `tomllib`, written with `tomli-w`). An unreadable file falls back to the defaults rather than stopping start-up. Every write goes through `recon/fs.py` (temp file, fsync, replace, fsync the folder).
 
 ## Data flow for a room
 
