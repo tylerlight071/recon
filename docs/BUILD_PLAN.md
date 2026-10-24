@@ -67,7 +67,7 @@ How Recon gets built, in order. Behaviour is defined in `docs/SPEC.md`; engineer
     - QML window: a PySide6 6.11 Qt Quick window opens on Wayland with Inter rendering and a 200 ms animation.
     - Global shortcut: call the host `Registry.Register` with the app ID as the first portal call, register F9, and print press and release events. Run it once from a terminal and once from a test `.desktop` entry. Tyler confirms KDE's permission dialog appears.
     - KWin rule: open two test windows with the same app ID and different titles ("Recon Panel test", "Recon test"); write a rule to `kwinrulesrc` matching the app ID **and** the panel title; reload KWin; confirm only the panel pins to the right edge and the other window moves and resizes freely. **Ask before writing to Tyler's KDE config.** Remove the test rule afterwards.
-- [ ] **0.8 Fixture rooms.** Write three original sample rooms in `tests/fixtures/rooms/` as JSON (the same shape the app will store): *Number Systems* (binary, hex, conversions, with two deliberate conversion mistakes), *Intro to Networking* (ports, TCP/UDP, OSI, with one wrong port), *Linux Basics* (commands with `#` descriptions, one wrong flag). Include a fake flag (`THM{this_is_a_test}`) in one to test stripping. **No TryHackMe text.**
+- [x] **0.8 Fixture rooms.** Write three original sample rooms in `tests/fixtures/rooms/` as JSON (the same shape the app will store): *Number Systems* (binary, hex, conversions, with two deliberate conversion mistakes), *Intro to Networking* (ports, TCP/UDP, OSI, with one wrong port), *Linux Basics* (commands with `#` descriptions, one wrong flag). Include a fake flag (`THM{this_is_a_test}`) in one to test stripping. **No TryHackMe text.**
 
 ### Gate 0 — manual test for Tyler
 
