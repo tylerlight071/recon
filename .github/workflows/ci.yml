@@ -15,9 +15,9 @@ concurrency:
 env:
   UV_MALWARE_CHECK: "1"
   UV_LOCKED: "1"
-  # Qt tests run headless; the system libraries PySide6 needs are added with
-  # the first Qt dependency (task 0.7).
+  # Qt tests run headless with the software scene graph.
   QT_QPA_PLATFORM: offscreen
+  QT_QUICK_BACKEND: software
   UV_VERSION: "0.13.5"
   GITLEAKS_VERSION: "8.30.1"
   GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
@@ -58,6 +58,11 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+      - name: Qt system libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64
       - name: Install
         run: uv sync
       - name: Tests (no Ollama, no GPU) with branch coverage

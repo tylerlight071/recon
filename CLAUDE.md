@@ -56,7 +56,7 @@ If this file, the build plan and the spec disagree, the spec wins on behaviour, 
 | Speech | `faster-whisper`, model `large-v3-turbo` | Lazy-loaded; unloaded after 60 s idle |
 | Audio capture | `sounddevice` | 16 kHz mono |
 | Spaced repetition | `fsrs` (py-fsrs) | |
-| Global hotkey | XDG GlobalShortcuts portal via **QtDBus** (part of PySide6) | Hold-to-talk via the `Activated`/`Deactivated` signals. Call the portal directly rather than adding the small `global-shortcut-portal` package (a one-person project built on asyncio, which fights Qt's event loop); use it only as a reference |
+| Global hotkey | XDG GlobalShortcuts portal via **jeepney** (blocking, on a worker thread) | Hold-to-talk via the `Activated`/`Deactivated` signals. QtDBus can't marshal `BindShortcuts`' `a(sa{sv})` from Python (ADR 0003). Call the portal directly rather than adding `global-shortcut-portal` (asyncio, which fights Qt's event loop) |
 | Notifications | freedesktop Notifications via **QtDBus** | Actions open the right screen; no extra dependency |
 | Storage | SQLite (stdlib `sqlite3`), WAL mode | Migrations in `recon/db/migrations/` |
 | Images | `Pillow` | |

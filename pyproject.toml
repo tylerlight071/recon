@@ -5,10 +5,12 @@ description = "Local-first TryHackMe study companion: capture panel, Obsidian va
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "jeepney>=0.9",
     "numpy>=2.5",
     "ollama>=0.6.3",
     "pillow>=13",
     "pydantic>=2.14",
+    "pyside6>=6.11.2,<6.12",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +32,7 @@ dev = [
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "pytest-qt>=4.5",
     "ruff>=0.17.2",
 ]
 
@@ -58,6 +61,8 @@ convention = "google"
 # PLR2004: literal expected values are the point of a test.
 # D1: test functions are named for what they check; docstrings would repeat the name.
 "tests/**" = ["S101", "PLR2004", "D1"]
+# T201: scripts/ are command-line tools; printing is their output.
+"scripts/**" = ["T201"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -73,9 +78,9 @@ files = ["recon", "scripts"]
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 
-# faster-whisper ships no type hints, and CI doesn't install the `voice` extra.
+# faster-whisper and jeepney ship no type hints; CI also skips the `voice` extra.
 [[tool.mypy.overrides]]
-module = ["faster_whisper", "faster_whisper.*"]
+module = ["faster_whisper", "faster_whisper.*", "jeepney", "jeepney.*"]
 ignore_missing_imports = true
 
 # --------------------------------------------------------------------------

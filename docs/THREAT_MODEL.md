@@ -24,7 +24,7 @@ Recon is a single-user desktop app on Tyler's own machine. This model lists what
 | E4 Every Ollama response (extraction, fact-check, quiz, answers, vision) | Untrusted; may be wrong or shaped by prompt injection in E1/E2 |
 | E5 Vault files Tyler edits in Obsidian | Trusted author, but may change between staging and Apply |
 | E6 Settings file and settings UI (vault path, backup folder) | Trusted user, unvalidated input |
-| E7 D-Bus (portal, notifications), KWin config | Local session services |
+| E7 D-Bus (portal via jeepney, notifications via QtDBus), KWin config | Local session services; portal replies are validated like any other input |
 | E8 Dependencies, CI actions, hook repos | Third-party code |
 | E9 Network | Only Ollama on loopback at runtime |
 
