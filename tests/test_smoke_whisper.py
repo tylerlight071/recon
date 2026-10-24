@@ -109,6 +109,12 @@ def fake_repo(tmp_path: Path) -> Path:
     fake_uv = bin_dir / "uv"
     fake_uv.write_text(
         "#!/bin/sh\n"
+        # `uv sync` installs the voice wheels: create their lib folders, as uv would.
+        'if [ "$1" = sync ]; then\n'
+        '  echo "sync=$*"\n'
+        '  mkdir -p "$PWD/.venv/lib/python3.13/site-packages/nvidia/cublas/lib"\n'
+        "  exit 0\n"
+        "fi\n"
         'echo "cwd=$(pwd)"\n'
         'echo "args=$*"\n'
         'echo "ld=$LD_LIBRARY_PATH"\n'
@@ -141,7 +147,8 @@ def test_launcher_sets_cuda_paths_and_runs_recon(fake_repo: Path) -> None:
 
     site = fake_repo / ".venv/lib/python3.13/site-packages/nvidia"
     assert out["ld"].split(":") == [str(site / "cublas/lib"), str(site / "cuda_nvrtc/lib")]
-    assert out["args"] == "run --frozen --extra voice python -m recon --screen revise"
+    assert out["args"] == "run --frozen --extra voice --no-sync python -m recon --screen revise"
+    assert out["sync"] == "sync --frozen --extra voice --inexact --quiet"
     assert out["cwd"] == str(fake_repo)
     assert out["cache"] == "4294967296"
     assert out["malware"] == "1"
@@ -151,7 +158,18 @@ def test_launcher_keeps_existing_library_path_and_runs_another_module(fake_repo:
     out = _launch(fake_repo, LD_LIBRARY_PATH="/opt/lib", RECON_MODULE="scripts.smoke.whisper")
 
     assert out["ld"].endswith(":/opt/lib")
-    assert out["args"] == "run --frozen --extra voice python -m scripts.smoke.whisper"
+    assert out["args"] == "run --frozen --extra voice --no-sync python -m scripts.smoke.whisper"
+
+
+def test_first_launch_after_plain_sync_still_finds_cuda(fake_repo: Path) -> None:
+    # A plain `uv sync` removed the voice wheels; the launcher must install them
+    # before it builds LD_LIBRARY_PATH (audit F-06).
+    shutil.rmtree(fake_repo / ".venv")
+
+    out = _launch(fake_repo)
+
+    cublas = fake_repo / ".venv/lib/python3.13/site-packages/nvidia/cublas/lib"
+    assert out["ld"].split(":") == [str(cublas)]
 
 
 def test_launcher_works_through_a_symlink(fake_repo: Path, tmp_path: Path) -> None:

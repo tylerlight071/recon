@@ -61,7 +61,7 @@ All deliberate errors derive from `ReconError` (`recon/errors.py`), each with a 
 
 ## Launching
 
-`packaging/recon-launch` is the only supported way to start the app (the desktop entry calls it). It puts the venv's `nvidia/*/lib` folders on `LD_LIBRARY_PATH` before Python starts, raises the CUDA JIT cache cap, and runs `uv run --frozen --extra voice python -m recon`. See [ADR 0002](adr/0002-voice-runtime.md).
+`packaging/recon-launch` is the only supported way to start the app (the desktop entry calls it). It syncs the `voice` extra (a quick no-op when up to date), then puts the venv's `nvidia/*/lib` folders on `LD_LIBRARY_PATH` before Python starts, raises the CUDA JIT cache cap, and runs `uv run --frozen --extra voice --no-sync python -m recon`. See [ADR 0002](adr/0002-voice-runtime.md).
 
 ## Tooling and CI
 

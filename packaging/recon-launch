@@ -23,6 +23,15 @@ if [ -z "$uv_bin" ]; then
     exit 127
 fi
 
+export UV_MALWARE_CHECK=1
+export UV_PREVIEW_FEATURES="${UV_PREVIEW_FEATURES:-malware-check}"
+cd "$repo"
+
+# Install the voice extra *before* looking for its CUDA libraries: a plain
+# `uv sync` or a fresh clone has no nvidia-* wheels yet, and the loader path
+# must be complete before Python starts (audit F-06). Quick when up to date.
+"$uv_bin" sync --frozen --extra voice --inexact --quiet
+
 # Every lib folder shipped by the nvidia-* wheels in the project's venv.
 cuda_libs=""
 for dir in "$repo"/.venv/lib/python3*/site-packages/nvidia/*/lib; do
@@ -38,7 +47,4 @@ fi
 # it to the 4 GB maximum to stop evictions bringing the slow first run back.
 export CUDA_CACHE_MAXSIZE="${CUDA_CACHE_MAXSIZE:-4294967296}"
 
-export UV_MALWARE_CHECK=1
-export UV_PREVIEW_FEATURES="${UV_PREVIEW_FEATURES:-malware-check}"
-cd "$repo"
-exec "$uv_bin" run --frozen --extra voice python -m "${RECON_MODULE:-recon}" "$@"
+exec "$uv_bin" run --frozen --extra voice --no-sync python -m "${RECON_MODULE:-recon}" "$@"

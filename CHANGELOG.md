@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- `recon-launch` installs the voice extra before building the CUDA library path, so the first launch after a plain `uv sync` or a fresh clone finds cuBLAS (audit F-06).
 - The per-package coverage gate prints what it checked, normalises absolute and `./` report paths, and fails on code the report never measured (audit F-05). `scripts/check_env.py` and `scripts/coverage_gates.py` are now measured too (F-08).
 - The network guard for hard rule 1 now also catches stdlib network clients, `asyncio`, `webbrowser`, Qt web modules, Hugging Face downloads, `subprocess` and `QDesktopServices` outside named modules, dynamic imports, and remote URLs or network APIs in QML (audit F-04).
 - Log redaction holes from the Phase 0 audit (F-03): content as the message under any logger name, exception text cached by another handler, and logger names. Permissions are re-checked after chmod, and an existing too-open `app.log` is locked to 0600 (F-14).
