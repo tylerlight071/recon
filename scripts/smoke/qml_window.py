@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PySide6.QtCore import SIGNAL, QMetaObject, QObject, QTimer, QUrl
+from PySide6.QtCore import SIGNAL, QEventLoop, QMetaObject, QObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QFontInfo, QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem, QQuickWindow
@@ -122,13 +122,18 @@ def _label_family(window: QQuickWindow) -> str:
     return QFontInfo(font).family() if isinstance(font, QFont) else ""
 
 
+_APPS: list[QGuiApplication] = []
+"""Keeps the app alive: Qt can't safely have it destroyed and recreated in one process."""
+
+
 def _app() -> QGuiApplication:
     existing = QGuiApplication.instance()
     if isinstance(existing, QGuiApplication):
         return existing
     QGuiApplication.setDesktopFileName(APP_ID)
     QGuiApplication.setApplicationName(APP_NAME)
-    return QGuiApplication(sys.argv[:1])
+    _APPS.append(QGuiApplication(sys.argv[:1]))
+    return _APPS[-1]
 
 
 def measure(screenshot: Path | None = None, hold_s: float = 0.0) -> Measurements:
@@ -141,7 +146,7 @@ def measure(screenshot: Path | None = None, hold_s: float = 0.0) -> Measurements
     Returns:
         The measurements.
     """
-    app = _app()
+    _app()
     m = Measurements(platform=QGuiApplication.platformName(), families=load_fonts())
     engine = QQmlApplicationEngine()
     engine.load(QUrl.fromLocalFile(str(QML)))
@@ -161,20 +166,27 @@ def measure(screenshot: Path | None = None, hold_s: float = 0.0) -> Measurements
         m.finished = time.monotonic()
         QTimer.singleShot(_SETTLE_MS + int(hold_s * 1000), done)
 
+    # A local loop that only this function quits: app.quit() would end every
+    # later event loop in the process too (and once broke the UI tests).
+    loop = QEventLoop()
+    give_up_timer = QTimer(singleShot=True, interval=_TIMEOUT_MS + int(hold_s * 1000))
+
     def done() -> None:
+        give_up_timer.stop()
         if screenshot is not None:
             screenshot.parent.mkdir(parents=True, exist_ok=True)
             window.grabWindow().save(str(screenshot))
-        app.quit()
+        loop.quit()
 
     def give_up() -> None:
         m.timed_out = m.finished == 0.0
-        app.quit()
+        loop.quit()
 
     QObject.connect(window, SIGNAL("animationFinished()"), finished)
+    give_up_timer.timeout.connect(give_up)
+    give_up_timer.start()
     QTimer.singleShot(_START_DELAY_MS, start)
-    QTimer.singleShot(_TIMEOUT_MS + int(hold_s * 1000), give_up)
-    app.exec()
+    loop.exec()
     window.close()
     return m
 

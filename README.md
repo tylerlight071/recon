@@ -33,7 +33,13 @@ scripts/install-hooks
 
 ## Run
 
-Not yet. From Phase 1, `./packaging/recon-launch` starts the app, and an app-menu entry is installed by `scripts/install_desktop.py`.
+The windows arrive in task 1.3. For now there's the developer component gallery:
+
+```fish
+uv run python -m recon --gallery
+```
+
+Once the app exists, `./packaging/recon-launch` starts it, and `scripts/install_desktop.py` installs an app-menu entry.
 
 ## Check your machine
 
