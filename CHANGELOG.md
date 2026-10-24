@@ -6,16 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-### Fixed
+## [0.0.0] - 2026-10-24
 
-- CI never cancels runs on `main`, and releases need a tag on `main` whose CI passed; the CHANGELOG section is matched literally (audit F-15). The headless QML test no longer depends on wall-clock timing (F-18). Reasons added to the remaining `Any` and ignore comments (F-13).
-- `check_env` no longer reports Ollama as running when `ollama --version` times out or fails, and the GPU check reads only the service's current run (audit F-07). It also reports unreadable `nvidia-smi` output, unrunnable programs and an unknown models folder instead of crashing or guessing (F-16).
-- `recon-launch` installs the voice extra before building the CUDA library path, so the first launch after a plain `uv sync` or a fresh clone finds cuBLAS (audit F-06).
-- The per-package coverage gate prints what it checked, normalises absolute and `./` report paths, and fails on code the report never measured (audit F-05). `scripts/check_env.py` and `scripts/coverage_gates.py` are now measured too (F-08).
-- The network guard for hard rule 1 now also catches stdlib network clients, `asyncio`, `webbrowser`, Qt web modules, Hugging Face downloads, `subprocess` and `QDesktopServices` outside named modules, dynamic imports, and remote URLs or network APIs in QML (audit F-04).
-- Log redaction holes from the Phase 0 audit (F-03): content as the message under any logger name, exception text cached by another handler, and logger names. Permissions are re-checked after chmod, and an existing too-open `app.log` is locked to 0600 (F-14).
-- `main` can no longer be changed by a multi-ref push, `--all` or a delete: the pre-push guard is now a git hook that reads every ref (audit F-02). Install with `scripts/install-hooks`. The fast-test commit hook now runs on every commit (F-17).
-- Docs from the Phase 0 audit: when task issues are created, the fast-test command, the audit template's areas, ADR 0001's portal note, and README's network wording.
+Phase 0, foundations: repository, tooling, environment checks and smoke tests proving the stack runs on Tyler's machine. No app to run yet.
 
 ### Added
 
@@ -34,3 +27,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Three original fixture rooms (`tests/fixtures/rooms/`) in the Phase 1 table shape, with deliberate conversion, port and command-flag mistakes, a fake flag and a flag-shaped example hash; a validating loader and tests proving each trap is really wrong.
 - Phase 0 independent audit (`docs/audits/phase-0.md`): 18 findings, each tracked as an issue. Phase 1 task issues created.
 - `scripts/check_env.py`: read-only environment check for Ollama, GPU, desktop portal, audio, Obsidian and disk space.
+
+### Fixed
+
+- CI never cancels runs on `main`, and releases need a tag on `main` whose CI passed; the CHANGELOG section is matched literally (audit F-15). The headless QML test no longer depends on wall-clock timing (F-18). Reasons added to the remaining `Any` and ignore comments (F-13).
+- `check_env` no longer reports Ollama as running when `ollama --version` times out or fails, and the GPU check reads only the service's current run (audit F-07). It also reports unreadable `nvidia-smi` output, unrunnable programs and an unknown models folder instead of crashing or guessing (F-16).
+- `recon-launch` installs the voice extra before building the CUDA library path, so the first launch after a plain `uv sync` or a fresh clone finds cuBLAS (audit F-06).
+- The per-package coverage gate prints what it checked, normalises absolute and `./` report paths, and fails on code the report never measured (audit F-05). `scripts/check_env.py` and `scripts/coverage_gates.py` are now measured too (F-08).
+- The network guard for hard rule 1 now also catches stdlib network clients, `asyncio`, `webbrowser`, Qt web modules, Hugging Face downloads, `subprocess` and `QDesktopServices` outside named modules, dynamic imports, and remote URLs or network APIs in QML (audit F-04).
+- Log redaction holes from the Phase 0 audit (F-03): content as the message under any logger name, exception text cached by another handler, and logger names. Permissions are re-checked after chmod, and an existing too-open `app.log` is locked to 0600 (F-14).
+- `main` can no longer be changed by a multi-ref push, `--all` or a delete: the pre-push guard is now a git hook that reads every ref (audit F-02). Install with `scripts/install-hooks`. The fast-test commit hook now runs on every commit (F-17).
+- Docs from the Phase 0 audit: when task issues are created, the fast-test command, the audit template's areas, ADR 0001's portal note, and README's network wording.
+
+[Unreleased]: https://github.com/tylerlight071/recon/compare/v0.0.0...HEAD
+[0.0.0]: https://github.com/tylerlight071/recon/releases/tag/v0.0.0
