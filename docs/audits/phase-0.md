@@ -228,25 +228,25 @@ No hard rule is broken by the code as it stands: there's no app code yet that to
 
 ## Follow-up
 
-Every finding is a GitHub issue (`audit-finding` label, Phase 0 milestone). The fixing pull requests are linked from each issue.
+Every finding became a GitHub issue (`audit-finding` label). All Critical, High and Medium findings are fixed; ten of the eleven Lows are fixed, and one is left open with a reason.
 
-| Finding | Issue | Severity |
-| --- | --- | --- |
-| F-01 | #19 | High |
-| F-02 | #20 | Medium |
-| F-03 | #21 | Medium |
-| F-04 | #22 | Medium |
-| F-05 | #23 | Medium |
-| F-06 | #24 | Medium |
-| F-07 | #25 | Medium |
-| F-08 | #26 | Low |
-| F-09 | #27 | Low |
-| F-10 | #28 | Low |
-| F-11 | #29 | Low |
-| F-12 | #30 | Low (wording fixed now; the pinned Whisper download moves to Phase 5) |
-| F-13 | #31 | Low |
-| F-14 | #32 | Low |
-| F-15 | #33 | Low |
-| F-16 | #34 | Low |
-| F-17 | #35 | Low |
-| F-18 | #36 | Low |
+| Finding | Severity | Issue | Resolution |
+| --- | --- | --- | --- |
+| F-01 | High | #19 | Fixed in #52: Phase 1 issues created (#37–#51); the plan says when task issues are made |
+| F-02 | Medium | #20 | Fixed in #53: a git pre-push hook reads every ref (multi-ref, `--all`, delete); tested against a real bare remote |
+| F-03 | Medium | #21 | Fixed in #54: static checks for any logger receiver, logger names and `LoggerAdapter`, with self-tests; the formatter never reuses cached exception text |
+| F-04 | Medium | #22 | Fixed in #55: wider banned list, dynamic imports, restricted names and a QML scan, each with self-tests. The QML network access manager factory is noted on task 1.3 (#39) |
+| F-05 | Medium | #23 | Fixed in #56: the gate reports per package, normalises paths and fails on unmeasured code |
+| F-06 | Medium | #24 | Fixed in #57: the launcher syncs the voice extra before building `LD_LIBRARY_PATH`; verified after a plain `uv sync` |
+| F-07 | Medium | #25 | Fixed in #58: the service is OK only when a server answers; the GPU check reads the current invocation only |
+| F-08 | Low | #26 | Fixed in #56: `scripts/` is measured (smoke probes excepted, with the reason given) |
+| F-09 | Low | #27 | Fixed in #52 |
+| F-10 | Low | #28 | Fixed in #52 |
+| F-11 | Low | #29 | Fixed in #52 |
+| F-12 | Low | #30 | **Open, Phase 5:** wording fixed in #52; the pinned, offline Whisper model needs the Phase 5 voice code |
+| F-13 | Low | #31 | Fixed in the hygiene PR: reasons on the `Any`, ignore and noqa comments |
+| F-14 | Low | #32 | Fixed in #54: re-check after chmod; an existing `app.log` is locked to 0600 |
+| F-15 | Low | #33 | Fixed in the hygiene PR: CI keeps runs on `main`; releases need a tag on `main` with passing CI; literal CHANGELOG matching |
+| F-16 | Low | #34 | Fixed in #58 |
+| F-17 | Low | #35 | Fixed in #53: the fast-test hook runs on every commit |
+| F-18 | Low | #36 | Fixed in the hygiene PR: headless QML tests skip the timing budget; the desktop run keeps it |

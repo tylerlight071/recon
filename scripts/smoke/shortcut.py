@@ -151,7 +151,7 @@ class PortalSession:
         self,
         method: str,
         signature: str,
-        args: tuple[Any, ...],
+        args: tuple[Any, ...],  # D-Bus body values; their types depend on `signature`
         timeout: float,
         extra_options: dict[str, Variant] | None = None,
     ) -> dict[str, Variant]:

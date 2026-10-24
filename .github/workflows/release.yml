@@ -18,17 +18,35 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      - name: Tag is on main and CI passed there
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Release tags must point at a commit on main"
+            exit 1
+          fi
+          conclusion=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" \
+            --event push --json conclusion --jq '.[0].conclusion')
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI on main for $GITHUB_SHA is '${conclusion:-missing}', not success"
+            exit 1
+          fi
       - name: Extract this version's notes
         env:
           TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
+          # index() compares literally, so the version's dots aren't regex wildcards.
           awk -v v="$version" '
-            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            index($0, "## [" v "]") == 1 { found = 1; next }
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"

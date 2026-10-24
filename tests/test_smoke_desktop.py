@@ -93,16 +93,16 @@ class _FakeConnection:
         self.responses = responses
         self.sent: list[object] = []
 
-    def send_and_get_reply(self, message: object, timeout: float) -> _Message:  # noqa: ARG002
+    def send_and_get_reply(self, message: object, timeout: float) -> _Message:  # noqa: ARG002 - matches jeepney's signature
         self.sent.append(message)
         if self.replies:
             return self.replies.pop(0)
         return _Message(())
 
-    def filter(self, _rule: object, bufsize: int = 1) -> AbstractContextManager[list[object]]:  # noqa: ARG002
+    def filter(self, _rule: object, bufsize: int = 1) -> AbstractContextManager[list[object]]:  # noqa: ARG002 - matches jeepney's signature
         return nullcontext([])
 
-    def recv_until_filtered(self, _queue: object, timeout: float) -> _Message:  # noqa: ARG002
+    def recv_until_filtered(self, _queue: object, timeout: float) -> _Message:  # noqa: ARG002 - matches jeepney's signature
         if not self.responses:
             raise TimeoutError
         return self.responses.pop(0)
@@ -110,14 +110,14 @@ class _FakeConnection:
 
 def test_register_error_is_reported() -> None:
     error = _Message(("App info not found",), shortcut.MessageType.error)
-    session = PortalSession(_FakeConnection([error], []), [])  # type: ignore[arg-type]
+    session = PortalSession(_FakeConnection([error], []), [])  # type: ignore[arg-type]  # duck-typed fake of DBusConnection
 
     with pytest.raises(PortalError, match=r"Registry\.Register refused"):
         session.register()
 
 
 def test_cancelled_request_is_reported() -> None:
-    session = PortalSession(_FakeConnection([], [_Message((1, {}))]), [])  # type: ignore[arg-type]
+    session = PortalSession(_FakeConnection([], [_Message((1, {}))]), [])  # type: ignore[arg-type]  # duck-typed fake of DBusConnection
 
     with pytest.raises(PortalError, match="CreateSession was cancelled"):
         session.create_session()
@@ -125,7 +125,7 @@ def test_cancelled_request_is_reported() -> None:
 
 def test_bind_reports_an_empty_trigger(capsys: pytest.CaptureFixture[str]) -> None:
     bound = ("a(sa{sv})", [("voice", {"trigger_description": ("s", "")})])
-    session = PortalSession(_FakeConnection([], [_Message((0, {"shortcuts": bound}))]), [])  # type: ignore[arg-type]
+    session = PortalSession(_FakeConnection([], [_Message((0, {"shortcuts": bound}))]), [])  # type: ignore[arg-type]  # duck-typed fake of DBusConnection
 
     assert session.bind() == ""
     assert "assigned no key" in capsys.readouterr().out
@@ -143,7 +143,7 @@ def test_full_sequence_with_presses() -> None:
         _Message((session_handle, "voice", 3, {}), member="Deactivated"),
     ]
     log: list[str] = []
-    session = PortalSession(_FakeConnection([], responses), log)  # type: ignore[arg-type]
+    session = PortalSession(_FakeConnection([], responses), log)  # type: ignore[arg-type]  # duck-typed fake of DBusConnection
     events = Events()
 
     session.register()
