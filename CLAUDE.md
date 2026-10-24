@@ -194,11 +194,11 @@ Define these in `ui/theme/Theme.qml` as a singleton. Components read tokens only
 | `textPrimary` | `#ececef` |
 | `textSecondary` | `#9a9ba3` |
 | `textTertiary` | `#84868f` (hints and quiet labels; ≥ 4.6:1 on every surface — don't go darker) |
-| `accent` (default: muted violet) | `#7c74d9`; hover `#8d86e3`; alternatives in Settings: cyan `#4fb3c9`, green `#5fb47a` |
-| `onAccent` | `#0b0c0e` — text on accent-filled buttons. White on these accents fails contrast (3.9:1 on violet, 2.4:1 on cyan); near-black passes on all three (≥ 5:1) |
+| `accent` (default: muted violet) | `#7c74d9`; hover `#8d86e3`; alternatives in Settings: cyan `#4fb3c9` (hover `#66bdd0`), green `#5fb47a` (hover `#74be8b`); the cyan and green hovers are a 13% white mix, like violet's |
+| `onAccent` (QML: `textOnAccent`, since QML reads `on…` names as signal handlers) | `#0b0c0e` — text on accent-filled buttons. White on these accents fails contrast (3.9:1 on violet, 2.4:1 on cyan); near-black passes on all three (≥ 5:1) |
 | `success` | `#5fb47a` |
 | `warning` (flags) | `#d9a441` |
-| Block edges | Key idea = accent, Command = `#4fb3c9`, Table = `#8a8fa3`, Screenshot = `#b37fd1`, Question = `#d9a441`, Confused by = `#d98a5f`, Room question = `#5fb47a`, Voice = `#7c9fd9` (all at reduced opacity) |
+| Block edges | Key idea = accent, Command = `#4fb3c9`, Table = `#8a8fa3`, Screenshot = `#b37fd1`, Question = `#d9a441`, Confused by = `#d98a5f`, Room question = `#5fb47a`, Voice = `#7c9fd9` (all at 70% opacity, `blockEdgeOpacity`) |
 | Font UI | Inter, 13 / 14 / 15 px, weights 400 / 500 / 600 |
 | Font mono | JetBrains Mono 13 px (commands, code) |
 | Spacing | 4 px grid: 4, 8, 12, 16, 20, 24, 32, 48 |

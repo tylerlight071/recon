@@ -15,9 +15,12 @@ repos:
       - id: check-toml
       - id: check-yaml
       - id: end-of-file-fixer
+        exclude: ^recon/ui/theme/fonts/  # upstream licence texts stay verbatim
       - id: trailing-whitespace
+        exclude: ^recon/ui/theme/fonts/  # upstream licence texts stay verbatim
         args: [--markdown-linebreak-ext=md]
       - id: mixed-line-ending
+        exclude: ^recon/ui/theme/fonts/  # upstream licence texts stay verbatim
         args: [--fix=lf]
 
   - repo: https://github.com/compilerla/conventional-pre-commit
