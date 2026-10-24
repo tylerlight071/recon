@@ -53,6 +53,9 @@ uv run python -m scripts.smoke.embeddings
 uv run python -m scripts.smoke.vision --model qwen3.5:9b
 uv run pytest -m ollama                                        # all of them, against the real models
 RECON_MODULE=scripts.smoke.whisper packaging/recon-launch      # Whisper on the GPU (add --compute-type int8_float16)
+uv run python -m scripts.smoke.qml_window --screenshot tests/screenshots/smoke-qml.png
+RECON_MODULE=scripts.smoke.shortcut packaging/recon-launch     # F9 via the portal; needs the app's .desktop file installed
+uv run python -m scripts.smoke.kwin_rule apply                 # then: windows, geometry, remove (writes ~/.config/kwinrulesrc)
 ```
 
 ## Develop
@@ -80,9 +83,10 @@ Recon never contacts tryhackme.com. These are the only places anything is downlo
 | PyPI: `nvidia-cublas-cu12` and other `voice` extra wheels | CUDA libraries for Whisper (~1.5 GB) | `uv sync --extra voice` |
 | Hugging Face (`mobiuslabsgmbh/faster-whisper-large-v3-turbo`) | Whisper model (~1.6 GB) into `~/.cache/huggingface` | first voice use or the Whisper smoke test |
 | GitHub: `SYSTRAN/faster-whisper` test data, pinned commit, SHA-256 checked | Public-domain 11 s speech clip for the Whisper smoke test, cached in `~/.cache/recon/smoke` | Whisper smoke test |
+| GitHub: `rsms/inter` release v4.1 | Inter font (OFL), bundled in `recon/ui/theme/fonts/` | once, committed |
 | Ollama registry (`registry.ollama.ai`) | `qwen3.5:9b`, `gemma4:12b`, `qwen3-embedding:0.6b` | `ollama pull`, once (task 0.6) |
 
-More sources (fonts) are added here before their first download.
+More sources (JetBrains Mono) are added here before their first download.
 
 ## Troubleshooting
 

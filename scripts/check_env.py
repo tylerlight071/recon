@@ -571,7 +571,7 @@ def main() -> int:
         free_bytes=lambda path: shutil.disk_usage(path).free,
     )
     results = run_checks(probe)
-    print(render(results))  # noqa: T201 - command-line output
+    print(render(results))
     return int(any(check.status is Status.ATTENTION for _, check in results))
 
 

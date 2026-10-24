@@ -60,5 +60,5 @@ def run(name: str, test: Callable[[], Outcome]) -> int:
         outcome = Outcome(False, f"Ollama returned an error: {exc.error}")
     elapsed = time.monotonic() - start
     verdict = "PASS" if outcome.passed else "FAIL"
-    print(f"{verdict}  {name}  ({elapsed:.1f} s)\n      {outcome.detail}")  # noqa: T201 - CLI output
+    print(f"{verdict}  {name}  ({elapsed:.1f} s)\n      {outcome.detail}")
     return 0 if outcome.passed else 1

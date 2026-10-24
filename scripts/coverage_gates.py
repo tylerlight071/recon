@@ -69,14 +69,14 @@ def main(argv: list[str]) -> int:
         Process exit code: 0 when all gates hold.
     """
     if len(argv) != 1:
-        print(__doc__)  # noqa: T201 - command-line output
+        print(__doc__)
         return 2
     report = json.loads(Path(argv[0]).read_text(encoding="utf-8"))
     failures = check(report)
     for line in failures:
-        print(f"coverage gate failed: {line}")  # noqa: T201 - command-line output
+        print(f"coverage gate failed: {line}")
     if not failures:
-        print("per-package coverage gates: OK")  # noqa: T201 - command-line output
+        print("per-package coverage gates: OK")
     return 1 if failures else 0
 
 
