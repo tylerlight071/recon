@@ -123,6 +123,14 @@ QtObject {
     readonly property real disabledOpacity: 0.4
     readonly property real pressedOpacity: 0.85
 
+    // ---- Main window (size only: KWin decides where it goes) ----------------
+    // Fits the 1280x720 logical desktop (2560x1440 at 200%).
+    readonly property int mainWindowWidth: 960
+    readonly property int mainWindowHeight: 640
+    readonly property int mainWindowMinWidth: 640
+    readonly property int mainWindowMinHeight: 420
+    readonly property int sidebarWidth: 200
+
     // ---- Developer gallery (--gallery only) -------------------------------
     readonly property int galleryWidth: 960
     readonly property int galleryHeight: 900

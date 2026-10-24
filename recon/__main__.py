@@ -1,18 +1,20 @@
 """Start Recon: `uv run python -m recon` (normally through packaging/recon-launch)."""
 
 import argparse
+import logging
 import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from PySide6.QtQml import QQmlApplicationEngine
-
-from recon.app import GALLERY_QML, create_application, load_qml
+from recon.app import GALLERY_QML, create_application, create_engine, load_qml, load_windows
+from recon.bridge.navigation import NavigationBridge
+from recon.bridge.settings import SettingsBridge
+from recon.config import load_settings, save_settings
 from recon.logging_setup import configure_logging
 from recon.paths import AppPaths
 
-NOT_YET = "Recon's windows arrive in task 1.3. For now, `--gallery` shows the component gallery."
+_log = logging.getLogger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -37,12 +39,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     paths = AppPaths.from_environ(dict(os.environ), Path.home())
     paths.ensure()
     configure_logging(paths.log_file)
-    if not args.gallery:
-        print(NOT_YET, file=sys.stderr)  # noqa: T201 - plain message on the command line
-        return 2
+    settings, problem = load_settings(paths.settings_file)
+    if problem is not None:
+        _log.warning("starting with default settings")
+
     app = create_application(sys.argv[:1])
-    engine = QQmlApplicationEngine()
-    if not load_qml(engine, GALLERY_QML):
+    settings_bridge = SettingsBridge(
+        settings, lambda changed: save_settings(paths.settings_file, changed), parent=app
+    )
+    navigation = NavigationBridge(parent=app)
+    app.aboutToQuit.connect(settings_bridge.flush)
+    qml = create_engine({"AppSettings": settings_bridge, "Navigation": navigation})
+
+    loaded = load_qml(qml.engine, GALLERY_QML) if args.gallery else load_windows(qml.engine)
+    if not loaded:
         return 1
     return app.exec()
 

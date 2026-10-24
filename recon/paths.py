@@ -26,6 +26,11 @@ class AppPaths:
         """Path of the rotating application log."""
         return self.data / "app.log"
 
+    @property
+    def settings_file(self) -> Path:
+        """Path of Tyler's settings (`settings.toml`)."""
+        return self.config / "settings.toml"
+
     @classmethod
     def from_environ(cls, environ: dict[str, str], home: Path) -> Self:
         """Resolve folders from XDG variables, falling back to the XDG defaults.

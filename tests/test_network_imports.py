@@ -42,6 +42,8 @@ RESTRICTED: dict[str, frozenset[str]] = {
     ),
     # Hugging Face downloads at runtime unless told not to (audit F-04, issue #30).
     **dict.fromkeys(("faster_whisper", "huggingface_hub"), frozenset({"services/whisper.py"})),
+    # QML's network access manager factory, which refuses every non-local scheme.
+    "PySide6.QtNetwork": frozenset({"services/qml_network.py"}),
     # Running programs: only from modules CLAUDE.md allows (KWin reload, etc.).
     "subprocess": frozenset({"services/kwin.py"}),
     # Banned everywhere in recon/.
@@ -58,7 +60,6 @@ RESTRICTED: dict[str, frozenset[str]] = {
             "socketserver",
             "multiprocessing.connection",
             "webbrowser",
-            "PySide6.QtNetwork",
             "PySide6.QtWebEngine",
             "PySide6.QtWebEngineCore",
             "PySide6.QtWebEngineWidgets",

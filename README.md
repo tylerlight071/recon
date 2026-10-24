@@ -33,13 +33,13 @@ scripts/install-hooks
 
 ## Run
 
-The windows arrive in task 1.3. For now there's the developer component gallery:
-
 ```fish
-uv run python -m recon --gallery
+./packaging/recon-launch                 # the app: main window, plus the panel when a room is open
+uv run python -m recon                   # quick dev run (no GPU libraries for voice)
+uv run python -m recon --gallery         # developer component gallery
 ```
 
-Once the app exists, `./packaging/recon-launch` starts it, and `scripts/install_desktop.py` installs an app-menu entry.
+An app-menu entry arrives with task 1.15 (`scripts/install_desktop.py`).
 
 ## Check your machine
 
