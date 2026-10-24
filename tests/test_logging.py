@@ -1,11 +1,12 @@
 """Hard rule: note content, prompts, transcripts and model output never reach app.log."""
 
 import ast
+import io
 import logging
 import logging.handlers
 import stat
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -126,27 +127,165 @@ def test_any_text_arg_never_appears_verbatim(text: str) -> None:
     assert record.args == (f"<redacted str len={len(text)}>",)
 
 
-def _logging_calls(tree: ast.AST) -> Iterator[ast.Call]:
-    for node in ast.walk(tree):
-        if (
+_NOT_LOGGERS = {"np", "numpy", "math", "cmath"}
+"""Receivers whose `.log` is maths, not logging."""
+
+
+def _receiver_name(func: ast.Attribute) -> str:
+    return func.value.id if isinstance(func.value, ast.Name) else ""
+
+
+def message_offenders(source: str) -> list[int]:
+    """Lines of logging-method calls whose message isn't a string literal.
+
+    Any `<anything>.<debug|info|warning|...>(...)` call counts, whatever the
+    receiver (`log`, `self._log`, `LOGGER`, `logging.getLogger(x)`), so the
+    rule can't be dodged by naming the logger differently.
+    """
+    lines: list[int] = []
+    for node in ast.walk(ast.parse(source)):
+        if not (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
             and node.func.attr in _LOG_METHODS
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id in {"log", "logger", "logging", "_log", "_logger"}
+            and _receiver_name(node.func) not in _NOT_LOGGERS
         ):
-            yield node
+            continue
+        # logger.log(level, msg, ...) takes the message second.
+        index = 1 if node.func.attr == "log" else 0
+        keyword = next((kw.value for kw in node.keywords if kw.arg == "msg"), None)
+        message = node.args[index] if len(node.args) > index else keyword
+        if not (isinstance(message, ast.Constant) and isinstance(message.value, str)):
+            lines.append(node.lineno)
+    return lines
 
 
-def test_every_log_message_in_recon_is_a_string_literal() -> None:
-    offenders: list[str] = []
-    for path in RECON_SRC.rglob("*.py"):
-        for call in _logging_calls(ast.parse(path.read_text(encoding="utf-8"))):
-            # logger.log(level, msg, ...) takes the message second.
-            assert isinstance(call.func, ast.Attribute)
-            index = 1 if call.func.attr == "log" else 0
-            message = call.args[index] if len(call.args) > index else None
-            if not (isinstance(message, ast.Constant) and isinstance(message.value, str)):
-                offenders.append(f"{path.relative_to(RECON_SRC)}:{call.lineno}")
+def logger_name_offenders(source: str) -> list[int]:
+    """Lines where getLogger gets something other than `__name__` or a literal."""
+    lines: list[int] = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if name != "getLogger" or not node.args:
+            continue
+        arg = node.args[0]
+        literal = isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+        dunder = isinstance(arg, ast.Name) and arg.id == "__name__"
+        if not (literal or dunder):
+            lines.append(node.lineno)
+    return lines
+
+
+def adapter_offenders(source: str) -> list[int]:
+    """Lines that use LoggerAdapter, whose process() could put content in msg."""
+    return [
+        node.lineno
+        for node in ast.walk(ast.parse(source))
+        if (isinstance(node, ast.Name) and node.id == "LoggerAdapter")
+        or (isinstance(node, ast.Attribute) and node.attr == "LoggerAdapter")
+    ]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "log.info(text)",
+        "self.log.info(text)",
+        "self._logger.warning(text)",
+        "LOGGER.error(text)",
+        "logging.getLogger(__name__).warning(text)",
+        "log.log(10, text)",
+        "log.info(msg=text)",
+        'log.info(f"{text}")',
+        "log.exception(error)",
+        "log.info()",
+    ],
+)
+def test_detector_catches_non_literal_messages(source: str) -> None:
+    assert message_offenders(source) == [1]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'log.info("saved %s", text)',
+        'self._log.log(20, "saved %s", text)',
+        'log.info(msg="saved")',
+        "np.log(values)",
+        "parser.add_argument('x')",
+    ],
+)
+def test_detector_allows_literal_messages(source: str) -> None:
+    assert message_offenders(source) == []
+
+
+@pytest.mark.parametrize(
+    ("source", "bad"),
+    [
+        ("logging.getLogger(__name__)", False),
+        ('logging.getLogger("recon.engine")', False),
+        ("logging.getLogger()", False),
+        ('logging.getLogger(f"recon.room.{name}")', True),
+        ("getLogger(room_name)", True),
+    ],
+)
+def test_detector_checks_logger_names(source: str, *, bad: bool) -> None:
+    assert bool(logger_name_offenders(source)) is bad
+
+
+def test_detector_finds_logger_adapters() -> None:
+    assert adapter_offenders("class A(logging.LoggerAdapter): pass") == [1]
+    assert adapter_offenders("from logging import LoggerAdapter") == []  # import alone is inert
+    assert adapter_offenders("from logging import LoggerAdapter\nx = LoggerAdapter(l, {})") == [2]
+
+
+@pytest.mark.parametrize(
+    "check", [message_offenders, logger_name_offenders, adapter_offenders], ids=lambda f: f.__name__
+)
+def test_recon_source_obeys_the_logging_rules(check: Callable[[str], list[int]]) -> None:
+    offenders = [
+        f"{path.relative_to(RECON_SRC)}:{line}"
+        for path in RECON_SRC.rglob("*.py")
+        for line in check(path.read_text(encoding="utf-8"))
+    ]
 
     assert offenders == []
+
+
+def test_exception_text_cached_by_another_handler_is_not_reused(log_file: Path) -> None:
+    # A plain handler on a child logger formats first and caches record.exc_text.
+    child = logging.getLogger("recon.engine.cache_probe")
+    sink = logging.StreamHandler(io.StringIO())
+    sink.setFormatter(logging.Formatter("%(message)s"))
+    child.addHandler(sink)
+
+    def fail() -> None:
+        raise ValueError(NOTE)
+
+    try:
+        try:
+            fail()
+        except ValueError:
+            child.exception("step failed")
+    finally:
+        child.removeHandler(sink)
+
+    stream = sink.stream
+    assert isinstance(stream, io.StringIO)
+    assert NOTE in stream.getvalue()  # the other handler did cache the full text
+    assert NOTE not in _read(log_file)
+    assert "builtins.ValueError: <redacted>" in _read(log_file)
+
+
+def test_existing_open_log_is_locked_down(tmp_path: Path) -> None:
+    path = tmp_path / "app.log"
+    path.write_text("old\n")
+    path.chmod(0o644)
+
+    handler = configure_logging(path)
+    logging.getLogger("recon").removeHandler(handler)
+    handler.close()
+
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

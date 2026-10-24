@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from recon import errors
-from recon.paths import AppPaths, ensure_private_dir, private_opener
+from recon.paths import AppPaths, ensure_private_dir, ensure_private_file, private_opener
 
 
 def test_xdg_defaults_when_unset(tmp_path: Path) -> None:
@@ -77,3 +77,32 @@ def test_private_opener_creates_0600(tmp_path: Path) -> None:
         handle.write("x")
 
     assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+
+def test_chmod_that_has_no_effect_is_caught(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "open"
+    folder.mkdir()
+    folder.chmod(0o755)
+    # Some filesystems accept chmod and ignore it.
+    monkeypatch.setattr(Path, "chmod", lambda _self, _mode: None)
+
+    with pytest.raises(errors.InsecurePermissionsError):
+        ensure_private_dir(folder)
+
+
+def test_ensure_private_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "f"
+    ensure_private_file(path)  # missing: nothing to do
+    assert not path.exists()
+
+    path.write_text("x")
+    path.chmod(0o644)
+    ensure_private_file(path)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+    path.chmod(0o644)
+    monkeypatch.setattr(Path, "chmod", lambda _self, _mode: None)
+    with pytest.raises(errors.InsecurePermissionsError):
+        ensure_private_file(path)

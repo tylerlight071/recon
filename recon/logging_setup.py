@@ -4,15 +4,18 @@ Content safety is enforced, not left to discipline:
 
 - Ruff's `G` rules forbid f-strings and `%`/`.format` in log calls, so every
   message is a literal format string and variable parts arrive as `args`.
-- A test checks that the first argument of every logging call in `recon/` is
-  a string literal, so content can't be passed as the message itself.
+- A test checks that the message of every logging-method call in `recon/`
+  (whatever the receiver: `log`, `self._log`, `getLogger(...)`) is a string
+  literal, so content can't be passed as the message itself; that logger
+  names are `__name__` or literals; and that `LoggerAdapter` isn't used.
 - `RedactingFilter` replaces every `str` (and any other non-allowlisted type)
   in `args` with a placeholder giving only its length. IDs and counts pass
   through when they are ints, floats, bools, UUIDs or enums. A string that is
   known to be safe (an error type name, a run ID) must be wrapped in `Safe`.
 - `RedactingFormatter` drops exception messages and keeps only the exception
   types and the stack frames, because messages (pydantic errors in particular)
-  can quote the input that failed.
+  can quote the input that failed. It always rebuilds that text, so an
+  unredacted copy cached by another handler is never reused.
 """
 
 import enum
@@ -25,7 +28,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import override
 
-from recon.paths import private_opener
+from recon.paths import ensure_private_file, private_opener
 
 MAX_LOG_BYTES = 5 * 1024 * 1024
 LOG_BACKUPS = 5
@@ -71,6 +74,13 @@ class RedactingFormatter(logging.Formatter):
     """Format exceptions as types and frames only, never their messages."""
 
     @override
+    def format(self, record: logging.LogRecord) -> str:
+        # logging.Formatter.format reuses record.exc_text if any earlier handler
+        # cached it, unredacted. Always rebuild it with formatException below.
+        record.exc_text = None
+        return super().format(record)
+
+    @override
     def formatException(self, ei: _ExcInfo | tuple[None, None, None]) -> str:
         _, exc, _ = ei
         if exc is None:
@@ -108,7 +118,8 @@ def configure_logging(log_file: Path, level: int = logging.INFO) -> logging.Hand
     """Send Recon's logs to `log_file`, rotated at 5 MB with five old files kept.
 
     The log's folder must already exist with private permissions
-    (see `recon.paths.AppPaths.ensure`).
+    (see `recon.paths.AppPaths.ensure`). An existing log that is too open is
+    locked down to 0600 first.
 
     Args:
         log_file: Path of `app.log`.
@@ -116,7 +127,11 @@ def configure_logging(log_file: Path, level: int = logging.INFO) -> logging.Hand
 
     Returns:
         The installed handler, so callers (and tests) can remove it.
+
+    Raises:
+        InsecurePermissionsError: An existing log file couldn't be made private.
     """
+    ensure_private_file(log_file)
     handler = _PrivateRotatingFileHandler(
         log_file, maxBytes=MAX_LOG_BYTES, backupCount=LOG_BACKUPS, encoding="utf-8"
     )
