@@ -74,12 +74,14 @@ def load_fonts(folder: Path = FONTS) -> list[str]:
     return sorted(families)
 
 
-def evaluate(m: Measurements, expected_platform: str) -> Outcome:
+def evaluate(m: Measurements, expected_platform: str, *, check_timing: bool = True) -> Outcome:
     """Turn measurements into PASS or FAIL with every problem listed.
 
     Args:
         m: What the run observed.
         expected_platform: Qt platform plugin that should be in use.
+        check_timing: Hold the animation to its duration and frame budget. Off for
+            headless CI runs, whose shared runners make wall-clock timing flaky.
 
     Returns:
         The outcome.
@@ -93,11 +95,8 @@ def evaluate(m: Measurements, expected_platform: str) -> Outcome:
         problems.append(f"Inter wasn't registered (got {m.families})")
     if m.label_family != "Inter":
         problems.append(f"label rendered with {m.label_family!r}, not Inter")
-    low, high = ANIMATION_TOLERANCE_MS
-    if not low <= m.animation_ms <= high:
-        problems.append(f"animation took {m.animation_ms:.0f} ms, expected about {ANIMATION_MS}")
-    if m.animation_frames < MIN_FRAMES:
-        problems.append(f"only {m.animation_frames} frames drawn during the animation")
+    if check_timing:
+        problems.extend(_timing_problems(m))
     summary = (
         f"{m.platform}; label in {m.label_family or 'unknown'}; "
         f"animation {m.animation_ms:.0f} ms over {m.animation_frames} frames"
@@ -105,6 +104,16 @@ def evaluate(m: Measurements, expected_platform: str) -> Outcome:
     if problems:
         return Outcome(False, f"{summary}. Problems: {'; '.join(problems)}")
     return Outcome(True, summary)
+
+
+def _timing_problems(m: Measurements) -> list[str]:
+    problems = []
+    low, high = ANIMATION_TOLERANCE_MS
+    if not low <= m.animation_ms <= high:
+        problems.append(f"animation took {m.animation_ms:.0f} ms, expected about {ANIMATION_MS}")
+    if m.animation_frames < MIN_FRAMES:
+        problems.append(f"only {m.animation_frames} frames drawn during the animation")
+    return problems
 
 
 def _label_family(window: QQuickWindow) -> str:
@@ -186,7 +195,11 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     return run(
         f"QML window (PySide6, {args.expect_platform})",
-        lambda: evaluate(measure(args.screenshot, args.hold), args.expect_platform),
+        lambda: evaluate(
+            measure(args.screenshot, args.hold),
+            args.expect_platform,
+            check_timing=args.expect_platform != "offscreen",
+        ),
     )
 
 

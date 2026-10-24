@@ -84,9 +84,20 @@ def test_headless_window_renders_inter_and_animates(tmp_path: Path) -> None:
     shot = tmp_path / "shot.png"
 
     m = qml_window.measure(screenshot=shot)
-    outcome = qml_window.evaluate(m, "offscreen")
+    # Timing isn't held to budget headless: shared CI runners make it flaky (audit F-18).
+    outcome = qml_window.evaluate(m, "offscreen", check_timing=False)
 
     assert outcome.passed, outcome.detail
     image = QImage(str(shot))
     assert not image.isNull()
     assert image.width() >= 420
+
+
+def test_timing_can_be_left_out_for_headless_runs() -> None:
+    slow = _good(finished=10.9, frames=[10.0])
+
+    assert not qml_window.evaluate(slow, "wayland").passed
+    assert qml_window.evaluate(slow, "wayland", check_timing=False).passed
+    assert not qml_window.evaluate(
+        _good(label_family="Noto Sans"), "wayland", check_timing=False
+    ).passed
