@@ -30,6 +30,21 @@ Rules that the structure enforces:
 
 `recon/ui/theme/Theme.qml` is a QML singleton (`qmldir`; screens import it with `import "../theme"`). It holds every colour, type size and weight, spacing step, radius, panel width and duration from CLAUDE.md's design system. It also loads the bundled Inter (400/500/600) and JetBrains Mono fonts. `accentName` ("violet", "cyan" or "green") and `reduceMotion` are the two settable properties; Settings binds them in task 1.14. Tests check the tokens against CLAUDE.md, 4.5:1 contrast for every text token on every surface and on every accent fill, and that no QML outside `ui/theme/` uses literal colours or sizes.
 
+## Components
+
+`recon/ui/components/` holds Recon's own controls, built on `QtQuick.Templates` so they follow the design system rather than the system theme:
+
+- **Controls:** `Button` (primary, secondary and quiet), `IconButton`, `TextArea` (the hint fades while typing), `SidebarItem`, `TimerChip`.
+- **Surfaces:** `Card`, and `Block` (a coloured edge per type, a type label, a drag handle).
+- **Feedback:** `ProgressRing`, `Toast` (an optional Undo; 10 s by default), `Dialog`, `Tooltip` (with a shortcut).
+- **Helpers:** `Icon` (Recon's own line icons drawn with QtQuick.Shapes, no icon font) and `FocusRing`.
+
+Every interactive component sets `Accessible.role` and `Accessible.name`, works from the keyboard (Space, Return and Enter), and shows a focus ring only for keyboard focus. `screens/Gallery.qml` shows them all (`python -m recon --gallery`, developer only).
+
+## Entry point
+
+`recon/__main__.py` sets up the private data folders and logging, then `recon/app.py` creates the `QGuiApplication` with the app ID (set before the app object, as the portal and KWin rule need) and loads QML into a `QQmlApplicationEngine`. QML warnings are logged as a count and line number only, since their text can quote bound values. `root_window()` casts PySide's plain `QWindow` root back to `QQuickWindow`.
+
 ## Two windows
 
 One `QQmlApplicationEngine` loads `PanelWindow.qml` (title "Recon Panel": room session and Finish, pinned to the right edge by an opt-in KWin rule) and `MainWindow.qml` (Home, Review, Cards, Revise, Ask, Library, Settings). Both bind to the same bridge objects. Wayland windows can't position themselves, and a pinned window can't resize freely, hence two windows.

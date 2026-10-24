@@ -14,6 +14,9 @@ QtObject {
     readonly property color raised: "#16181c"
     readonly property color overlay: "#1c1e23"
     readonly property color border: "#23252a"
+    readonly property color clear: "#00000000"
+    // Dims the window behind a modal dialog.
+    readonly property color scrim: "#99000000"
 
     // ---- Text -------------------------------------------------------------
     readonly property color textPrimary: "#ececef"
@@ -101,6 +104,28 @@ QtObject {
     readonly property int radiusSmall: 6
     readonly property int radiusCard: 8
     readonly property int radiusDialog: 12
+    readonly property int focusRingGap: 2
+    readonly property int blockEdgeWidth: 3
+
+    // ---- Controls ---------------------------------------------------------
+    readonly property int controlHeight: 32
+    readonly property int controlHeightSmall: 28
+    readonly property int iconSize: 16
+    readonly property int iconSizeLarge: 20
+    readonly property int iconViewBox: 24      // icon paths are drawn on a 24x24 grid
+    readonly property real iconStroke: 2
+    readonly property int ringSize: 28
+    readonly property real ringStroke: 3
+    readonly property int textAreaMinHeight: 64
+    readonly property int toastWidth: 360
+    readonly property int dialogWidth: 400
+    readonly property int sidebarItemHeight: 36
+    readonly property real disabledOpacity: 0.4
+    readonly property real pressedOpacity: 0.85
+
+    // ---- Developer gallery (--gallery only) -------------------------------
+    readonly property int galleryWidth: 960
+    readonly property int galleryHeight: 900
 
     // ---- Panel ------------------------------------------------------------
     readonly property int panelWidthDefault: 420
@@ -112,6 +137,11 @@ QtObject {
     property bool reduceMotion: false
     readonly property int durationFast: reduceMotion ? 0 : 150
     readonly property int durationBase: reduceMotion ? 0 : 200
+    // The progress ring and completion moment are the only "showy" motion (SPEC.md).
+    readonly property int durationSlow: reduceMotion ? 0 : 400
+    readonly property int tooltipDelay: 500
+    // Deletions show an Undo toast for 10 s (ADHD rule 4).
+    readonly property int undoToastMs: 10000
     readonly property int easing: Easing.OutCubic
 
     // ---- Fonts (bundled, OFL; loaded once with the theme) ------------------

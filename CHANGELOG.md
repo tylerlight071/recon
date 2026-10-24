@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Component set on QtQuick.Templates: Button (primary, secondary, quiet), IconButton, Card, TextArea with a fading hint, Block, ProgressRing, Toast with Undo, Dialog, SidebarItem, TimerChip, Tooltip with shortcut, plus Recon's own line icons and keyboard focus rings. Every interactive component has an accessible role and name. `python -m recon --gallery` shows them all.
 - `Theme.qml` singleton with every design token (colours, accent choice, block edges, type, spacing, radii, panel widths, motion with Reduce motion) and the bundled Inter and JetBrains Mono fonts (OFL). Tests check the tokens against CLAUDE.md, text contrast of at least 4.5:1, and that QML outside the theme uses no literal colours or sizes.
 
 ## [0.0.0] - 2026-10-24
