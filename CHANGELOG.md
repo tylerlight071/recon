@@ -17,4 +17,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - README, SECURITY, architecture, threat model, audit checklist and the stack ADR.
 - `docs/environment.md`: the development machine's state and the fixes agreed in task 0.5.
 - Pulled the default models (`qwen3.5:9b`, `gemma4:12b`, `qwen3-embedding:0.6b`), recorded in `docs/environment.md`; the Ollama registry is listed as a download source.
+- Model smoke tests (`scripts/smoke/`): structured output, embeddings and vision against local Ollama, with unit tests and `-m ollama` tests. Runtime dependencies `ollama`, `pydantic`, `numpy` and `pillow` added.
 - `scripts/check_env.py`: read-only environment check for Ollama, GPU, desktop portal, audio, Obsidian and disk space.
