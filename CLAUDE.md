@@ -353,7 +353,7 @@ uv sync                                  # install deps
 ./packaging/recon-launch                 # run the app as Tyler will (sets CUDA library paths)
 uv run python -m recon                   # quick dev run (voice won't use the GPU without the launcher)
 uv run python -m recon --nudge           # run the daily nudge check once
-uv run pytest -m "not ollama"            # fast tests
+uv run pytest -m "not ollama and not gpu" # fast tests (CI and pre-commit run these)
 uv run pytest                            # all tests (needs Ollama for -m ollama)
 uv run pytest --cov --cov-branch         # with coverage
 uv run mutmut run                        # mutation tests on safety-critical modules
