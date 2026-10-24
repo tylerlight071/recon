@@ -9,6 +9,7 @@ dependencies = [
     "ollama>=0.6.3",
     "pillow>=13",
     "pydantic>=2.14",
+    "pyside6>=6.11.2,<6.12",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +31,7 @@ dev = [
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "pytest-qt>=4.5",
     "ruff>=0.17.2",
 ]
 
