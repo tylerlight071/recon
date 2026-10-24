@@ -5,7 +5,7 @@ import "theme"
 
 // The normal window: Home, Review, Cards, Revise, Ask, Library, Settings.
 // Size only; KWin decides where it goes. Closing it never closes the panel.
-// Bridges: Navigation (current screen, raise requests).
+// Bridges: Navigation (current screen, raise requests), Pinning (KWin rule, task 1.4).
 Window {
     id: main
 
@@ -44,6 +44,16 @@ Window {
         target: Navigation
         function onMainWindowRequested() { main.bringForward() }
     }
+
+    Connections {
+        target: Pinning
+        function onPinFailed() {
+            toast.show(qsTr("Couldn't pin the panel. It opens as a normal window for now. You can try again in Settings."))
+        }
+    }
+
+    // Asked once, at first launch (Tyler's choice), before any room starts.
+    Component.onCompleted: if (Pinning.askNeeded) pinQuestion.open()
 
     NumberAnimation {
         id: fadeIn
@@ -103,5 +113,24 @@ Window {
             height: parent.height
             source: main.screenFile(Navigation.currentScreen)
         }
+    }
+
+    Dialog {
+        id: pinQuestion
+        objectName: "pinQuestion"
+        title: qsTr("Pin the Recon panel to the right edge of your screen while you work?")
+        body: qsTr("Recon adds a KDE window rule for its panel only, so it always sits beside your browser at full height. You can turn this off in Settings.")
+        primaryText: qsTr("Pin the panel")
+        secondaryText: qsTr("Not now")
+        onAccepted: Pinning.pin()
+        onRejected: Pinning.decline()
+    }
+
+    Toast {
+        id: toast
+        objectName: "toast"
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.space6
     }
 }

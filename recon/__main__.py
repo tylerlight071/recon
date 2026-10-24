@@ -7,12 +7,16 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from PySide6.QtGui import QGuiApplication
+
 from recon.app import GALLERY_QML, create_application, create_engine, load_qml, load_windows
 from recon.bridge.navigation import NavigationBridge
+from recon.bridge.pinning import PinningBridge
 from recon.bridge.settings import SettingsBridge
 from recon.config import load_settings, save_settings
 from recon.logging_setup import configure_logging
 from recon.paths import AppPaths
+from recon.services.kwin import KWinPinning, run_command
 
 _log = logging.getLogger(__name__)
 
@@ -48,13 +52,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         settings, lambda changed: save_settings(paths.settings_file, changed), parent=app
     )
     navigation = NavigationBridge(parent=app)
+    pinning = PinningBridge(
+        settings_bridge,
+        KWinPinning(run_command, paths.data / "kwin-panel.js"),
+        lambda: _screen_area(app),
+        parent=app,
+    )
     app.aboutToQuit.connect(settings_bridge.flush)
-    qml = create_engine({"AppSettings": settings_bridge, "Navigation": navigation})
+    qml = create_engine(
+        {"AppSettings": settings_bridge, "Navigation": navigation, "Pinning": pinning}
+    )
 
     loaded = load_qml(qml.engine, GALLERY_QML) if args.gallery else load_windows(qml.engine)
     if not loaded:
         return 1
-    return app.exec()
+    # Rewrite the pin each launch (if on), so a new screen or width is picked up.
+    pinning.applyIfOn()
+    code = app.exec()
+    # Engine first: its bindings must never re-run against already-deleted bridges.
+    del qml
+    return code
+
+
+def _screen_area(app: QGuiApplication) -> tuple[int, int, int, int]:
+    """The primary screen's area in logical pixels (KWin fits the height to the taskbar)."""
+    area = app.primaryScreen().geometry()
+    return area.x(), area.y(), area.width(), area.height()
 
 
 if __name__ == "__main__":

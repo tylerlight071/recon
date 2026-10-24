@@ -3,7 +3,7 @@
 import logging
 import tomllib
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 import tomli_w
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -27,6 +27,9 @@ PANEL_WIDTH_MIN: Final = 360
 PANEL_WIDTH_MAX: Final = 520
 PANEL_WIDTH_DEFAULT: Final = 420
 
+type PinningChoice = Literal["ask", "on", "off"]
+PINNING_CHOICES: Final = ("ask", "on", "off")
+
 _log = logging.getLogger(__name__)
 
 
@@ -39,6 +42,8 @@ class Settings(BaseModel):
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     panel_width: int = Field(default=PANEL_WIDTH_DEFAULT, ge=PANEL_WIDTH_MIN, le=PANEL_WIDTH_MAX)
+    kwin_pinning: PinningChoice = "ask"
+    """Pin the panel with a KWin rule: "ask" (first launch asks once), "on" or "off"."""
 
 
 def clamp_panel_width(width: float) -> int:

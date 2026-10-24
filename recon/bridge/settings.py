@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
-from recon.config import Settings, clamp_panel_width
+from recon.config import PINNING_CHOICES, Settings, clamp_panel_width
 
 SAVE_DELAY_MS = 500
 """Saves wait for changes to settle, e.g. while the panel is being dragged wider."""
@@ -18,6 +18,7 @@ class SettingsBridge(QObject):
     """
 
     panelWidthChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    pinningChanged = Signal()  # noqa: N815 - Qt naming, used from QML
 
     def __init__(
         self,
@@ -51,14 +52,29 @@ class SettingsBridge(QObject):
         clamped = clamp_panel_width(width)
         if clamped == self._settings.panel_width:
             return
-        self._settings = self._settings.model_copy(update={"panel_width": clamped})
-        self._dirty = True
-        self._timer.start()
+        self._update(panel_width=clamped)
         self.panelWidthChanged.emit()
 
     panelWidth = Property(  # noqa: N815 - Qt naming, used from QML
         int, _get_panel_width, _set_panel_width, notify=panelWidthChanged
     )
+
+    def _get_pinning(self) -> str:
+        return self._settings.kwin_pinning
+
+    def _set_pinning(self, choice: str) -> None:
+        if choice not in PINNING_CHOICES or choice == self._settings.kwin_pinning:
+            return
+        self._update(kwin_pinning=choice)
+        self.pinningChanged.emit()
+
+    pinning = Property(str, _get_pinning, _set_pinning, notify=pinningChanged)
+    """"ask", "on" or "off"; anything else is ignored."""
+
+    def _update(self, **changes: object) -> None:
+        self._settings = self._settings.model_copy(update=changes)
+        self._dirty = True
+        self._timer.start()
 
     @Slot()
     def flush(self) -> None:

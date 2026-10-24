@@ -53,6 +53,7 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 - **Panel** (title "Recon Panel", which the KWin rule matches; room session and Finish): hidden until a room opens (`Navigation.showPanel()`). Its width comes from `AppSettings.panelWidth`, limited to 360–520. Resizing it updates the setting, which `SettingsBridge` saves 500 ms after the last change and again at quit.
 - **Opening a full-view screen from the panel** (`Navigation.open(screen)`) shows or raises the main window, with a quick fade of its content (Wayland ignores window opacity). Closing the main window hides it and never closes the panel.
 - **Network:** the engine's network access manager (`services/qml_network.py`) refuses every URL scheme except `file:`, `qrc:` and `data:`.
+- **Pinning** (opt-in, [ADR 0004](adr/0004-panel-pinning.md)): asked once at first launch. `services/kwin.py` writes Recon's KWin rule (exact app ID and title, position forced, width forced, height from vertical maximise), with a session KWin script as the fallback. `bridge/pinning.py` runs it on Qt's thread pool and re-pins when the width setting changes. While pinned, the width comes from Settings only.
 
 Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with `tomllib`, written with `tomli-w`). An unreadable file falls back to the defaults rather than stopping start-up. Every write goes through `recon/fs.py` (temp file, fsync, replace, fsync the folder).
 
