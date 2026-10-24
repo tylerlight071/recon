@@ -1,0 +1,44 @@
+#!/bin/sh
+# Start Recon with the CUDA libraries faster-whisper needs on the loader path.
+#
+# CTranslate2 loads libcublas.so.12 at runtime. It comes from the
+# nvidia-cublas-cu12 wheel (the `voice` extra), which isn't on the system
+# loader path, and LD_LIBRARY_PATH must be set before Python starts, so the
+# desktop entry and every real launch go through this script.
+#
+# Usage:  packaging/recon-launch [recon arguments...]
+#         RECON_MODULE=scripts.smoke.whisper packaging/recon-launch   # dev: run another module
+set -eu
+
+here=$(dirname "$(readlink -f "$0")")
+repo=$(dirname "$here")
+
+uv_bin=$(command -v uv 2>/dev/null || true)
+for candidate in "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv"; do
+    [ -n "$uv_bin" ] && break
+    [ -x "$candidate" ] && uv_bin=$candidate
+done
+if [ -z "$uv_bin" ]; then
+    echo "recon-launch: couldn't find uv. Install it, then try again." >&2
+    exit 127
+fi
+
+# Every lib folder shipped by the nvidia-* wheels in the project's venv.
+cuda_libs=""
+for dir in "$repo"/.venv/lib/python3*/site-packages/nvidia/*/lib; do
+    [ -d "$dir" ] && cuda_libs="${cuda_libs:+$cuda_libs:}$dir"
+done
+if [ -n "$cuda_libs" ]; then
+    LD_LIBRARY_PATH="$cuda_libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export LD_LIBRARY_PATH
+fi
+
+# Kernels CTranslate2 JIT-compiles for sm_120 are cached here (first run ~13 s,
+# later runs <1 s). The default 1 GB cap was already full in Phase 0, so raise
+# it to the 4 GB maximum to stop evictions bringing the slow first run back.
+export CUDA_CACHE_MAXSIZE="${CUDA_CACHE_MAXSIZE:-4294967296}"
+
+export UV_MALWARE_CHECK=1
+export UV_PREVIEW_FEATURES="${UV_PREVIEW_FEATURES:-malware-check}"
+cd "$repo"
+exec "$uv_bin" run --frozen --extra voice python -m "${RECON_MODULE:-recon}" "$@"

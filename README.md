@@ -25,7 +25,7 @@ Recon is a desktop study companion for TryHackMe. It sits as a slim panel beside
 git clone https://github.com/tylerlight071/recon.git
 cd recon
 set -x UV_MALWARE_CHECK 1
-uv sync
+uv sync --extra voice        # or plain `uv sync` to skip the ~1.5 GB of CUDA wheels for voice
 uv run pre-commit install
 ```
 
@@ -52,6 +52,7 @@ uv run python -m scripts.smoke.structured --model qwen3.5:9b   # add --think to 
 uv run python -m scripts.smoke.embeddings
 uv run python -m scripts.smoke.vision --model qwen3.5:9b
 uv run pytest -m ollama                                        # all of them, against the real models
+RECON_MODULE=scripts.smoke.whisper packaging/recon-launch      # Whisper on the GPU (add --compute-type int8_float16)
 ```
 
 ## Develop
@@ -76,12 +77,17 @@ Recon never contacts tryhackme.com. These are the only places anything is downlo
 | Astral python-build-standalone (`github.com/astral-sh`) | CPython 3.13 | first `uv sync` |
 | GitHub: `pre-commit/pre-commit-hooks`, `compilerla/conventional-pre-commit` | Commit hook code, pinned by commit | `pre-commit install` |
 | CachyOS/Arch repos | `gitleaks`, `obsidian` | once, by hand |
+| PyPI: `nvidia-cublas-cu12` and other `voice` extra wheels | CUDA libraries for Whisper (~1.5 GB) | `uv sync --extra voice` |
+| Hugging Face (`mobiuslabsgmbh/faster-whisper-large-v3-turbo`) | Whisper model (~1.6 GB) into `~/.cache/huggingface` | first voice use or the Whisper smoke test |
+| GitHub: `SYSTRAN/faster-whisper` test data, pinned commit, SHA-256 checked | Public-domain 11 s speech clip for the Whisper smoke test, cached in `~/.cache/recon/smoke` | Whisper smoke test |
 | Ollama registry (`registry.ollama.ai`) | `qwen3.5:9b`, `gemma4:12b`, `qwen3-embedding:0.6b` | `ollama pull`, once (task 0.6) |
 
-More sources (fonts, the Whisper model from Hugging Face) are added here before their first download.
+More sources (fonts) are added here before their first download.
 
 ## Troubleshooting
 
 - **A commit is refused:** read the hook output. Fix the issue and commit again; never use `--no-verify`.
 - **`gitleaks: command not found` on commit:** install it with `sudo pacman -S gitleaks`.
+- **Whisper says `libcublas.so.12 is not found`:** start it through `packaging/recon-launch`, which puts the CUDA libraries on the loader path.
+- **The first voice clip after a driver update is slow (~13 s):** the driver is recompiling GPU kernels; later clips are fast.
 - **`uv lock --check` fails:** run `uv lock` and commit `uv.lock` with your change.

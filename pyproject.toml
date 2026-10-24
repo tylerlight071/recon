@@ -11,6 +11,17 @@ dependencies = [
     "pydantic>=2.14",
 ]
 
+[project.optional-dependencies]
+voice = [
+    # faster-whisper 1.2.1 passes `metadata_errors` to av.open(), which PyAV 19
+    # removed. Fixed upstream (SYSTRAN/faster-whisper#1589) but not released;
+    # drop this cap once a faster-whisper release includes the fix.
+    "av>=11,<19",
+    "ctranslate2>=4.6.3",
+    "faster-whisper>=1.2.1",
+    "nvidia-cublas-cu12>=12.8",
+]
+
 [dependency-groups]
 dev = [
     "hypothesis>=6.170.8",
@@ -61,6 +72,11 @@ strict = true
 files = ["recon", "scripts"]
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+# faster-whisper ships no type hints, and CI doesn't install the `voice` extra.
+[[tool.mypy.overrides]]
+module = ["faster_whisper", "faster_whisper.*"]
+ignore_missing_imports = true
 
 # --------------------------------------------------------------------------
 # pytest and coverage
