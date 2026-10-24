@@ -26,6 +26,10 @@ Rules that the structure enforces:
 - Only `services/ollama.py` may import networking modules, and it refuses non-loopback hosts. Hugging Face libraries are allowed only in `services/whisper.py`, `subprocess` only in `services/kwin.py`, and `QDesktopServices` only in `services/open_url.py`. Dynamic imports are banned, and QML may not reference remote URLs or network APIs. `tests/test_network_imports.py` checks all of this, with self-tests for each bypass form.
 - Dependencies (Ollama client, Whisper, clock, filesystem roots, ID generation) are passed in, so tests can fake them.
 
+## Design tokens
+
+`recon/ui/theme/Theme.qml` is a QML singleton (`qmldir`; screens import it with `import "../theme"`). It holds every colour, type size and weight, spacing step, radius, panel width and duration from CLAUDE.md's design system. It also loads the bundled Inter (400/500/600) and JetBrains Mono fonts. `accentName` ("violet", "cyan" or "green") and `reduceMotion` are the two settable properties; Settings binds them in task 1.14. Tests check the tokens against CLAUDE.md, 4.5:1 contrast for every text token on every surface and on every accent fill, and that no QML outside `ui/theme/` uses literal colours or sizes.
+
 ## Two windows
 
 One `QQmlApplicationEngine` loads `PanelWindow.qml` (title "Recon Panel": room session and Finish, pinned to the right edge by an opt-in KWin rule) and `MainWindow.qml` (Home, Review, Cards, Revise, Ask, Library, Settings). Both bind to the same bridge objects. Wayland windows can't position themselves, and a pinned window can't resize freely, hence two windows.
