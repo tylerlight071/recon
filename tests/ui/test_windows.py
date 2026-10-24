@@ -9,8 +9,10 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow
 
 from recon.app import QmlEngine, create_engine, load_windows, root_window
 from recon.bridge.navigation import NavigationBridge
+from recon.bridge.pinning import PinningBridge
 from recon.bridge.settings import SettingsBridge
 from recon.config import Settings
+from tests.bridge.test_pinning_bridge import FakePinner
 from tests.ui.qml_harness import app, wait, wait_until
 
 
@@ -23,6 +25,7 @@ class Running:
     panel: QQuickWindow
     warnings: list[str]
     saved: list[Settings]
+    pinner: "FakePinner"
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -34,16 +37,27 @@ class Running:
             pending.extend(item.childItems())
         raise AssertionError(name)
 
+    def find_object(self, window: QQuickWindow, name: str) -> QObject:
+        # Popups (Dialog) live outside the item tree, so search QObject children.
+        found = window.findChild(QObject, name)
+        assert found is not None, name
+        return found
+
 
 @pytest.fixture
 def running(request: pytest.FixtureRequest) -> Iterator[Running]:
     app()
-    width = getattr(request, "param", 420)
+    # Most tests don't want the first-launch pin question in the way.
+    initial: Settings = getattr(request, "param", Settings(kwin_pinning="off"))
     owner = QObject()
     saved: list[Settings] = []
-    settings = SettingsBridge(Settings(panel_width=width), saved.append, parent=owner)
+    settings = SettingsBridge(initial, saved.append, parent=owner)
     navigation = NavigationBridge(parent=owner)
-    qml = create_engine({"AppSettings": settings, "Navigation": navigation})
+    pinner = FakePinner()
+    pinning = PinningBridge(
+        settings, pinner, lambda: (0, 0, 1280, 720), lambda job: job(), parent=owner
+    )
+    qml = create_engine({"AppSettings": settings, "Navigation": navigation, "Pinning": pinning})
     warnings: list[str] = []
     qml.engine.warnings.connect(lambda errors: warnings.extend(e.toString() for e in errors))
     assert load_windows(qml.engine)
@@ -51,7 +65,7 @@ def running(request: pytest.FixtureRequest) -> Iterator[Running]:
     assert main is not None
     assert panel is not None
     wait(50)
-    yield Running(qml, settings, navigation, main, panel, warnings, saved)
+    yield Running(qml, settings, navigation, main, panel, warnings, saved, pinner)
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
         window.close()
@@ -82,7 +96,7 @@ def test_panel_width_limits(running: Running) -> None:
     assert running.panel.maximumWidth() == 520
 
 
-@pytest.mark.parametrize("running", [480], indirect=True)
+@pytest.mark.parametrize("running", [Settings(panel_width=480, kwin_pinning="off")], indirect=True)
 def test_panel_opens_at_the_remembered_width(running: Running) -> None:
     running.navigation.showPanel()
 
@@ -98,7 +112,7 @@ def test_resizing_the_panel_is_remembered(running: Running) -> None:
 
     # The resize reaches QML through the platform's event queue, a moment later.
     assert wait_until(lambda: running.settings.property("panelWidth") == 470)
-    assert wait_until(lambda: running.saved == [Settings(panel_width=470)])
+    assert wait_until(lambda: running.saved == [Settings(panel_width=470, kwin_pinning="off")])
 
 
 def test_panel_button_brings_back_a_closed_main_window(running: Running) -> None:
@@ -143,3 +157,63 @@ def test_both_windows_share_one_navigation_state(running: Running) -> None:
 
     assert running.find(running.main, "nav-settings").property("selected") is True
     assert running.warnings == []
+
+
+# Task 1.4: the first-launch pin question ------------------------------------------------
+
+ASKING = [Settings(kwin_pinning="ask")]
+
+
+@pytest.mark.parametrize("running", ASKING, indirect=True)
+def test_first_launch_asks_to_pin_the_panel(running: Running) -> None:
+    question = running.find_object(running.main, "pinQuestion")
+
+    assert wait_until(lambda: question.property("visible") is True)
+    assert question.property("title") == (
+        "Pin the Recon panel to the right edge of your screen while you work?"
+    )
+    assert question.property("primaryText") == "Pin the panel"
+    assert running.warnings == []
+
+
+@pytest.mark.parametrize("running", ASKING, indirect=True)
+def test_pin_the_panel_pins_it(running: Running) -> None:
+    question = running.find_object(running.main, "pinQuestion")
+    wait_until(lambda: question.property("visible") is True)
+
+    QMetaObject.invokeMethod(question, "accept")
+    wait(50)
+
+    assert running.settings.property("pinning") == "on"
+    assert running.pinner.pinned[0].x == 860
+
+
+@pytest.mark.parametrize("running", ASKING, indirect=True)
+def test_not_now_never_asks_again(running: Running) -> None:
+    question = running.find_object(running.main, "pinQuestion")
+    wait_until(lambda: question.property("visible") is True)
+
+    QMetaObject.invokeMethod(question, "reject")
+    wait(50)
+
+    assert running.settings.property("pinning") == "off"
+    assert running.pinner.pinned == []
+
+
+def test_no_question_once_answered(running: Running) -> None:
+    wait(100)
+
+    assert running.find_object(running.main, "pinQuestion").property("visible") is False
+
+
+@pytest.mark.parametrize("running", [Settings(kwin_pinning="on")], indirect=True)
+def test_pin_failure_shows_a_calm_toast(running: Running) -> None:
+    running.pinner.method = None
+    toast = running.find(running.main, "toast")
+
+    QMetaObject.invokeMethod(
+        running.qml.engine.rootContext().contextProperty("Pinning"), "applyIfOn"
+    )
+
+    assert wait_until(lambda: toast.property("shown") is True)
+    assert toast.property("message").startswith("Couldn't pin the panel.")

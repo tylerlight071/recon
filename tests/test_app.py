@@ -178,3 +178,10 @@ def test_qml_warnings_are_logged_without_their_text(
 
 def test_qguiapplication_is_the_type_we_create() -> None:
     assert isinstance(qt_app(), QGuiApplication)
+
+
+def test_screen_area_comes_from_the_primary_screen() -> None:
+    app = qt_app()
+    area = app.primaryScreen().geometry()
+
+    assert entry._screen_area(app) == (area.x(), area.y(), area.width(), area.height())

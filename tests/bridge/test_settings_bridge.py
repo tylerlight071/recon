@@ -71,3 +71,21 @@ def test_setting_the_same_width_saves_nothing(
     wait(SAVE_DELAY_MS + 100)
 
     assert saved == []
+
+
+@pytest.mark.parametrize("choice", ["sometimes", "", "ON"])
+def test_unknown_pinning_choice_is_ignored(
+    bridge: SettingsBridge, saved: list[Settings], choice: str
+) -> None:
+    bridge.setProperty("pinning", choice)
+    wait(SAVE_DELAY_MS + 100)
+
+    assert bridge.property("pinning") == "ask"
+    assert saved == []
+
+
+def test_pinning_choice_is_saved(bridge: SettingsBridge, saved: list[Settings]) -> None:
+    bridge.setProperty("pinning", "on")
+    bridge.flush()
+
+    assert saved == [Settings(kwin_pinning="on")]

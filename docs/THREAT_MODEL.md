@@ -44,7 +44,7 @@ Recon is a single-user desktop app on Tyler's own machine. This model lists what
 | T10 | Malicious image (decompression bomb, parser bug, metadata leak) (E2, A4) | Pillow bomb limit; size limit; re-encode to PNG; strip EXIF/GPS | EXIF/GPS and oversize tests |
 | T11 | Recordings kept longer than needed (A4) | Deleted after transcription unless "Keep recordings" is on | Recording deletion test |
 | T12 | Command injection via subprocess (A6) | Subprocesses only where unavoidable, argument lists, no `shell=True`, allowlisted binaries by full path; ruff `S` rules | Lint, review |
-| T13 | KDE config damaged by the KWin rule (A6) | Opt-in; rule scoped to app ID and panel title; clean removal from Settings | Rule write/remove tests |
+| T13 | KDE config damaged by the KWin rule (A6) | Opt-in (asked once at first launch); only Recon's own `recon-panel` group is written; removal deletes its keys and its `rules`/`Order` entries and drops `count` when empty, leaving every other rule alone; allowlisted KDE tools by full path, no shell; checked against a backup on Tyler's desktop (ADR 0004) | `tests/test_kwin.py` (fake KDE store pre-filled with Tyler's real config) |
 | T14 | Compromised dependency, action or hook (E8) | `uv.lock` pinning; `UV_MALWARE_CHECK`; `uv audit` in CI and at gates; actions and hooks pinned by commit SHA; least-privilege tokens; Dependabot PRs reviewed by hand with a cooldown | CI |
 | T15 | Secrets or real data committed (A7) | gitleaks in pre-commit and CI; `.gitignore` for `*.db` and audio; fixtures are invented | CI |
 | T16 | Model wrong but confident (E4) | Code checks override the model; flags are suggestions; `unsure` dropped; generated content labelled | Fact-check tests |
