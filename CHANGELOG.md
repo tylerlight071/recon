@@ -30,6 +30,7 @@ Phase 0, foundations: repository, tooling, environment checks and smoke tests pr
 
 ### Fixed
 
+- The release workflow's main-and-CI guard no longer tries an unauthenticated `git fetch` (it already has `origin/main` from the full checkout), which stopped the first v0.0.0 release run.
 - CI never cancels runs on `main`, and releases need a tag on `main` whose CI passed; the CHANGELOG section is matched literally (audit F-15). The headless QML test no longer depends on wall-clock timing (F-18). Reasons added to the remaining `Any` and ignore comments (F-13).
 - `check_env` no longer reports Ollama as running when `ollama --version` times out or fails, and the GPU check reads only the service's current run (audit F-07). It also reports unreadable `nvidia-smi` output, unrunnable programs and an unknown models folder instead of crashing or guessing (F-16).
 - `recon-launch` installs the voice extra before building the CUDA library path, so the first launch after a plain `uv sync` or a fresh clone finds cuBLAS (audit F-06).
