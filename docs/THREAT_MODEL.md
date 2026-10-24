@@ -40,7 +40,7 @@ Recon is a single-user desktop app on Tyler's own machine. This model lists what
 | T6 | Apply clobbers a note Tyler edited meanwhile (E5 → A1) | Re-hash every target at Apply; abort on mismatch (`ApplyConflict`); backups before overwrite; restore from History | Conflict and backup tests |
 | T7 | Note content leaks via logs (A1) | `RedactingFilter`, `RedactingFormatter` (never reuses cached exception text), literal-only log messages for any logger receiver, literal or `__name__` logger names, no `LoggerAdapter`, ruff `G` rules; content only in private `runs/` (30-day expiry) | `tests/test_logging.py` (runtime probes plus static checks with detector self-tests) |
 | T8 | Other local users read data (A1, A4) | Folders `0700`, files `0600`, checked at launch; SQLite `secure_delete` | Permission tests |
-| T9 | Data leaves the machine (A1) | No telemetry or update checks; only `services/ollama.py` imports networking and it refuses non-loopback hosts | `tests/test_network_imports.py`, loopback test |
+| T9 | Data leaves the machine (A1) | No telemetry or update checks. Only `services/ollama.py` imports networking, and it refuses non-loopback hosts. Hugging Face libraries only in `services/whisper.py` (loaded offline, #30). `subprocess` and URL openers only in named modules. No dynamic imports. QML can't contain remote URLs or network APIs. QML's network access manager refuses non-local schemes (task 1.3) | `tests/test_network_imports.py` (static, with detector self-tests), loopback test |
 | T10 | Malicious image (decompression bomb, parser bug, metadata leak) (E2, A4) | Pillow bomb limit; size limit; re-encode to PNG; strip EXIF/GPS | EXIF/GPS and oversize tests |
 | T11 | Recordings kept longer than needed (A4) | Deleted after transcription unless "Keep recordings" is on | Recording deletion test |
 | T12 | Command injection via subprocess (A6) | Subprocesses only where unavoidable, argument lists, no `shell=True`, allowlisted binaries by full path; ruff `S` rules | Lint, review |
@@ -48,7 +48,7 @@ Recon is a single-user desktop app on Tyler's own machine. This model lists what
 | T14 | Compromised dependency, action or hook (E8) | `uv.lock` pinning; `UV_MALWARE_CHECK`; `uv audit` in CI and at gates; actions and hooks pinned by commit SHA; least-privilege tokens; Dependabot PRs reviewed by hand with a cooldown | CI |
 | T15 | Secrets or real data committed (A7) | gitleaks in pre-commit and CI; `.gitignore` for `*.db` and audio; fixtures are invented | CI |
 | T16 | Model wrong but confident (E4) | Code checks override the model; flags are suggestions; `unsure` dropped; generated content labelled | Fact-check tests |
-| T17 | Contacting tryhackme.com (policy) | No networking outside the Ollama service; loopback-only | Network tests |
+| T17 | Contacting tryhackme.com (policy) | No networking outside the Ollama service; loopback-only; no URL openers or browsers outside `services/open_url.py` (obsidian:// only) | Network tests |
 
 ## Out of scope
 

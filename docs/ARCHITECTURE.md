@@ -23,7 +23,7 @@ Rules that the structure enforces:
 - `engine/` never imports Qt. It takes pydantic models in and returns pydantic models out.
 - `bridge/` holds no business logic; QML never does I/O.
 - The UI thread never blocks: model calls, Whisper, embeddings and file writes run on worker threads and report plain-English progress.
-- Only `services/ollama.py` may import networking modules, and it refuses non-loopback hosts (tested by `tests/test_network_imports.py`).
+- Only `services/ollama.py` may import networking modules, and it refuses non-loopback hosts. Hugging Face libraries are allowed only in `services/whisper.py`, `subprocess` only in `services/kwin.py`, and `QDesktopServices` only in `services/open_url.py`. Dynamic imports are banned, and QML may not reference remote URLs or network APIs. `tests/test_network_imports.py` checks all of this, with self-tests for each bypass form.
 - Dependencies (Ollama client, Whisper, clock, filesystem roots, ID generation) are passed in, so tests can fake them.
 
 ## Two windows
