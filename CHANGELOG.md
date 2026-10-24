@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Log redaction holes from the Phase 0 audit (F-03): content as the message under any logger name, exception text cached by another handler, and logger names. Permissions are re-checked after chmod, and an existing too-open `app.log` is locked to 0600 (F-14).
 - `main` can no longer be changed by a multi-ref push, `--all` or a delete: the pre-push guard is now a git hook that reads every ref (audit F-02). Install with `scripts/install-hooks`. The fast-test commit hook now runs on every commit (F-17).
 - Docs from the Phase 0 audit: when task issues are created, the fast-test command, the audit template's areas, ADR 0001's portal note, and README's network wording.
 

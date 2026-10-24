@@ -59,6 +59,18 @@ class AppPaths:
             ensure_private_dir(folder)
 
 
+def _ensure_mode(path: Path, mode: int) -> None:
+    if stat.S_IMODE(path.stat().st_mode) == mode:
+        return
+    try:
+        path.chmod(mode)
+    except OSError as exc:
+        raise InsecurePermissionsError(str(path)) from exc
+    # Some filesystems (FUSE, NTFS, ACL-managed mounts) accept chmod and ignore it.
+    if stat.S_IMODE(path.stat().st_mode) != mode:
+        raise InsecurePermissionsError(str(path))
+
+
 def ensure_private_dir(folder: Path) -> None:
     """Create `folder` (and parents) and make sure it is mode 0700.
 
@@ -66,14 +78,23 @@ def ensure_private_dir(folder: Path) -> None:
         folder: Folder to create or check.
 
     Raises:
-        InsecurePermissionsError: The folder is too open and chmod failed.
+        InsecurePermissionsError: The folder is too open and couldn't be locked down.
     """
     folder.mkdir(mode=PRIVATE_DIR_MODE, parents=True, exist_ok=True)
-    if stat.S_IMODE(folder.stat().st_mode) != PRIVATE_DIR_MODE:
-        try:
-            folder.chmod(PRIVATE_DIR_MODE)
-        except OSError as exc:
-            raise InsecurePermissionsError(str(folder)) from exc
+    _ensure_mode(folder, PRIVATE_DIR_MODE)
+
+
+def ensure_private_file(path: Path) -> None:
+    """Make sure an existing file is mode 0600; do nothing if it doesn't exist.
+
+    Args:
+        path: File to check.
+
+    Raises:
+        InsecurePermissionsError: The file is too open and couldn't be locked down.
+    """
+    if path.exists():
+        _ensure_mode(path, PRIVATE_FILE_MODE)
 
 
 def private_opener(path: str, flags: int) -> int:

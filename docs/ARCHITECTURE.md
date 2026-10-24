@@ -53,7 +53,7 @@ Folders are created `0700` and files `0600` (`recon/paths.py`).
 
 ## Logging
 
-`recon/logging_setup.py` installs a rotating handler on the `recon` logger with two guards: a filter that redacts every string argument unless it's wrapped in `Safe`, and a formatter that drops exception messages but keeps types and frames. Ruff's `G` rules stop f-strings in log calls, and a test checks every log message in `recon/` is a string literal. Debug content (prompts, responses) goes only to `runs/<run_id>/`.
+`recon/logging_setup.py` installs a rotating handler on the `recon` logger with two guards: a filter that redacts every string argument unless it's wrapped in `Safe`, and a formatter that drops exception messages but keeps types and frames, and always rebuilds that text rather than reusing a copy another handler cached. Ruff's `G` rules stop f-strings in log calls. Static tests (each with a self-test of the detector) check that every logging-method call in `recon/`, whatever its receiver, has a literal message; that logger names are `__name__` or literals; and that `LoggerAdapter` isn't used. Existing log files are locked to 0600 at start-up. Debug content (prompts, responses) goes only to `runs/<run_id>/`.
 
 ## Errors
 
