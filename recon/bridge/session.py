@@ -2,11 +2,12 @@
 
 One task at a time: header (room, "Task 3 of 7", ring, time), an optional
 task title, the task's blocks (never a blank page: a Key idea block is always
-there), the add bar, and one primary button, "Next task" or "Finish room".
+there), the add bar, "Previous task" and "Skip this task", and one primary
+button, "Next task" or "Finish room".
 
 Edits pass through the flag filter and into the autosave queue on every
 keystroke (hard rules 2 and 7). Everything else that writes (opening a task,
-adding a block, saving the title, moving on) runs in order on a private
+adding a block, saving the title, moving between tasks) runs in order on a private
 worker thread, and the result comes back to the UI thread as a signal.
 """
 
@@ -141,6 +142,9 @@ class RoomSessionBridge(QObject):
     def _is_last(self) -> bool:
         return bool(self._tasks) and self._index == len(self._tasks)
 
+    def _can_go_back(self) -> bool:
+        return self._index > 1
+
     def _primary_text(self) -> str:
         return "Finish room" if self._is_last() else "Next task"
 
@@ -166,6 +170,7 @@ class RoomSessionBridge(QObject):
     progress = Property(float, _progress, notify=changed)
     isLastTask = Property(bool, _is_last, notify=changed)  # noqa: N815
     primaryText = Property(str, _primary_text, notify=changed)  # noqa: N815
+    canGoBack = Property(bool, _can_go_back, notify=changed)  # noqa: N815
     busy = Property(bool, _get_busy, notify=busyChanged)
     elapsed = Property(int, _elapsed, notify=elapsedChanged)
     blocks = Property(QObject, _get_blocks, constant=True)
@@ -315,42 +320,55 @@ class RoomSessionBridge(QObject):
     @Slot()
     def next(self) -> None:
         """Finish this task and open the next (or finish the room on the last one)."""
-        self._advance("done")
+        self._move(1, "done")
 
     @Slot()
     def skip(self) -> None:
         """Skip this task: no shame, it's just marked skipped and the next one opens."""
-        self._advance("skipped")
+        self._move(1, "skipped")
 
-    def _advance(self, status: TaskStatus) -> None:
+    @Slot()
+    def previous(self) -> None:
+        """Go back one task to add or fix something; no task's status changes."""
+        self._move(-1, None)
+
+    def _move(self, step: int, status: TaskStatus | None) -> None:
+        # Save everything, mark the task (unless going back), then open the target task.
         room, task = self._room, self._task()
-        if room is None or task is None or self._busy:
+        target = self._index + step
+        if room is None or task is None or self._busy or target < 1:
             return
-        title, index, tasks = self._take_title(), self._index, list(self._tasks)
+        title, tasks = self._take_title(), list(self._tasks)
 
         def work() -> Then:
             self._autosave.flush()
             if title is not None:
                 self._tasks_repo.set_title(task.id, title)
-            self._tasks_repo.set_status(task.id, status)
-            if index >= len(tasks):
+            if status is not None:
+                self._tasks_repo.set_status(task.id, status)
+            if target > len(tasks):
                 done = self._tasks_repo.for_room(room.id)
                 return lambda: self._room_finished(room, done, status)
-            self._rooms.update_progress(room.id, last_task_index=index + 1)
-            blocks = self._starter_blocks(tasks[index])
+            self._rooms.update_progress(room.id, last_task_index=target)
+            blocks = self._starter_blocks(tasks[target - 1])
             fresh = self._tasks_repo.for_room(room.id)
-            return lambda: self._moved_on(room, fresh, index + 1, blocks, status)
+            return lambda: self._moved_on(room, fresh, target, blocks, status)
 
         self._background(work)
 
     def _moved_on(
-        self, room: Room, tasks: list[Task], index: int, blocks: list[Block], status: TaskStatus
+        self,
+        room: Room,
+        tasks: list[Task],
+        index: int,
+        blocks: list[Block],
+        status: TaskStatus | None,
     ) -> None:
         if status == "done":
             self.taskCompleted.emit()
         self._show(room, tasks, index, blocks)
 
-    def _room_finished(self, room: Room, tasks: list[Task], status: TaskStatus) -> None:
+    def _room_finished(self, room: Room, tasks: list[Task], status: TaskStatus | None) -> None:
         self._tasks = tasks
         self.changed.emit()
         if status == "done":
