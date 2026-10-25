@@ -13,7 +13,13 @@ from recon.bridge.session import RoomSessionBridge
 from recon.bridge.start import StartRoomBridge
 from recon.db.connection import Database
 from recon.db.migrate import migrate
-from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, utc_now
+from recon.db.repositories import (
+    BlockRepository,
+    RoomRepository,
+    TaskRepository,
+    UndoRepository,
+    utc_now,
+)
 from tests.bridge.fakes import FakeAutosave
 from tests.ui.qml_harness import SignalCounter, app
 
@@ -33,7 +39,7 @@ def flow(tmp_path: Path) -> Iterator[Flow]:
     home = HomeBridge(rooms, blocks, utc_now)
     start = StartRoomBridge(rooms, lambda job: job())
     session = RoomSessionBridge(
-        (rooms, TaskRepository(db), blocks),
+        (rooms, TaskRepository(db), blocks, UndoRepository(db)),
         FakeAutosave(blocks),
         FlagGuard(blocks.keep_lookalike),
         submit=lambda job: job(),

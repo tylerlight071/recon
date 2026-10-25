@@ -41,20 +41,22 @@ Window {
         function onPanelRequested() { panel.bringForward() }
     }
 
-    // The hex string (and its block) that "Not a flag, keep it" would keep.
-    property int skippedBlock: -1
-    property string skippedText: ""
+    // What the toast's button does ("Not a flag, keep it", or Undo a delete).
+    property var toastAction: null
+
+    function notify(message, actionText, action) {
+        toastAction = action === undefined ? null : action
+        toast.show(message, actionText)
+    }
 
     Connections {
         target: FlagGuard
         function onFlagSkipped(blockId, keepable) {
-            panel.skippedBlock = blockId
-            panel.skippedText = keepable
             if (keepable === "")
-                flagToast.show(qsTr("Flag skipped. Recon never saves flags."))
+                panel.notify(qsTr("Flag skipped. Recon never saves flags."))
             else
-                flagToast.show(qsTr("Skipped something that looks like a flag. If it's an example hash, you can keep it."),
-                               qsTr("Not a flag, keep it"))
+                panel.notify(qsTr("Skipped something that looks like a flag. If it's an example hash, you can keep it."),
+                             qsTr("Not a flag, keep it"), () => FlagGuard.keep(blockId, keepable))
         }
     }
 
@@ -70,7 +72,11 @@ Window {
 
     Connections {
         target: RoomSession
-        function onFailed(message) { flagToast.show(message) }
+        function onFailed(message) { panel.notify(message) }
+        // Deletions get a 10 s Undo (ADHD rule 4).
+        function onBlockDeleted(blockId) {
+            panel.notify(qsTr("Block deleted."), qsTr("Undo"), () => RoomSession.undoDelete(blockId))
+        }
     }
 
     Item {
@@ -122,13 +128,18 @@ Window {
     }
 
     Toast {
-        id: flagToast
-        objectName: "flagToast"
+        id: toast
+        objectName: "panelToast"
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         // Above the add bar and footer while a room is open, so it never hides them.
         anchors.bottomMargin: RoomSession.hasRoom ? sessionView.bottomChrome + Theme.space3 : Theme.space6
         width: parent.width - Theme.space4 * 2
-        onAction: FlagGuard.keep(panel.skippedBlock, panel.skippedText)
+        onAction: {
+            const action = panel.toastAction
+            panel.toastAction = null
+            if (action)
+                action()
+        }
     }
 }

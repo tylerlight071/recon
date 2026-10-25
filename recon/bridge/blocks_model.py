@@ -190,6 +190,34 @@ class BlockListModel(QAbstractListModel):
             self.dataChanged.emit(index, index, [self.TextRole])
         return True
 
+    def block(self, block_id: int) -> Block | None:
+        """A block as on screen now, its position being its row."""
+        row = self._row(block_id)
+        if row is None:
+            return None
+        return self._blocks[row].model_copy(update={"position": row})
+
+    def row(self, block_id: int) -> int | None:
+        """Where a block is in the list, or None."""
+        return self._row(block_id)
+
+    def insert(self, block: Block) -> None:
+        """Put a block back at its position (clamped to the list)."""
+        row = max(0, min(block.position, len(self._blocks)))
+        self.beginInsertRows(QModelIndex(), row, row)
+        self._blocks.insert(row, block)
+        self.endInsertRows()
+
+    def remove(self, block_id: int) -> bool:
+        """Take a block out of the list; False if it isn't here."""
+        row = self._row(block_id)
+        if row is None:
+            return False
+        self.beginRemoveRows(QModelIndex(), row, row)
+        del self._blocks[row]
+        self.endRemoveRows()
+        return True
+
     def move(self, block_id: int, position: int) -> int | None:
         """Move a block to `position` (clamped); the others close up around it.
 
@@ -209,6 +237,10 @@ class BlockListModel(QAbstractListModel):
         self._blocks.insert(target, self._blocks.pop(row))
         self.endMoveRows()
         return target
+
+    def id_at(self, row: int) -> int | None:
+        """The ID of the block at `row`, or None."""
+        return self._blocks[row].id if 0 <= row < len(self._blocks) else None
 
     def first_id(self) -> int | None:
         """The first block's ID (the one to focus), or None."""

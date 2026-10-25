@@ -23,7 +23,13 @@ from recon.config import Settings
 from recon.db.connection import Database
 from recon.db.migrate import migrate
 from recon.db.models import NewRoom
-from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, utc_now
+from recon.db.repositories import (
+    BlockRepository,
+    RoomRepository,
+    TaskRepository,
+    UndoRepository,
+    utc_now,
+)
 from tests.bridge.fakes import FakeAutosave
 from tests.bridge.test_pinning_bridge import FakePinner
 from tests.ui.qml_harness import app, wait, wait_until
@@ -100,7 +106,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     autosave = FakeAutosave(blocks)
     tasks = TaskRepository(db)
     session = RoomSessionBridge(
-        (rooms, tasks, blocks),
+        (rooms, tasks, blocks, UndoRepository(db)),
         autosave,
         flag_guard,
         submit=lambda job: job(),
@@ -303,7 +309,7 @@ MD5 = "5d41402abc4b2a76b9719d911017c592"
 
 
 def test_braced_flag_notice_has_no_keep_button(running: Running) -> None:
-    toast = running.find(running.panel, "flagToast")
+    toast = running.find(running.panel, "panelToast")
 
     running.flag_guard.clean(7, "answer THM{x}", [])
 
@@ -313,7 +319,7 @@ def test_braced_flag_notice_has_no_keep_button(running: Running) -> None:
 
 
 def test_hash_notice_offers_not_a_flag_keep_it(running: Running) -> None:
-    toast = running.find(running.panel, "flagToast")
+    toast = running.find(running.panel, "panelToast")
     restored: list[tuple[int, str]] = []
     running.flag_guard.keptRestored.connect(lambda block, text: restored.append((block, text)))
 
@@ -562,7 +568,7 @@ def test_typing_saves_and_flags_vanish(running: Running) -> None:
     assert editor.property("text") == "TXT records hold text "
     (content,) = running.autosave.pending.values()
     assert content.text == "TXT records hold text "
-    toast = running.find(running.panel, "flagToast")
+    toast = running.find(running.panel, "panelToast")
     assert wait_until(lambda: toast.property("shown") is True)
 
 
@@ -673,7 +679,7 @@ def test_a_failed_save_shows_a_calm_toast(running: Running) -> None:
 
     running.session.failed.emit("Couldn't save to Recon's data folder.")
 
-    toast = running.find(running.panel, "flagToast")
+    toast = running.find(running.panel, "panelToast")
     assert wait_until(lambda: toast.property("shown") is True)
     assert toast.property("message") == "Couldn't save to Recon's data folder."
 
@@ -899,3 +905,78 @@ def test_dragging_the_grip_moves_a_block(running: Running) -> None:
 
     assert _ids(running) == [command, question, key]
     assert running.find(running.panel, "dropLine").property("visible") is False
+
+
+# Task 1.11: undo ------------------------------------------------------------------------------
+
+
+def _type_keys(running: Running, text: str) -> None:
+    for char in text:
+        QTest.keyClick(running.panel, char)
+
+
+def test_ctrl_z_in_a_block_undoes_a_word_and_ctrl_shift_z_redoes(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    editor = _editors(running)[0]
+    assert wait_until(lambda: editor.property("activeFocus") is True)
+    running.panel.requestActivate()
+    _type_keys(running, "MX is mail")
+
+    QTest.keyClick(running.panel, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+    wait(20)
+    assert editor.property("text") == "MX is "
+    assert editor.property("cursorPosition") == len("MX is ")
+
+    QTest.keyClick(
+        running.panel,
+        Qt.Key.Key_Z,
+        Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+    )
+    wait(20)
+    assert editor.property("text") == "MX is mail"
+
+
+def test_deleting_a_block_offers_undo_for_ten_seconds(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    first = _blocks(running)[0]
+    assert _in(first, "deleteBlock").property("visible") is False  # never a blank page
+    command = _add(running, "command")
+    _in(command, "editor").setProperty("text", "dig MX")
+    wait(20)
+    delete = _in(command, "deleteBlock")
+    assert delete.property("visible") is True
+    assert delete.property("tip") == "Delete block"
+
+    QMetaObject.invokeMethod(delete, "clicked")
+    wait(20)
+
+    assert len(_blocks(running)) == 1
+    toast = running.find(running.panel, "panelToast")
+    assert wait_until(lambda: toast.property("shown") is True)
+    assert toast.property("message") == "Block deleted."
+    assert toast.property("actionText") == "Undo"
+    assert toast.property("timeout") == 10000
+
+    QMetaObject.invokeMethod(running.find(running.panel, "action"), "clicked")
+    wait(20)
+
+    blocks = _blocks(running)
+    assert len(blocks) == 2
+    assert _in(blocks[1], "editor").property("text") == "dig MX"
+    assert toast.property("shown") is False
+
+
+def test_ctrl_shift_backspace_deletes_the_block_with_the_cursor(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    question = _add(running, "question")
+    assert wait_until(lambda: _in(question, "editor").property("activeFocus") is True)
+    running.panel.requestActivate()
+
+    QTest.keyClick(
+        running.panel,
+        Qt.Key.Key_Backspace,
+        Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+    )
+    wait(20)
+
+    assert [b.property("blockType") for b in _blocks(running)] == ["key_idea"]

@@ -7,7 +7,8 @@ import "../theme"
 // - Command: monospace; `# what it does` shown dimmer.
 // - Table: paste or type rows; a grid preview of how the note will read them.
 // - Room question: the question, then the answer behind "Show answer".
-// Drag the grip (or Alt+Up / Alt+Down) to reorder. Bridges: RoomSession, Editors.
+// Drag the grip (or Alt+Up / Alt+Down) to reorder; × (Ctrl+Shift+Backspace) deletes,
+// with Undo. Ctrl+Z / Ctrl+Shift+Z undo and redo across the task. Bridges: RoomSession, Editors.
 Block {
     id: block
 
@@ -29,12 +30,36 @@ Block {
     signal focused()
 
     objectName: "block-" + blockId
+    deleteShortcut: qsTr("Ctrl+Shift+Backspace")
+    onDeleteRequested: RoomSession.deleteBlock(blockId)
     type: blockType
     label: typeLabel
     opacity: dragging ? Theme.draggingOpacity : 1
 
     // Every keystroke: flags out, autosave queued (hard rules 2 and 7). Returns
     // the text to show, keeping the cursor where it was.
+    // Undo put text back: show it, with the cursor where the change was.
+    function replace(area, value) {
+        const old = area.text
+        let same = 0
+        while (same < old.length && same < value.length && old[same] === value[same])
+            ++same
+        area.text = value
+        area.cursorPosition = Math.min(value.length, same + Math.max(0, value.length - old.length))
+    }
+
+    // Ctrl+Z / Ctrl+Shift+Z undo across the task, not just inside this editor.
+    function undoKeys(event) {
+        if (event.matches(StandardKey.Undo)) {
+            RoomSession.undo()
+            event.accepted = true
+        } else if (event.matches(StandardKey.Redo)
+                   || (event.key === Qt.Key_Z && event.modifiers === (Qt.ControlModifier | Qt.ShiftModifier))) {
+            RoomSession.redo()
+            event.accepted = true
+        }
+    }
+
     function apply(area, shown) {
         if (shown === area.text)
             return
@@ -76,6 +101,7 @@ Block {
 
         onTextChanged: if (ready) block.apply(editor, RoomSession.edit(block.blockId, text))
         onActiveFocusChanged: if (activeFocus) block.focused()
+        Keys.onPressed: event => block.undoKeys(event)
     }
 
     // ---- Table: grid preview ---------------------------------------------------
@@ -130,6 +156,7 @@ Block {
 
             onTextChanged: if (ready) block.apply(answerEditor, RoomSession.editAnswer(block.blockId, text))
             onActiveFocusChanged: if (activeFocus) block.focused()
+            Keys.onPressed: event => block.undoKeys(event)
         }
     }
 
@@ -144,7 +171,7 @@ Block {
                 return
             const area = field === "answer" ? answerEditor : editor
             if (area.text !== value)
-                area.text = value
+                block.replace(area, value)
         }
     }
 }

@@ -27,7 +27,13 @@ from recon.db import backup
 from recon.db.autosave import AutosaveQueue
 from recon.db.connection import Database
 from recon.db.migrate import migrate
-from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, utc_now
+from recon.db.repositories import (
+    BlockRepository,
+    RoomRepository,
+    TaskRepository,
+    UndoRepository,
+    utc_now,
+)
 from recon.errors import StorageError
 from recon.logging_setup import configure_logging
 from recon.paths import AppPaths
@@ -139,7 +145,11 @@ def _create_bridges(
         on_error=lambda _exc: session.failed.emit(StorageError.user_message),
     )
     session = RoomSessionBridge(
-        (rooms, tasks, blocks), autosave, flag_guard, submit=serial_submit(app), parent=app
+        (rooms, tasks, blocks, UndoRepository(db)),
+        autosave,
+        flag_guard,
+        submit=serial_submit(app),
+        parent=app,
     )
     connect_room_flow(navigation, home, start, session)
     # In order: settings, the last title, then every queued keystroke (hard rule 7).
