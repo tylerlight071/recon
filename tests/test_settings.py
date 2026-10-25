@@ -38,7 +38,9 @@ def test_round_trip_is_private(tmp_path: Path) -> None:
     settings, problem = load_settings(path)
 
     assert (settings.panel_width, problem) == (470, None)
-    assert path.read_text() == 'panel_width = 470\nkwin_pinning = "ask"\nchime = false\n'
+    assert path.read_text() == (
+        'panel_width = 470\nkwin_pinning = "ask"\nchime = false\nexport_folder = ""\n'
+    )
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
 

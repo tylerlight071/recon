@@ -516,6 +516,23 @@ class RoomSessionBridge(QObject):
 
         self._background(work, busy=False)
 
+    @Slot()
+    def closeRoom(self) -> None:  # noqa: N802 - Qt naming, used from QML
+        """Put the room away (Finish): save what's pending; the panel then shows no room."""
+        self._save_title()
+
+        def work() -> Then:
+            self._autosave.flush()
+            return lambda: None
+
+        # On the serial worker, so it lands before anything reads the room back.
+        self._background(work, busy=False)
+        self._room, self._tasks, self._index = None, [], 0
+        self._skipped.clear()
+        self._history.close_group()
+        self._model.reset([])
+        self.changed.emit()
+
     def current_task(self) -> Task | None:
         """The task on screen (with its recorded time), or None."""
         return self._task()

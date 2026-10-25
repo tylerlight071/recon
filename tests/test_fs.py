@@ -80,3 +80,14 @@ def test_file_and_folder_are_fsynced(tmp_path: Path, monkeypatch: pytest.MonkeyP
     fs.atomic_write_text(tmp_path / "f", "x")
 
     assert len(synced) == 2  # the temp file, then the folder after the rename
+
+
+def test_atomic_create_never_replaces(tmp_path: Path) -> None:
+    target = tmp_path / "note.md"
+    fs.atomic_create_text(target, "first")
+
+    with pytest.raises(FileExistsError):
+        fs.atomic_create_text(target, "second")
+
+    assert target.read_text() == "first"
+    assert [p.name for p in tmp_path.iterdir()] == ["note.md"]

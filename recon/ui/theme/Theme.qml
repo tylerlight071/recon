@@ -116,6 +116,7 @@ QtObject {
     readonly property int iconViewBox: 24      // icon paths are drawn on a 24x24 grid
     readonly property real iconStroke: 2
     readonly property int ringSize: 28
+    readonly property int badgeSize: 48
     readonly property real ringStroke: 3
     readonly property int textAreaMinHeight: 64
     readonly property int numberFieldWidth: 96

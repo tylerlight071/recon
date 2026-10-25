@@ -52,3 +52,28 @@ def _fsync_dir(folder: Path) -> None:
         os.fsync(fd)
     finally:
         os.close(fd)
+
+
+def atomic_create_text(path: Path, text: str, mode: int = PRIVATE_FILE_MODE) -> None:
+    """Create `path` with UTF-8 `text` atomically, never replacing an existing file.
+
+    The data is written and fsynced to a temp file, then hard-linked into place:
+    the link fails if `path` exists, so nothing is ever overwritten, and a
+    crash leaves either no file or the whole file.
+
+    Raises:
+        FileExistsError: `path` already exists (nothing changed).
+        OSError: The write failed (the temp file is removed).
+    """
+    fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    temp = Path(temp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(text.encode("utf-8"))
+            handle.flush()
+            os.fsync(handle.fileno())
+        temp.chmod(mode)
+        os.link(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
+    _fsync_dir(path.parent)

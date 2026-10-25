@@ -20,6 +20,7 @@ class SettingsBridge(QObject):
     panelWidthChanged = Signal()  # noqa: N815 - Qt naming, used from QML
     pinningChanged = Signal()  # noqa: N815 - Qt naming, used from QML
     chimeChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    exportFolderChanged = Signal()  # noqa: N815 - Qt naming, used from QML
 
     def __init__(
         self,
@@ -83,6 +84,20 @@ class SettingsBridge(QObject):
 
     chime = Property(bool, _get_chime, _set_chime, notify=chimeChanged)
     """Play the focus chime (Settings, task 1.14)."""
+
+    def _get_export_folder(self) -> str:
+        return self._settings.export_folder
+
+    def _set_export_folder(self, folder: str) -> None:
+        if folder == self._settings.export_folder:
+            return
+        self._update(export_folder=folder)
+        self.exportFolderChanged.emit()
+
+    exportFolder = Property(  # noqa: N815 - Qt naming, used from QML
+        str, _get_export_folder, _set_export_folder, notify=exportFolderChanged
+    )
+    """The folder the last Markdown export went to (task 1.13)."""
 
     def _update(self, **changes: object) -> None:
         self._settings = self._settings.model_copy(update=changes)

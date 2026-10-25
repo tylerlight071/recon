@@ -104,3 +104,14 @@ def test_chime_is_off_by_default_and_saved_when_turned_on(
     assert bridge.property("chime") is True
     assert changed.count == 1
     assert saved == [Settings(chime=True)]
+
+
+def test_export_folder_is_remembered(bridge: SettingsBridge, saved: list[Settings]) -> None:
+    changed = SignalCounter(bridge, "exportFolderChanged()")
+
+    bridge.setProperty("exportFolder", "/home/tyler/Documents")
+    bridge.setProperty("exportFolder", "/home/tyler/Documents")
+    bridge.flush()
+
+    assert changed.count == 1
+    assert saved == [Settings(export_folder="/home/tyler/Documents")]

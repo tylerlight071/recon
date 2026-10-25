@@ -837,3 +837,17 @@ def test_activity_is_signalled_while_tyler_works(world: World) -> None:
 
     assert activity.count >= 4
     assert world.session.current_task() is not None
+
+
+def test_close_room_puts_the_room_away_and_saves(world: World) -> None:
+    world.opened()
+    block = world.shown()[0]
+    world.session.edit(block.id, "last words")
+    world.session.setTitle("Last")
+
+    world.session.closeRoom()
+
+    assert world.session.property("hasRoom") is False
+    assert world.session.property("blocks").rowCount() == 0
+    assert world.blocks.get(block.id).content.text == "last words"  # type: ignore[union-attr]
+    assert world.tasks.for_room(world.room_id())[0].title == "Last"

@@ -8,7 +8,7 @@ import "theme"
 // Its title is what the KWin rule matches (with the app ID), so it never changes.
 // Bridges: AppSettings (panel width), Navigation (open main-window screens),
 // FlagGuard (hard rule 2: the "Flag skipped" notice and "Not a flag, keep it"),
-// RoomSession (the open room; task 1.9).
+// RoomSession (the open room; task 1.9), Focus (the timer), Finish (task 1.13).
 Window {
     id: panel
 
@@ -80,6 +80,11 @@ Window {
     }
 
     Connections {
+        target: Finish
+        function onFailed(message) { panel.notify(message) }
+    }
+
+    Connections {
         target: Focus
         function onFocusDone(minutes) {
             panel.notify(qsTr("That's %1 minutes of focus. Keep going, or take a short break.").arg(minutes))
@@ -96,13 +101,19 @@ Window {
         Session {
             id: sessionView
             anchors.fill: parent
-            visible: RoomSession.hasRoom
+            visible: RoomSession.hasRoom && !Finish.shown
+            focus: visible
+        }
+
+        Finished {
+            anchors.fill: parent
+            visible: Finish.shown
             focus: visible
         }
 
         Column {
             objectName: "noRoom"
-            visible: !RoomSession.hasRoom
+            visible: !RoomSession.hasRoom && !Finish.shown
             anchors.centerIn: parent
             width: parent.width - Theme.space6 * 2
             spacing: Theme.space3

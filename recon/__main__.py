@@ -13,8 +13,9 @@ from PySide6.QtGui import QGuiApplication
 
 from recon.app import GALLERY_QML, create_application, create_engine, load_qml, load_windows
 from recon.bridge.editors import EditorsBridge
+from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
-from recon.bridge.flow import connect_room_flow
+from recon.bridge.flow import connect_finish, connect_room_flow
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
@@ -40,6 +41,7 @@ from recon.logging_setup import configure_logging
 from recon.paths import AppPaths
 from recon.services.chime import Chime
 from recon.services.kwin import KWinPinning, run_command
+from recon.services.open_url import open_folder
 
 _log = logging.getLogger(__name__)
 
@@ -138,7 +140,25 @@ def _create_bridges(
         lambda: _screen_area(app),
         parent=app,
     )
+    # Settings save first at quit; the room's own savers follow in _room_bridges.
+    app.aboutToQuit.connect(settings_bridge.flush)
+    bridges: dict[str, QObject] = {
+        "AppSettings": settings_bridge,
+        "Navigation": navigation,
+        "Pinning": pinning,
+        "Editors": EditorsBridge(parent=app),
+        **_room_bridges(app, db, settings_bridge, navigation),
+    }
+    return bridges, pinning
+
+
+def _room_bridges(
+    app: QGuiApplication, db: Database, settings: SettingsBridge, navigation: NavigationBridge
+) -> dict[str, QObject]:
+    """Home, Start, the room session, its timer and Finish, sharing one worker."""
     rooms, tasks, blocks = RoomRepository(db), TaskRepository(db), BlockRepository(db)
+    # One serial worker for the room's writes, so saves land before anything reads them back.
+    room_worker = serial_submit(app)
     flag_guard = FlagGuard(blocks.keep_lookalike, parent=app)
     home = HomeBridge(rooms, blocks, utc_now, parent=app)
     start = StartRoomBridge(rooms, parent=app)
@@ -150,34 +170,33 @@ def _create_bridges(
         (rooms, tasks, blocks, UndoRepository(db)),
         autosave,
         flag_guard,
-        submit=serial_submit(app),
+        submit=room_worker,
         parent=app,
     )
     focus = FocusBridge(
         tasks,
         Chime(parent=app).play,
-        lambda: settings_bridge.settings.chime,
-        submit=serial_submit(app),
+        lambda: settings.settings.chime,
+        submit=room_worker,
         parent=app,
     )
+    finish = FinishBridge(
+        (rooms, tasks, blocks), settings, open_folder, submit=room_worker, parent=app
+    )
     connect_room_flow(navigation, home, start, session, focus)
-    # In order: settings, the last title, then every queued keystroke (hard rule 7).
-    app.aboutToQuit.connect(settings_bridge.flush)
+    connect_finish(navigation, home, session, focus, finish)
+    # In order: the last title, the last seconds, then every queued keystroke (hard rule 7).
     app.aboutToQuit.connect(session.close)
     app.aboutToQuit.connect(focus.close)
     app.aboutToQuit.connect(autosave.close)
-    bridges: dict[str, QObject] = {
-        "AppSettings": settings_bridge,
-        "Navigation": navigation,
-        "Pinning": pinning,
+    return {
         "FlagGuard": flag_guard,
         "HomeModel": home,
         "StartRoom": start,
         "RoomSession": session,
         "Focus": focus,
-        "Editors": EditorsBridge(parent=app),
+        "Finish": finish,
     }
-    return bridges, pinning
 
 
 def _screen_area(app: QGuiApplication) -> tuple[int, int, int, int]:

@@ -1,0 +1,20 @@
+{#- A finished room as one note (Phase 1 export). Filters are defined in engine/render.py. -#}
+# {{ room.name | oneline }}
+
+{% if place %}
+{{ place | oneline }}
+{% endif %}
+Finished {{ room.finished_on | day }} · {{ room.time_spent_s | duration }}
+
+{% for task in room.tasks %}
+## Task {{ task.index }}{{ (": " ~ (task.title | oneline)) if task.title else "" }}
+
+{% if task.status == "skipped" %}
+*Skipped.*
+
+{% endif %}
+{% for block in task.blocks if has_content(block) %}
+{{ block | block }}
+
+{% endfor %}
+{% endfor %}

@@ -2,17 +2,28 @@
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject, QPoint, QPointF, Qt
+from PySide6.QtCore import (
+    QCoreApplication,
+    QEvent,
+    QMetaObject,
+    QObject,
+    QPoint,
+    QPointF,
+    Qt,
+    QUrl,
+)
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtTest import QTest
 
 from recon.app import QmlEngine, create_engine, load_windows, root_window
 from recon.bridge.editors import EditorsBridge
+from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
-from recon.bridge.flow import connect_room_flow
+from recon.bridge.flow import connect_finish, connect_room_flow
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
@@ -74,6 +85,8 @@ class Running:
     focus: FocusBridge
     clock: "FakeMonotonic"
     chimes: list[int]
+    finish: FinishBridge
+    opened: list[Path]
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -137,6 +150,17 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         parent=owner,
     )
     connect_room_flow(navigation, home, start, session, focus)
+    opened: list[Path] = []
+    finish = FinishBridge(
+        (rooms, tasks, blocks),
+        settings,
+        lambda folder: opened.append(folder) is None,
+        submit=lambda job: job(),
+        today=lambda: date(2026, 10, 25),
+        home=tmp_path,
+        parent=owner,
+    )
+    connect_finish(navigation, home, session, focus, finish)
     qml = create_engine(
         {
             "AppSettings": settings,
@@ -147,6 +171,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "StartRoom": start,
             "RoomSession": session,
             "Focus": focus,
+            "Finish": finish,
             "Editors": EditorsBridge(parent=owner),
         }
     )
@@ -176,6 +201,8 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         focus,
         clock,
         chimes,
+        finish,
+        opened,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -1077,3 +1104,87 @@ def test_a_finished_focus_block_and_the_break_nudge_are_gentle_toasts(running: R
     assert toast.property("message") == (
         "You've been at this for an hour and a half. Time for a short break?"
     )
+
+
+# Task 1.13: Finish (temporary) ------------------------------------------------------------
+
+
+def _finish_room(running: Running, tasks: int = 2) -> None:
+    _start_room(running, "DNS in Detail", tasks)
+    for _ in range(tasks):
+        QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+        wait(20)
+
+
+def test_finish_room_shows_a_calm_completion_screen(running: Running) -> None:
+    _finish_room(running)
+    find = running.find
+
+    assert find(running.panel, "finishTitle").property("text") == "DNS in Detail is finished."
+    assert find(running.panel, "finishSummary").property("text") == "All 2 tasks written up."
+    assert find(running.panel, "finishTime").property("text") == "under a minute on this room"
+    assert find(running.panel, "sessionScreen").property("visible") is False
+    assert find(running.panel, "noRoom").property("visible") is False
+    assert find(running.panel, "exportedArea").property("visible") is False
+    assert _visible_primary_buttons(running.panel.contentItem()) == ["exportButton"]
+    assert running.rooms.recent(1)[0].status == "done"
+    assert running.warnings == []
+
+
+def test_export_from_the_finish_screen(running: Running, tmp_path: Path) -> None:
+    _finish_room(running)
+    folder = tmp_path / "exports"
+    folder.mkdir()
+    dialog = running.find_object(running.panel, "folderDialog")
+    assert dialog.property("title") == "Choose a folder for the Markdown file"
+
+    running.finish.export(QUrl.fromLocalFile(str(folder)).toString())
+    wait(20)
+
+    assert (folder / "DNS in Detail.md").exists()
+    assert running.find(running.panel, "exportedArea").property("visible") is True
+    assert running.find(running.panel, "exportedText").property("text") == (
+        "Saved as DNS in Detail.md in ~/exports"
+    )
+    QMetaObject.invokeMethod(running.find(running.panel, "openFolder"), "clicked")
+    assert running.opened == [folder.resolve()]
+
+
+def test_back_to_the_room_from_finish(running: Running) -> None:
+    _finish_room(running)
+
+    QMetaObject.invokeMethod(running.find(running.panel, "backToRoom"), "clicked")
+    wait(20)
+
+    assert running.find(running.panel, "sessionScreen").property("visible") is True
+    assert running.find(running.panel, "taskLabel").property("text") == "Task 2 of 2"
+    room = running.rooms.current()
+    assert room is not None
+    assert room.status == "capturing"
+
+
+def test_done_returns_home_where_the_room_is_listed_as_done(running: Running) -> None:
+    _finish_room(running)
+
+    QMetaObject.invokeMethod(running.find(running.panel, "finishDone"), "clicked")
+    wait(50)
+
+    assert running.find(running.panel, "noRoom").property("visible") is True
+    assert running.navigation.property("currentScreen") == "home"
+    assert running.find(running.main, "primaryAction").property("text") == "Start a room"
+    room_id = running.rooms.recent(1)[0].id
+    row = running.find(running.main, f"recent-{room_id}")
+    assert row.property("detail") == "Done"
+    assert row.property("interactive") is False
+
+
+def test_an_open_focus_menu_closes_when_the_room_finishes(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 1)
+    menu = running.find_object(running.panel, "focusMenu")
+    QMetaObject.invokeMethod(running.find(running.panel, "timerChip"), "clicked")
+    assert wait_until(lambda: menu.property("visible") is True)
+
+    running.session.next()  # Ctrl+Return on the last task
+
+    assert wait_until(lambda: menu.property("visible") is False)
+    assert running.find(running.panel, "finishTitle").property("visible") is True

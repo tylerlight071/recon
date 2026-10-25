@@ -46,6 +46,8 @@ class Settings(BaseModel):
     """Pin the panel with a KWin rule: "ask" (first launch asks once), "on" or "off"."""
     chime: bool = False
     """Play a soft chime when a focus block ends (calm by default: off)."""
+    export_folder: str = ""
+    """Where the last Markdown export went ("" until the first one)."""
 
 
 def clamp_panel_width(width: float) -> int:
