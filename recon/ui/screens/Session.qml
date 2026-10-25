@@ -89,6 +89,30 @@ FocusScope {
         onActivated: RoomSession.next()
     }
 
+    // Undo and redo when the cursor isn't in a block (blocks handle their own keys;
+    // the task title keeps its own text undo).
+    Shortcut {
+        sequences: [StandardKey.Undo]
+        enabled: session.visible
+        onActivated: RoomSession.undo()
+    }
+
+    Shortcut {
+        sequences: [StandardKey.Redo, "Ctrl+Shift+Z"]
+        enabled: session.visible
+        onActivated: RoomSession.redo()
+    }
+
+    Shortcut {
+        sequence: "Ctrl+Shift+Backspace"
+        enabled: session.visible && session.focusedIndex >= 0 && blockList.count > 1
+        onActivated: {
+            const item = session.blockAt(session.focusedIndex)
+            if (item)
+                RoomSession.deleteBlock(item.blockId)
+        }
+    }
+
     Shortcut {
         sequence: "Alt+Up"
         enabled: session.visible && session.focusedIndex > 0
@@ -270,6 +294,7 @@ FocusScope {
 
                 BlockEditor {
                     width: page.width
+                    deletable: blockList.count > 1
                     onFocused: session.focusedIndex = index
                     onDragMovedTo: sceneY => session.dragTo(index, sceneY)
                     onDragFinished: session.drop(index)

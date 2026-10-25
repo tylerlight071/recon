@@ -1,7 +1,7 @@
 """Rows of app.db as pydantic models: the boundary between the database and the rest of Recon."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -81,3 +81,66 @@ class Block(_Row):
     """Column `pass`: "recall" in From memory's first pass, otherwise "fill"."""
     created_at: datetime
     updated_at: datetime
+
+
+# ---- Undo (task 1.11) ------------------------------------------------------------
+# Each entry in `undo_log` is the action that puts things back. Applying one
+# returns its opposite, which goes on the other stack (undo <-> redo).
+
+
+class SetContent(_Row):
+    """Put a block's content back as it was."""
+
+    kind: Literal["set_content"] = "set_content"
+    block_id: int
+    content: BlockContent
+
+
+class RemoveBlock(_Row):
+    """Remove a block (undoing an add)."""
+
+    kind: Literal["remove_block"] = "remove_block"
+    block_id: int
+
+
+class InsertBlock(_Row):
+    """Put a deleted block back, at its old place."""
+
+    kind: Literal["insert_block"] = "insert_block"
+    block: Block
+
+
+class MoveBlock(_Row):
+    """Move a block back to where it was."""
+
+    kind: Literal["move_block"] = "move_block"
+    block_id: int
+    position: int
+
+
+type UndoAction = Annotated[
+    SetContent | RemoveBlock | InsertBlock | MoveBlock, Field(discriminator="kind")
+]
+
+
+def action_block_id(action: UndoAction) -> int:
+    """The block an undo action is about."""
+    return action.block.id if isinstance(action, InsertBlock) else action.block_id
+
+
+def remap_action(action: UndoAction, old: int, new: int) -> UndoAction:
+    """The same action, about block `new` if it was about block `old`."""
+    if action_block_id(action) != old:
+        return action
+    if isinstance(action, InsertBlock):
+        return action.model_copy(update={"block": action.block.model_copy(update={"id": new})})
+    return action.model_copy(update={"block_id": new})
+
+
+class UndoEntry(_Row):
+    """A row of `undo_log`: one step back for a task."""
+
+    id: int
+    room_id: int
+    task_id: int
+    action: UndoAction

@@ -10,6 +10,11 @@ T.Pane {
     property string type: "key_idea"
     property string label: ""
     property bool showHandle: true
+    // Shows a small delete button in the header (the session hides it on a lone block).
+    property bool deletable: false
+    property string deleteShortcut: ""
+
+    signal deleteRequested()
     readonly property alias handle: grip
     default property alias content: body.data
 
@@ -42,7 +47,7 @@ T.Pane {
 
         Item {
             width: parent.width
-            height: Math.max(typeLabel.implicitHeight, grip.implicitHeight)
+            height: Math.max(typeLabel.implicitHeight, grip.implicitHeight, deleteButton.implicitHeight)
 
             Text {
                 id: typeLabel
@@ -55,14 +60,32 @@ T.Pane {
                 color: Theme.textSecondary
             }
 
-            Icon {
-                id: grip
-                objectName: "grip"
+            Row {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                name: "grip"
-                color: Theme.textTertiary
-                visible: block.showHandle
+                spacing: Theme.space1
+
+                IconButton {
+                    id: deleteButton
+                    objectName: "deleteBlock"
+                    anchors.verticalCenter: parent.verticalCenter
+                    size: Theme.controlHeightTiny
+                    idleColor: Theme.textTertiary
+                    iconName: "close"
+                    tip: qsTr("Delete block")
+                    shortcutHint: block.deleteShortcut
+                    visible: block.deletable
+                    onClicked: block.deleteRequested()
+                }
+
+                Icon {
+                    id: grip
+                    objectName: "grip"
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "grip"
+                    color: Theme.textTertiary
+                    visible: block.showHandle
+                }
             }
         }
 

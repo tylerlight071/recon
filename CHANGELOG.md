@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Undo: Ctrl+Z / Ctrl+Shift+Z across the task (typing about a word at a time, adds, deletes, moves), kept in `undo_log` so a deleted block can come back after a restart. Each block has a quiet × (Ctrl+Shift+Backspace) to delete it, with a 10 s "Block deleted." Undo toast; the last block can't be deleted.
 - Block editors: Command is monospace with `# comments` shown dimmer; Table shows a grid preview of tab, pipe or comma rows; Room question has an answer field hidden behind "Show answer" when you come back. Drag a block's grip, or press Alt+Up / Alt+Down, to reorder. Table parsing and comment detection live in `engine/parse.py` with property tests.
 - "Previous task" in the panel footer (Alt+Left) to go back and add or fix something. It saves first, never changes a task's status, and is greyed out on task 1.
 - Room session in the panel: room name, "Task n of N", progress ring and time in the header; an optional task title; the task's blocks with a Key idea block always ready and focused; an add bar with all eight block types in a fixed order (Ctrl+1 to Ctrl+7; Screenshot and Voice "Coming soon"); "Skip this task"; and one primary button, "Next task" or "Finish room" (Ctrl+Return), with a small tick. Every keystroke is flag-filtered and autosaved; other writes run in order off the UI thread. Starting a room or "Carry on" opens it here.

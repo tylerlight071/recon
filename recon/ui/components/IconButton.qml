@@ -10,9 +10,12 @@ T.Button {
     property string iconName: ""
     property string tip: ""
     property string shortcutHint: ""
+    property int size: Theme.controlHeight
+    // The icon's colour at rest; quieter for buttons repeated on every block.
+    property color idleColor: Theme.textSecondary
 
-    implicitWidth: Theme.controlHeight
-    implicitHeight: Theme.controlHeight
+    implicitWidth: size
+    implicitHeight: size
     padding: Theme.space2
     focusPolicy: Qt.StrongFocus
     opacity: enabled ? 1 : Theme.disabledOpacity
@@ -29,7 +32,7 @@ T.Button {
         Icon {
             anchors.centerIn: parent
             name: control.iconName
-            color: control.hovered || control.checked ? Theme.textPrimary : Theme.textSecondary
+            color: control.hovered || control.checked ? Theme.textPrimary : control.idleColor
         }
     }
 

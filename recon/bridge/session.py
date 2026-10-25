@@ -6,23 +6,44 @@ there), the add bar, "Previous task" and "Skip this task", and one primary
 button, "Next task" or "Finish room".
 
 Edits pass through the flag filter and into the autosave queue on every
-keystroke (hard rules 2 and 7). Everything else that writes (opening a task,
-adding a block, saving the title, moving between tasks) runs in order on a private
-worker thread, and the result comes back to the UI thread as a signal.
+keystroke (hard rules 2 and 7). Ctrl+Z / Ctrl+Shift+Z undo and redo within
+the task on screen (adds, deletes, moves and typing, about a word at a time);
+`bridge/undo.py` keeps the steps and `undo_log` keeps them across restarts.
+Everything else that writes (opening a task, adding a block, saving the title,
+moving between tasks) runs in order on a private worker thread, and the
+result comes back to the UI thread as a signal.
 """
 
 import logging
 import time
 from collections.abc import Callable
-from typing import Final, Literal, Protocol
+from typing import Final, Protocol
 
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
 from recon.bridge.blocks_model import BlockListModel, add_bar_entries, kind_named
 from recon.bridge.flags import FlagGuard
+from recon.bridge.undo import Field, Step, UndoHistory
 from recon.bridge.workers import Submit
-from recon.db.models import Block, BlockContent, Room, Task, TaskStatus
-from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository
+from recon.db.models import (
+    Block,
+    BlockContent,
+    InsertBlock,
+    MoveBlock,
+    RemoveBlock,
+    Room,
+    SetContent,
+    Task,
+    TaskStatus,
+    UndoAction,
+    UndoEntry,
+)
+from recon.db.repositories import (
+    BlockRepository,
+    RoomRepository,
+    TaskRepository,
+    UndoRepository,
+)
 from recon.errors import ReconError
 from recon.logging_setup import Safe
 
@@ -30,8 +51,6 @@ TITLE_SAVE_MS: Final = 500
 """The task title saves this long after the last keystroke (hard rule 7)."""
 TICK_MS: Final = 1000
 
-type Field = Literal["text", "answer"]
-"""A block's editable text fields."""
 type Then = Callable[[], None]
 """What to do on the UI thread once a background job has finished."""
 
@@ -65,11 +84,13 @@ class RoomSessionBridge(QObject):
     finishRequested = Signal(int)  # noqa: N815 - Qt naming; the room ID (Finish, task 1.13)
     failed = Signal(str)
     """Something couldn't be saved: a calm message for a toast."""
+    blockDeleted = Signal(int)  # noqa: N815 - Qt naming, used from QML
+    """A block was deleted: show the 10 s Undo toast (ADHD rule 4)."""
     _done = Signal(object)
 
     def __init__(  # noqa: PLR0913 - every collaborator is injected (CLAUDE.md)
         self,
-        repos: tuple[RoomRepository, TaskRepository, BlockRepository],
+        repos: tuple[RoomRepository, TaskRepository, BlockRepository, UndoRepository],
         autosave: Autosave,
         flag_guard: FlagGuard,
         *,
@@ -80,7 +101,7 @@ class RoomSessionBridge(QObject):
         """Wire the session to storage.
 
         Args:
-            repos: Rooms, tasks and blocks.
+            repos: Rooms, tasks, blocks and the undo log.
             autosave: Saves block edits within half a second.
             flag_guard: Strips flags from edits and offers "Not a flag, keep it".
             submit: Runs a job off the UI thread, in order (tests pass a synchronous one).
@@ -88,7 +109,7 @@ class RoomSessionBridge(QObject):
             parent: Qt parent.
         """
         super().__init__(parent)
-        self._rooms, self._tasks_repo, self._blocks = repos
+        self._rooms, self._tasks_repo, self._blocks, self._undo_repo = repos
         self._autosave = autosave
         self._guard = flag_guard
         self._submit = submit
@@ -102,6 +123,9 @@ class RoomSessionBridge(QObject):
         # Block ID -> (field, text as typed, text after a hex lookalike was skipped).
         self._skipped: dict[int, tuple[Field, str, str]] = {}
         self._model = BlockListModel(self)
+        self._history = UndoHistory(monotonic)
+        # True while Undo puts text back, so the editors' echo isn't recorded as typing.
+        self._replaying = False
         self._title_timer = QTimer(self, singleShot=True, interval=TITLE_SAVE_MS)
         self._title_timer.timeout.connect(self._save_title)
         self._tick = QTimer(self, interval=TICK_MS)
@@ -194,7 +218,8 @@ class RoomSessionBridge(QObject):
             tasks = self._tasks_repo.for_room(room_id)
             index = max(1, min(room.last_task_index, len(tasks)))
             blocks = self._starter_blocks(tasks[index - 1])
-            return lambda: self._show(room, tasks, index, blocks)
+            history = self._undo_repo.for_room(room_id)
+            return lambda: self._show(room, tasks, index, blocks, history)
 
         self._background(work)
 
@@ -203,10 +228,20 @@ class RoomSessionBridge(QObject):
         self._blocks.ensure_starter_block(task.id)
         return self._blocks.for_task(task.id)
 
-    def _show(self, room: Room, tasks: list[Task], index: int, blocks: list[Block]) -> None:
+    def _show(
+        self,
+        room: Room,
+        tasks: list[Task],
+        index: int,
+        blocks: list[Block],
+        history: list[UndoEntry] | None = None,
+    ) -> None:
         if self._room is None or self._room.id != room.id:
             self._opened_at = self._monotonic()
             self._tick.start()
+        if history is not None:
+            self._history.load(history)
+        self._history.close_group()
         self._room, self._tasks, self._index = room, tasks, index
         self._skipped.clear()
         self._model.reset(blocks)
@@ -244,6 +279,14 @@ class RoomSessionBridge(QObject):
         shown = self._guard.clean(block_id, text, list(content.kept))
         if shown != text:
             self._skipped[block_id] = (field, text, shown)
+        old = (content.answer or "") if field == "answer" else content.text
+        task_id = self._task_id()
+        if shown != old and task_id is not None and not self._replaying:
+            step = self._history.typed(
+                task_id, block_id=block_id, field_name=field, before=content, new=shown
+            )
+            if step is not None:
+                self._save_step(step)
         updated = content.model_copy(update={field: shown})
         self._model.set_content(block_id, updated, notify=False)
         self._autosave.put(block_id, updated)
@@ -260,9 +303,8 @@ class RoomSessionBridge(QObject):
         text = typed if now == shown else f"{now.rstrip()} {kept}".lstrip()
         keep = content.kept if kept in content.kept else (*content.kept, kept)
         updated = content.model_copy(update={field: text, "kept": keep})
-        self._model.set_content(block_id, updated, notify=True)
-        self._autosave.put(block_id, updated)
-        self.replaceText.emit(block_id, field, text)
+        self._record(SetContent(block_id=block_id, content=content))
+        self._set_content(block_id, updated, (field,))
 
     @Slot(str)
     def setTitle(self, title: str) -> None:  # noqa: N802 - Qt naming, used from QML
@@ -320,14 +362,22 @@ class RoomSessionBridge(QObject):
     def _added(self, block: Block) -> None:
         if self._task() is not None and self._task_id() == block.task_id:
             self._model.append(block)
+            self._record(RemoveBlock(block_id=block.id))
             self.focusBlock.emit(block.id)
 
     @Slot(int, int)
     def moveBlock(self, block_id: int, position: int) -> None:  # noqa: N802 - Qt naming, used from QML
         """Move a block within the task (drag, or Alt+Up / Alt+Down); the rest close up."""
+        undo = self._move_block(block_id, position)
+        if undo is not None:
+            self._record(undo)
+
+    def _move_block(self, block_id: int, position: int) -> MoveBlock | None:
+        # Move now on screen, then in storage; returns the move that goes back.
+        old = self._model.row(block_id)
         target = self._model.move(block_id, position)
-        if target is None:
-            return
+        if old is None or target is None:
+            return None
 
         def work() -> Then:
             self._blocks.move(block_id, target)
@@ -335,6 +385,145 @@ class RoomSessionBridge(QObject):
 
         self._background(work, busy=False)
         self.focusBlock.emit(block_id)
+        return MoveBlock(block_id=block_id, position=old)
+
+    @Slot(int)
+    def deleteBlock(self, block_id: int) -> None:  # noqa: N802 - Qt naming, used from QML
+        """Delete a block (never the last one: never a blank page); Undo brings it back."""
+        if self._busy or self._model.rowCount() <= 1:
+            return
+        undo = self._remove_block(block_id)
+        if undo is not None:
+            self._record(undo)
+            self.blockDeleted.emit(block_id)
+
+    def _remove_block(self, block_id: int) -> InsertBlock | None:
+        # Remove now on screen, then in storage; returns the insert that goes back.
+        block, row = self._model.block(block_id), self._model.row(block_id)
+        if block is None or row is None or not self._model.remove(block_id):
+            return None
+
+        def work() -> Then:
+            self._blocks.delete(block_id)
+            return lambda: None
+
+        self._background(work, busy=False)
+        neighbour = self._model.id_at(max(0, row - 1))
+        if neighbour is not None:
+            self.focusBlock.emit(neighbour)
+        return InsertBlock(block=block)
+
+    # ---- Undo and redo ---------------------------------------------------------------
+
+    @Slot()
+    def undo(self) -> None:
+        """Ctrl+Z: step back once in the task on screen."""
+        task_id = self._task_id()
+        if task_id is None or self._busy:
+            return
+        step = self._history.pop_undo(task_id)
+        if step is not None:
+            self._forget(step)
+            self._apply(step.action, lambda back: self._history.push_redo(task_id, back))
+
+    @Slot()
+    def redo(self) -> None:
+        """Ctrl+Shift+Z: step forward again after an undo."""
+        task_id = self._task_id()
+        if task_id is None or self._busy:
+            return
+        action = self._history.pop_redo(task_id)
+        if action is not None:
+            self._apply(
+                action, lambda back: self._save_step(self._history.push_undo(task_id, back))
+            )
+
+    @Slot(int)
+    def undoDelete(self, block_id: int) -> None:  # noqa: N802 - Qt naming, used from QML
+        """The delete toast's Undo: bring that block back, whatever happened since."""
+        step = self._history.take_insert(block_id)
+        if step is not None and not self._busy:
+            self._forget(step)
+            self._apply(step.action, lambda back: self._history.push_redo(step.task_id, back))
+
+    def _record(self, action: UndoAction) -> None:
+        task_id = self._task_id()
+        if task_id is not None:
+            self._save_step(self._history.record(task_id, action))
+
+    def _apply(self, action: UndoAction, then: Callable[[UndoAction], None]) -> None:
+        # Do `action`, then hand its opposite to `then` (for the other stack).
+        if isinstance(action, SetContent):
+            current = self._model.content(action.block_id)
+            if current is not None:
+                self._set_content(action.block_id, action.content)
+                self.focusBlock.emit(action.block_id)
+                then(SetContent(block_id=action.block_id, content=current))
+        elif isinstance(action, RemoveBlock):
+            insert = self._remove_block(action.block_id)
+            if insert is not None:
+                then(insert)
+        elif isinstance(action, MoveBlock):
+            move = self._move_block(action.block_id, action.position)
+            if move is not None:
+                then(move)
+        else:
+            self._insert_block(action.block, then)
+
+    def _insert_block(self, block: Block, then: Callable[[UndoAction], None]) -> None:
+        room = self._room
+        if room is None:
+            return
+
+        def work() -> Then:
+            restored = self._blocks.restore(block)
+            if restored.id != block.id:
+                self._undo_repo.remap(room.id, block.id, restored.id)
+            return lambda: self._inserted(block.id, restored, then)
+
+        self._background(work)
+
+    def _inserted(self, old_id: int, block: Block, then: Callable[[UndoAction], None]) -> None:
+        if block.id != old_id:
+            self._history.remap(old_id, block.id)
+        if self._task_id() == block.task_id:
+            self._model.insert(block)
+            self.focusBlock.emit(block.id)
+        then(RemoveBlock(block_id=block.id))
+
+    def _set_content(
+        self, block_id: int, content: BlockContent, fields: tuple[Field, ...] = ("text", "answer")
+    ) -> None:
+        # Show `content` in the block's editors (without recording it as typing) and save it.
+        self._model.set_content(block_id, content, notify=True)
+        self._autosave.put(block_id, content)
+        self._replaying = True
+        try:
+            for field in fields:
+                value = (content.answer or "") if field == "answer" else content.text
+                self.replaceText.emit(block_id, field, value)
+        finally:
+            self._replaying = False
+
+    def _save_step(self, step: Step) -> None:
+        room = self._room
+        if room is None:
+            return
+
+        def work() -> Then:
+            step.entry_id = self._undo_repo.push(room.id, step.task_id, step.action).id
+            return lambda: None
+
+        self._background(work, busy=False)
+
+    def _forget(self, step: Step) -> None:
+        # Runs after the step's own save (the worker is serial), so its ID is known by then.
+        def work() -> Then:
+            if step.entry_id is not None:
+                self._undo_repo.delete(step.entry_id)
+            return lambda: None
+
+        self._background(work, busy=False)
 
     def _task_id(self) -> int | None:
         task = self._task()

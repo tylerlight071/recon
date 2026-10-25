@@ -103,6 +103,18 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 
 **Reordering:** drag a block's grip (an accent line shows where it will land), or press Alt+Up / Alt+Down in a block. `RoomSession.moveBlock` moves the model row at once and saves the new order on the worker thread.
 
+## Undo
+
+Ctrl+Z / Ctrl+Shift+Z undo and redo within the task on screen.
+
+- **What's undoable:** typing, adds, deletes, moves and "Not a flag, keep it". Typing is grouped by `bridge/undo.py` (`UndoHistory`), so one step is about a word: a new step starts on another block or field, after a one-second pause, or once a word ends.
+- **How a step is stored:** each step is the action that goes back (`SetContent`, `RemoveBlock`, `InsertBlock`, `MoveBlock` in `db/models.py`). Applying one returns its opposite, which goes on the other stack.
+- **Persistence:**
+  - Undo steps are written to `undo_log` (`UndoRepository`, flag-filtered like every other store, the newest 300 per room kept), so a deleted block can come back after a restart. Redo lives in memory.
+  - `BlockRepository.restore` brings a block back at its old place, keeping its ID if it's still free. Otherwise the steps are remapped to the new ID.
+- **Deleting:** a block's × (Ctrl+Shift+Backspace) deletes it, never the last one. The panel shows "Block deleted." with Undo for 10 s, and that Undo brings back that block even if other things happened since.
+- **Keys:** the block editors catch Ctrl+Z themselves, so it undoes across the task rather than inside one editor. The task title field keeps its own text undo.
+
 Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with `tomllib`, written with `tomli-w`). An unreadable file falls back to the defaults rather than stopping start-up. Every write goes through `recon/fs.py` (temp file, fsync, replace, fsync the folder).
 
 ## Data flow for a room

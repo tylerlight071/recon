@@ -13,7 +13,7 @@ from recon.bridge.session import RoomSessionBridge
 from recon.db.connection import Database
 from recon.db.migrate import migrate
 from recon.db.models import Block, BlockContent, BlockType, NewRoom, Room
-from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository
+from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, UndoRepository
 from recon.errors import ReconError, StorageError
 from tests.bridge.fakes import FakeAutosave
 from tests.db.conftest import FakeClock
@@ -101,7 +101,7 @@ def _world(
     guard = FlagGuard(blocks.keep_lookalike)
     monotonic = Monotonic()
     session = RoomSessionBridge(
-        (rooms, tasks, blocks),
+        (rooms, tasks, blocks, UndoRepository(db)),
         autosave,
         guard,
         submit=submit or (lambda job: job()),
@@ -473,7 +473,7 @@ def test_a_failed_title_save_is_reported(db: Database) -> None:
     blocks = BlockRepository(db, clock)
     rooms = RoomRepository(db, clock)
     session = RoomSessionBridge(
-        (rooms, BrokenTasks(db, clock), blocks),
+        (rooms, BrokenTasks(db, clock), blocks, UndoRepository(db, clock)),
         FakeAutosave(blocks),
         FlagGuard(blocks.keep_lookalike),
         submit=lambda job: job(),
@@ -647,3 +647,191 @@ def test_moving_nowhere_writes_nothing(world: World) -> None:
     world.session.moveBlock(9999, 0)
 
     assert len(world.focused) == focused
+
+
+# Task 1.11: undo and redo ------------------------------------------------------------------
+
+
+def _typing(world: World, block_id: int, text: str) -> None:
+    typed = ""
+    for char in text:
+        typed += char
+        world.session.edit(block_id, typed)
+
+
+def _texts(world: World) -> list[str]:
+    model = world.session.property("blocks")
+    return [model.data(model.index(i), BlockListModel.TextRole) for i in range(model.rowCount())]
+
+
+def test_undo_typing_a_word_at_a_time_and_redo(world: World) -> None:
+    world.opened()
+    block = world.shown()[0]
+    _typing(world, block.id, "MX is mail")
+    replaced: list[tuple[str, str]] = []
+    world.session.replaceText.connect(lambda _i, f, t: replaced.append((f, t)))
+
+    world.session.undo()
+    assert _texts(world) == ["MX is "]
+    world.session.undo()
+    assert _texts(world) == ["MX "]
+    world.session.redo()
+    assert _texts(world) == ["MX is "]
+
+    assert ("text", "MX is ") in replaced
+    assert world.autosave.pending[block.id].text == "MX is "
+    # The editors' echo of undone text isn't recorded as new typing.
+    world.session.edit(block.id, "MX is ")
+    world.session.redo()
+    assert _texts(world) == ["MX is mail"]
+
+
+def test_new_typing_after_undo_drops_redo(world: World) -> None:
+    world.opened()
+    block = world.shown()[0]
+    _typing(world, block.id, "one two")
+    world.session.undo()
+
+    world.session.edit(block.id, "one three")
+    world.session.redo()
+
+    assert _texts(world) == ["one three"]
+
+
+def test_undo_an_added_block_and_redo_it(world: World) -> None:
+    world.opened()
+    world.session.addBlock("command")
+    command = world.shown()[1]
+    world.session.edit(command.id, "dig")
+
+    world.session.undo()  # the typing
+    world.session.undo()  # the add
+
+    assert len(world.shown()) == 1
+    world.session.redo()
+    assert [b.type for b in world.shown()] == ["key_idea", "command"]
+    assert world.shown()[1].id == command.id
+
+
+def test_delete_shows_the_toast_and_undo_brings_it_back(world: World) -> None:
+    world.opened()
+    world.session.addBlock("command")
+    command = world.shown()[1]
+    world.session.edit(command.id, "dig MX")
+    world.autosave.flush()
+    deleted: list[int] = []
+    world.session.blockDeleted.connect(deleted.append)
+
+    world.session.deleteBlock(command.id)
+
+    assert deleted == [command.id]
+    assert [b.type for b in world.shown()] == ["key_idea"]
+    world.session.edit(world.shown()[0].id, "typed since")  # the toast's Undo still works
+    world.session.undoDelete(command.id)
+    shown = world.shown()
+    assert [(b.id, b.content.text) for b in shown][1] == (command.id, "dig MX")
+    assert world.focused[-1] == command.id
+
+
+def test_ctrl_z_also_undoes_a_delete(world: World) -> None:
+    world.opened()
+    world.session.addBlock("question")
+    key, question = world.shown()
+
+    world.session.deleteBlock(key.id)
+    world.session.undo()
+
+    assert [b.id for b in world.shown()] == [key.id, question.id]
+    world.session.redo()
+    assert [b.id for b in world.shown()] == [question.id]
+
+
+def test_the_last_block_cannot_be_deleted(world: World) -> None:
+    world.opened()
+    deleted = SignalCounter(world.session, "blockDeleted(int)")
+
+    world.session.deleteBlock(world.shown()[0].id)
+    world.session.deleteBlock(9999)
+
+    assert len(world.shown()) == 1
+    assert deleted.count == 0
+
+
+def test_undo_a_move(world: World) -> None:
+    world.opened()
+    world.session.addBlock("command")
+    key, command = (b.id for b in world.shown())
+    world.session.moveBlock(command, 0)
+
+    world.session.undo()
+
+    assert [b.id for b in world.shown()] == [key, command]
+    world.session.redo()
+    assert [b.id for b in world.shown()] == [command, key]
+
+
+def test_undo_is_per_task(world: World) -> None:
+    world.opened()
+    world.session.addBlock("command")
+    world.session.next()
+
+    world.session.undo()  # nothing to undo on task 2
+    assert world.session.property("taskLabel") == "Task 2 of 3"
+    assert len(world.shown()) == 1
+
+    world.session.previous()
+    world.session.undo()
+    assert [b.type for b in world.shown()] == ["key_idea"]
+
+
+def test_a_deleted_block_can_come_back_after_a_restart(db: Database) -> None:
+    first = _world(db)
+    room = first.opened()
+    first.session.addBlock("command")
+    command = first.shown()[1]
+    first.session.deleteBlock(command.id)
+
+    second = _world(db)
+    second.session.open(room.id)
+    second.session.undo()
+
+    assert [b.id for b in second.shown()] == [second.shown()[0].id, command.id]
+
+
+def test_a_restored_block_with_a_reused_id_keeps_its_history(world: World) -> None:
+    world.opened()
+    world.session.addBlock("command")
+    command = world.shown()[1]
+    _typing(world, command.id, "dig MX")
+    world.session.deleteBlock(command.id)
+    world.blocks.add(world.shown()[0].task_id, "table")  # takes the freed ID behind the scenes
+
+    world.session.undo()  # brings the command back, under a new ID
+
+    (restored,) = [b for b in world.shown() if b.type == "command"]
+    assert restored.id != command.id
+    assert restored.content.text == "dig MX"
+    world.session.undo()  # its typing history followed it
+    assert world.autosave.pending[restored.id].text == "dig "
+
+
+def test_keep_can_be_undone(world: World) -> None:
+    world.opened()
+    block = world.shown()[0]
+    world.session.edit(block.id, f"hash {MD5}")
+    world.guard.keep(block.id, MD5)
+
+    world.session.undo()
+
+    assert _texts(world) == ["hash "]
+
+
+def test_nothing_to_undo_or_redo_is_fine(world: World) -> None:
+    world.session.undo()
+    world.session.redo()
+    world.opened()
+    world.session.undo()
+    world.session.redo()
+    world.session.undoDelete(9999)
+
+    assert len(world.shown()) == 1

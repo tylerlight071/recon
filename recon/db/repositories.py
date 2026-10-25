@@ -8,6 +8,7 @@ blocks also bumps the room's `updated_at`, which "recent rooms" and
 "Where was I?" sort by.
 """
 
+import json
 import sqlite3
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
@@ -19,11 +20,17 @@ from recon.db.models import (
     BlockContent,
     BlockPass,
     BlockType,
+    InsertBlock,
     NewRoom,
     Room,
     RoomStatus,
+    SetContent,
     Task,
     TaskStatus,
+    UndoAction,
+    UndoEntry,
+    action_block_id,
+    remap_action,
 )
 from recon.engine.flags_filter import LONE_HEX, strip_flags
 from recon.errors import StorageError
@@ -86,6 +93,21 @@ _INSERT_BLOCK: Final = """
 _UPDATE_BLOCK_CONTENT: Final = "UPDATE blocks SET content = ?, updated_at = ? WHERE id = ?"
 _SET_BLOCK_POSITION: Final = "UPDATE blocks SET position = ? WHERE id = ?"
 _DELETE_BLOCK: Final = "DELETE FROM blocks WHERE id = ?"
+_BLOCK_EXISTS: Final = "SELECT 1 FROM blocks WHERE id = ?"
+_RESTORE_BLOCK: Final = """
+    INSERT INTO blocks (id, task_id, type, position, content, pass, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+_INSERT_UNDO: Final = """
+    INSERT INTO undo_log (entity, entity_id, before, created_at) VALUES (?, ?, ?, ?)"""
+_SELECT_UNDO: Final = """
+    SELECT id, before FROM undo_log
+    WHERE json_extract(before, '$.room_id') = ? ORDER BY id"""
+_UPDATE_UNDO: Final = "UPDATE undo_log SET entity_id = ?, before = ? WHERE id = ?"
+_DELETE_UNDO: Final = "DELETE FROM undo_log WHERE id = ?"
+_PRUNE_UNDO: Final = """
+    DELETE FROM undo_log WHERE json_extract(before, '$.room_id') = ? AND id NOT IN (
+        SELECT id FROM undo_log WHERE json_extract(before, '$.room_id') = ?
+        ORDER BY id DESC LIMIT ?)"""
 _SELECT_LATEST_WRITTEN: Final = """
     SELECT b.id, b.task_id, b.type, b.position, b.content, b.pass, b.created_at, b.updated_at
     FROM blocks b JOIN tasks t ON t.id = b.task_id
@@ -324,6 +346,39 @@ class BlockRepository:
         kept = (*block.content.kept, text)
         return self.update_content(block_id, block.content.model_copy(update={"kept": kept}))
 
+    def restore(self, block: Block) -> Block:
+        """Put a deleted block back at its old place (Undo), keeping its ID if it's free.
+
+        Returns:
+            The block as stored; its ID differs only if the old one was reused meanwhile.
+        """
+        now = self._clock().isoformat()
+        body = clean_content(block.content).model_dump_json()
+        with self._db.transaction() as conn:
+            free = conn.execute(_BLOCK_EXISTS, (block.id,)).fetchone() is None
+            ids = [r[0] for r in conn.execute(_SELECT_BLOCK_IDS, (block.task_id,))]
+            cursor = conn.execute(
+                _RESTORE_BLOCK,
+                (
+                    block.id if free else None,
+                    block.task_id,
+                    block.type,
+                    len(ids),
+                    body,
+                    block.phase,
+                    block.created_at.isoformat(),
+                    now,
+                ),
+            )
+            block_id = _inserted_id(cursor)
+            ids.insert(max(0, min(block.position, len(ids))), block_id)
+            _renumber(conn, ids)
+            conn.execute(_TOUCH_ROOM_OF_TASK, (now, block.task_id))
+        restored = self.get(block_id)
+        if restored is None:  # just committed, so only a broken database gets here
+            raise StorageError
+        return restored
+
     def move(self, block_id: int, new_position: int) -> bool:
         """Move a block within its task; the others close up around it.
 
@@ -359,3 +414,74 @@ class BlockRepository:
 
 def _renumber(conn: sqlite3.Connection, ids: list[int]) -> None:
     conn.executemany(_SET_BLOCK_POSITION, [(i, block_id) for i, block_id in enumerate(ids)])
+
+
+def _clean_action(action: UndoAction) -> UndoAction:
+    # Undo history is stored text too: flags never reach it (hard rule 2).
+    if isinstance(action, SetContent):
+        return action.model_copy(update={"content": clean_content(action.content)})
+    if isinstance(action, InsertBlock):
+        block = action.block.model_copy(update={"content": clean_content(action.block.content)})
+        return action.model_copy(update={"block": block})
+    return action
+
+
+def _undo_body(room_id: int, task_id: int, action: UndoAction) -> str:
+    return json.dumps(
+        {
+            "room_id": room_id,
+            "task_id": task_id,
+            "action": action.model_dump(mode="json", by_alias=True),
+        }
+    )
+
+
+class UndoRepository:
+    """The `undo_log`: steps back for each task, kept across restarts."""
+
+    KEEP_PER_ROOM: Final = 300
+    """Older steps are dropped when a room opens."""
+
+    def __init__(self, db: Database, clock: Clock = utc_now) -> None:
+        """Use `db`; `clock` stamps created_at."""
+        self._db = db
+        self._clock = clock
+
+    def push(self, room_id: int, task_id: int, action: UndoAction) -> UndoEntry:
+        """Record a step back (flags stripped) and return it with its ID."""
+        action = _clean_action(action)
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                _INSERT_UNDO,
+                (
+                    action.kind,
+                    action_block_id(action),
+                    _undo_body(room_id, task_id, action),
+                    self._clock().isoformat(),
+                ),
+            )
+        return UndoEntry(id=_inserted_id(cursor), room_id=room_id, task_id=task_id, action=action)
+
+    def for_room(self, room_id: int) -> list[UndoEntry]:
+        """The room's steps back, oldest first, after dropping all but the newest few hundred."""
+        with self._db.transaction() as conn:
+            conn.execute(_PRUNE_UNDO, (room_id, room_id, self.KEEP_PER_ROOM))
+            rows = conn.execute(_SELECT_UNDO, (room_id,)).fetchall()
+        return [UndoEntry.model_validate({"id": row[0], **json.loads(row[1])}) for row in rows]
+
+    def delete(self, entry_id: int) -> None:
+        """Forget a step (it was taken)."""
+        with self._db.transaction() as conn:
+            conn.execute(_DELETE_UNDO, (entry_id,))
+
+    def remap(self, room_id: int, old: int, new: int) -> None:
+        """A restored block got a new ID: point the room's steps at it."""
+        entries = self.for_room(room_id)
+        with self._db.transaction() as conn:
+            for entry in entries:
+                action = remap_action(entry.action, old, new)
+                if action is not entry.action:
+                    conn.execute(
+                        _UPDATE_UNDO,
+                        (new, _undo_body(entry.room_id, entry.task_id, action), entry.id),
+                    )

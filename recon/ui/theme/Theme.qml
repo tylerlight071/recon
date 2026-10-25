@@ -110,6 +110,7 @@ QtObject {
     // ---- Controls ---------------------------------------------------------
     readonly property int controlHeight: 32
     readonly property int controlHeightSmall: 28
+    readonly property int controlHeightTiny: 24
     readonly property int iconSize: 16
     readonly property int iconSizeLarge: 20
     readonly property int iconViewBox: 24      // icon paths are drawn on a 24x24 grid
