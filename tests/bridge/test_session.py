@@ -129,7 +129,6 @@ def test_nothing_open_at_first(world: World) -> None:
     assert (session.property("roomName"), session.property("taskLabel")) == ("", "")
     assert (session.property("titleHint"), session.property("taskTitle")) == ("", "")
     assert session.property("progress") == 0.0
-    assert session.property("elapsed") == 0
     assert session.property("isLastTask") is False
 
 
@@ -176,16 +175,6 @@ def test_finished_and_missing_rooms_do_not_open(world: World) -> None:
     world.session.open(9999)
 
     assert world.session.property("hasRoom") is False
-
-
-def test_time_on_the_room_counts_from_opening(world: World) -> None:
-    world.opened()
-    changed = SignalCounter(world.session, "elapsedChanged()")
-
-    world.clock.now += 75
-
-    assert world.session.property("elapsed") == 75
-    assert wait_until(lambda: changed.count >= 1, timeout_ms=1500)
 
 
 # Editing ------------------------------------------------------------------------------------
@@ -835,3 +824,16 @@ def test_nothing_to_undo_or_redo_is_fine(world: World) -> None:
     world.session.undoDelete(9999)
 
     assert len(world.shown()) == 1
+
+
+def test_activity_is_signalled_while_tyler_works(world: World) -> None:
+    activity = SignalCounter(world.session, "activity()")
+    world.opened()
+    block = world.shown()[0]
+
+    world.session.edit(block.id, "a")
+    world.session.setTitle("T")
+    world.session.addBlock("command")
+
+    assert activity.count >= 4
+    assert world.session.current_task() is not None

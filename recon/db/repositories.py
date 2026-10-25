@@ -68,8 +68,12 @@ _UPDATE_PROGRESS: Final = """
     WHERE id = ?"""
 _INSERT_TASK: Final = "INSERT INTO tasks (room_id, task_index) VALUES (?, ?)"
 _SELECT_TASKS: Final = """
-    SELECT id, room_id, task_index, title, status
+    SELECT id, room_id, task_index, title, status, time_spent_s
     FROM tasks WHERE room_id = ? ORDER BY task_index"""
+_ADD_TASK_TIME: Final = "UPDATE tasks SET time_spent_s = time_spent_s + ? WHERE id = ?"
+_ADD_ROOM_TIME_OF_TASK: Final = """
+    UPDATE rooms SET time_spent_s = time_spent_s + ?
+    WHERE id = (SELECT room_id FROM tasks WHERE id = ?)"""
 _SET_TASK_TITLE: Final = "UPDATE tasks SET title = ? WHERE id = ?"
 _SET_TASK_STATUS: Final = "UPDATE tasks SET status = ? WHERE id = ?"
 _TOUCH_ROOM_OF_TASK: Final = (
@@ -239,7 +243,10 @@ class TaskRepository:
         """The room's tasks in order."""
         with self._db.read() as conn:
             rows = conn.execute(_SELECT_TASKS, (room_id,)).fetchall()
-        return [Task(id=r[0], room_id=r[1], task_index=r[2], title=r[3], status=r[4]) for r in rows]
+        return [
+            Task(id=r[0], room_id=r[1], task_index=r[2], title=r[3], status=r[4], time_spent_s=r[5])
+            for r in rows
+        ]
 
     def set_title(self, task_id: int, title: str) -> bool:
         """Rename a task ("" means the default "Task n"). Returns whether it exists."""
@@ -248,6 +255,22 @@ class TaskRepository:
     def set_status(self, task_id: int, status: TaskStatus) -> bool:
         """Mark a task open, done or skipped. Returns whether it exists."""
         return self._update(_SET_TASK_STATUS, task_id, status)
+
+    def add_time(self, task_id: int, seconds: int) -> bool:
+        """Record time spent on a task, and on its room.
+
+        Doesn't touch the room's `updated_at`: "Where was I?" means the last note,
+        not the last tick of the clock.
+
+        Returns:
+            Whether the task exists.
+        """
+        if seconds <= 0:
+            return False
+        with self._db.transaction() as conn:
+            cursor = conn.execute(_ADD_TASK_TIME, (seconds, task_id))
+            conn.execute(_ADD_ROOM_TIME_OF_TASK, (seconds, task_id))
+        return cursor.rowcount == 1
 
     def _update(self, query: str, task_id: int, value: str) -> bool:
         with self._db.transaction() as conn:

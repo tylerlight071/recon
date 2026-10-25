@@ -19,6 +19,7 @@ class SettingsBridge(QObject):
 
     panelWidthChanged = Signal()  # noqa: N815 - Qt naming, used from QML
     pinningChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    chimeChanged = Signal()  # noqa: N815 - Qt naming, used from QML
 
     def __init__(
         self,
@@ -70,6 +71,18 @@ class SettingsBridge(QObject):
 
     pinning = Property(str, _get_pinning, _set_pinning, notify=pinningChanged)
     """"ask", "on" or "off"; anything else is ignored."""
+
+    def _get_chime(self) -> bool:
+        return self._settings.chime
+
+    def _set_chime(self, on: bool) -> None:
+        if on == self._settings.chime:
+            return
+        self._update(chime=on)
+        self.chimeChanged.emit()
+
+    chime = Property(bool, _get_chime, _set_chime, notify=chimeChanged)
+    """Play the focus chime (Settings, task 1.14)."""
 
     def _update(self, **changes: object) -> None:
         self._settings = self._settings.model_copy(update=changes)

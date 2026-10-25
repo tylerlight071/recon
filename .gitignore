@@ -27,6 +27,8 @@ tests/screenshots/
 *.sqlite3
 *.wav
 *.flac
+# ...except Recon's own generated UI sounds (scripts/make_chime.py), never recordings.
+!recon/ui/sounds/*.wav
 
 # Editors and OS
 .idea/

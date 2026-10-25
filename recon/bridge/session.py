@@ -1,6 +1,6 @@
 """The room session in the panel, exposed to QML as `RoomSession` (task 1.9).
 
-One task at a time: header (room, "Task 3 of 7", ring, time), an optional
+One task at a time: header (room, "Task 3 of 7", ring, and the `Focus` timer), an optional
 task title, the task's blocks (never a blank page: a Key idea block is always
 there), the add bar, "Previous task" and "Skip this task", and one primary
 button, "Next task" or "Finish room".
@@ -49,7 +49,6 @@ from recon.logging_setup import Safe
 
 TITLE_SAVE_MS: Final = 500
 """The task title saves this long after the last keystroke (hard rule 7)."""
-TICK_MS: Final = 1000
 
 type Then = Callable[[], None]
 """What to do on the UI thread once a background job has finished."""
@@ -72,7 +71,6 @@ class RoomSessionBridge(QObject):
 
     changed = Signal()
     busyChanged = Signal()  # noqa: N815 - Qt naming, used from QML
-    elapsedChanged = Signal()  # noqa: N815 - Qt naming, used from QML
     taskShown = Signal()  # noqa: N815 - Qt naming, used from QML
     """A task (or room) was opened: refill the title field."""
     focusBlock = Signal(int)  # noqa: N815 - Qt naming, used from QML
@@ -84,6 +82,8 @@ class RoomSessionBridge(QObject):
     finishRequested = Signal(int)  # noqa: N815 - Qt naming; the room ID (Finish, task 1.13)
     failed = Signal(str)
     """Something couldn't be saved: a calm message for a toast."""
+    activity = Signal()
+    """Tyler did something in the session (the timer counts while he's here)."""
     blockDeleted = Signal(int)  # noqa: N815 - Qt naming, used from QML
     """A block was deleted: show the 10 s Undo toast (ADHD rule 4)."""
     _done = Signal(object)
@@ -105,7 +105,7 @@ class RoomSessionBridge(QObject):
             autosave: Saves block edits within half a second.
             flag_guard: Strips flags from edits and offers "Not a flag, keep it".
             submit: Runs a job off the UI thread, in order (tests pass a synchronous one).
-            monotonic: Seconds, for the time shown in the header.
+            monotonic: Seconds, for grouping typing into undo steps.
             parent: Qt parent.
         """
         super().__init__(parent)
@@ -113,12 +113,10 @@ class RoomSessionBridge(QObject):
         self._autosave = autosave
         self._guard = flag_guard
         self._submit = submit
-        self._monotonic = monotonic
         self._room: Room | None = None
         self._tasks: list[Task] = []
         self._index = 0
         self._busy = False
-        self._opened_at = 0.0
         self._pending_title: str | None = None
         # Block ID -> (field, text as typed, text after a hex lookalike was skipped).
         self._skipped: dict[int, tuple[Field, str, str]] = {}
@@ -128,8 +126,6 @@ class RoomSessionBridge(QObject):
         self._replaying = False
         self._title_timer = QTimer(self, singleShot=True, interval=TITLE_SAVE_MS)
         self._title_timer.timeout.connect(self._save_title)
-        self._tick = QTimer(self, interval=TICK_MS)
-        self._tick.timeout.connect(self.elapsedChanged)
         # A bound method, so Qt queues worker results back to the UI thread.
         self._done.connect(self._finish_job)
         flag_guard.keptRestored.connect(self._restore_kept)
@@ -177,9 +173,6 @@ class RoomSessionBridge(QObject):
     def _get_busy(self) -> bool:
         return self._busy
 
-    def _elapsed(self) -> int:
-        return int(self._monotonic() - self._opened_at) if self._room else 0
-
     def _get_blocks(self) -> BlockListModel:
         return self._model
 
@@ -198,7 +191,6 @@ class RoomSessionBridge(QObject):
     primaryText = Property(str, _primary_text, notify=changed)  # noqa: N815
     canGoBack = Property(bool, _can_go_back, notify=changed)  # noqa: N815
     busy = Property(bool, _get_busy, notify=busyChanged)
-    elapsed = Property(int, _elapsed, notify=elapsedChanged)
     blocks = Property(QObject, _get_blocks, constant=True)
     addBar = Property(list, _get_add_bar, constant=True)  # noqa: N815
 
@@ -236,18 +228,15 @@ class RoomSessionBridge(QObject):
         blocks: list[Block],
         history: list[UndoEntry] | None = None,
     ) -> None:
-        if self._room is None or self._room.id != room.id:
-            self._opened_at = self._monotonic()
-            self._tick.start()
         if history is not None:
             self._history.load(history)
         self._history.close_group()
         self._room, self._tasks, self._index = room, tasks, index
+        self.activity.emit()
         self._skipped.clear()
         self._model.reset(blocks)
         self.changed.emit()
         self.taskShown.emit()
-        self.elapsedChanged.emit()
         first = self._model.first_id()
         if first is not None:
             self.focusBlock.emit(first)
@@ -276,6 +265,7 @@ class RoomSessionBridge(QObject):
         content = self._model.content(block_id)
         if content is None:
             return text
+        self.activity.emit()
         shown = self._guard.clean(block_id, text, list(content.kept))
         if shown != text:
             self._skipped[block_id] = (field, text, shown)
@@ -311,6 +301,7 @@ class RoomSessionBridge(QObject):
         """Tyler typed the task title; it saves half a second after he stops."""
         if self._task() is None:
             return
+        self.activity.emit()
         self._pending_title = title
         self._title_timer.start()
 
@@ -344,7 +335,6 @@ class RoomSessionBridge(QObject):
                 self._tasks_repo.set_title(task.id, title)
             except ReconError as exc:
                 _log.warning("title not saved at quit: %s", Safe(type(exc).__name__))
-        self._tick.stop()
 
     @Slot(str)
     def addBlock(self, block_type: str) -> None:  # noqa: N802 - Qt naming, used from QML
@@ -447,6 +437,7 @@ class RoomSessionBridge(QObject):
             self._apply(step.action, lambda back: self._history.push_redo(step.task_id, back))
 
     def _record(self, action: UndoAction) -> None:
+        self.activity.emit()
         task_id = self._task_id()
         if task_id is not None:
             self._save_step(self._history.record(task_id, action))
@@ -524,6 +515,10 @@ class RoomSessionBridge(QObject):
             return lambda: None
 
         self._background(work, busy=False)
+
+    def current_task(self) -> Task | None:
+        """The task on screen (with its recorded time), or None."""
+        return self._task()
 
     def _task_id(self) -> int | None:
         task = self._task()
