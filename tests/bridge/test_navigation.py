@@ -50,3 +50,19 @@ def test_show_panel_asks_for_the_panel(navigation: NavigationBridge) -> None:
     navigation.showPanel()
 
     assert requested.count == 1
+
+
+def test_switch_to_changes_screen_without_raising(navigation: NavigationBridge) -> None:
+    changed = SignalCounter(navigation, "currentScreenChanged()")
+    raised = SignalCounter(navigation, "mainWindowRequested()")
+
+    assert navigation.switch_to("start") is True
+    assert navigation.switch_to("start") is True
+
+    assert navigation.property("currentScreen") == "start"
+    assert (changed.count, raised.count) == (1, 0)
+
+
+def test_switch_to_an_unknown_screen_changes_nothing(navigation: NavigationBridge) -> None:
+    assert navigation.switch_to("nowhere") is False
+    assert navigation.property("currentScreen") == "home"

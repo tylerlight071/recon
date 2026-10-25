@@ -5,15 +5,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject
+from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject, Qt
 from PySide6.QtQuick import QQuickItem, QQuickWindow
+from PySide6.QtTest import QTest
 
 from recon.app import QmlEngine, create_engine, load_windows, root_window
 from recon.bridge.flags import FlagGuard
+from recon.bridge.flow import connect_room_flow
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.settings import SettingsBridge
+from recon.bridge.start import StartRoomBridge
 from recon.config import Settings
 from recon.db.connection import Database
 from recon.db.migrate import migrate
@@ -43,6 +46,7 @@ class Running:
     pinner: "FakePinner"
     flag_guard: FlagGuard
     kept: list[tuple[int, str]]
+    rooms: RoomRepository
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -70,8 +74,9 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     # Most tests don't want the first-launch pin question in the way.
     param = getattr(request, "param", Settings(kwin_pinning="off"))
     initial = param.settings if isinstance(param, WithRooms) else param
+    rooms = RoomRepository(db)
     for room in param.rooms if isinstance(param, WithRooms) else ():
-        RoomRepository(db).create(room)
+        rooms.create(room)
     owner = QObject()
     saved: list[Settings] = []
     settings = SettingsBridge(initial, saved.append, parent=owner)
@@ -82,13 +87,17 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     )
     kept: list[tuple[int, str]] = []
     flag_guard = FlagGuard(lambda block, text: kept.append((block, text)) is None, parent=owner)
+    home = HomeBridge(rooms, BlockRepository(db), utc_now, parent=owner)
+    start = StartRoomBridge(rooms, lambda job: job(), parent=owner)
+    connect_room_flow(navigation, home, start)
     qml = create_engine(
         {
             "AppSettings": settings,
             "Navigation": navigation,
             "Pinning": pinning,
             "FlagGuard": flag_guard,
-            "HomeModel": HomeBridge(RoomRepository(db), BlockRepository(db), utc_now, parent=owner),
+            "HomeModel": home,
+            "StartRoom": start,
         }
     )
     warnings: list[str] = []
@@ -98,7 +107,9 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     assert main is not None
     assert panel is not None
     wait(50)
-    yield Running(qml, settings, navigation, main, panel, warnings, saved, pinner, flag_guard, kept)
+    yield Running(
+        qml, settings, navigation, main, panel, warnings, saved, pinner, flag_guard, kept, rooms
+    )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
         window.close()
@@ -315,6 +326,142 @@ def test_home_with_a_room_in_progress(running: Running) -> None:
     assert running.warnings == []
 
 
+# Task 1.8: Start a room ----------------------------------------------------------------
+
+
+def _type(item: QObject, text: str) -> None:
+    item.setProperty("text", text)
+
+
+def _open_start(running: Running) -> None:
+    QMetaObject.invokeMethod(running.find(running.main, "primaryAction"), "clicked")
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "start")
+    wait(50)
+
+
+def test_start_a_room_from_home(running: Running) -> None:
+    _open_start(running)
+
+    loader = running.find(running.main, "screenLoader")
+    assert str(loader.property("source").toString()).endswith("screens/Start.qml")
+    # Start sits under Home, so Home stays lit in the sidebar.
+    assert running.find(running.main, "nav-home").property("selected") is True
+    assert running.find(running.main, "roomName").property("activeFocus") is True
+    assert running.find(running.main, "modeNew").property("checked") is True
+    memory = running.find(running.main, "modeMemory")
+    assert (memory.property("enabled"), memory.property("checked")) == (False, False)
+    assert running.find(running.main, "moreFields").property("visible") is False
+    assert running.warnings == []
+
+
+def test_starting_opens_the_panel_and_home_shows_the_room(running: Running) -> None:
+    _open_start(running)
+    _type(running.find(running.main, "roomName"), "  DNS in Detail ")
+    _type(running.find(running.main, "taskCount"), "7")
+
+    QMetaObject.invokeMethod(running.find(running.main, "startButton"), "clicked")
+
+    assert wait_until(running.panel.isVisible)
+    assert running.navigation.property("currentScreen") == "home"
+    room = running.rooms.current()
+    assert room is not None
+    assert (room.name, room.task_count, room.mode) == ("DNS in Detail", 7, "new")
+    assert wait_until(
+        lambda: running.find(running.main, "currentName").property("text") == "DNS in Detail"
+    )
+    assert running.warnings == []
+
+
+def test_a_missing_name_is_asked_for_calmly(running: Running) -> None:
+    _open_start(running)
+    _type(running.find(running.main, "taskCount"), "7")
+    running.find(running.main, "taskCount").forceActiveFocus()
+
+    QMetaObject.invokeMethod(running.find(running.main, "startButton"), "clicked")
+    wait(20)
+
+    problem = running.find(running.main, "problem")
+    assert problem.property("visible") is True
+    assert problem.property("text") == "Give the room a name, then press Start."
+    assert running.find(running.main, "roomName").property("activeFocus") is True
+    assert running.rooms.recent() == []
+    assert not running.panel.isVisible()
+
+
+def test_a_bad_task_count_is_asked_for_calmly(running: Running) -> None:
+    _open_start(running)
+    _type(running.find(running.main, "roomName"), "DNS in Detail")
+
+    QMetaObject.invokeMethod(running.find(running.main, "startButton"), "clicked")
+    wait(20)
+
+    assert running.find(running.main, "problem").property("text") == (
+        "Number of tasks should be a whole number from 1 to 50."
+    )
+    assert running.find(running.main, "taskCount").property("activeFocus") is True
+
+
+@pytest.mark.parametrize(
+    "running",
+    [WithRooms(QUIET, (NewRoom(name="Old", task_count=1, path="Pre Security", module="Linux"),))],
+    indirect=True,
+)
+def test_path_and_module_are_remembered_behind_more(running: Running) -> None:
+    QMetaObject.invokeMethod(running.find(running.main, "startNew"), "clicked")
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "start")
+    wait(50)
+
+    assert running.find(running.main, "placeSummary").property("text") == "Pre Security · Linux"
+    QMetaObject.invokeMethod(running.find(running.main, "moreToggle"), "clicked")
+    wait(20)
+    assert running.find(running.main, "moreFields").property("visible") is True
+    assert running.find(running.main, "pathField").property("text") == "Pre Security"
+    _type(running.find(running.main, "moduleField"), "Networking")
+    _type(running.find(running.main, "roomName"), "New one")
+    _type(running.find(running.main, "taskCount"), "3")
+
+    QMetaObject.invokeMethod(running.find(running.main, "startButton"), "clicked")
+
+    assert wait_until(running.panel.isVisible)
+    room = running.rooms.current()
+    assert room is not None
+    assert (room.path, room.module) == ("Pre Security", "Networking")
+
+
+def test_back_returns_home_without_a_room(running: Running) -> None:
+    _open_start(running)
+
+    QMetaObject.invokeMethod(running.find(running.main, "backButton"), "clicked")
+
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "home")
+    assert running.rooms.recent() == []
+
+
+def test_start_works_from_the_keyboard(running: Running) -> None:
+    _open_start(running)
+    running.main.requestActivate()
+    for char in "Linux":
+        QTest.keyClick(running.main, char)
+    QTest.keyClick(running.main, Qt.Key.Key_Tab)
+    QTest.keyClick(running.main, "4")
+
+    QTest.keyClick(running.main, Qt.Key.Key_Return)
+
+    assert wait_until(running.panel.isVisible)
+    room = running.rooms.current()
+    assert room is not None
+    assert (room.name, room.task_count) == ("Linux", 4)
+
+
+def test_escape_goes_back_home(running: Running) -> None:
+    _open_start(running)
+    running.main.requestActivate()
+
+    QTest.keyClick(running.main, Qt.Key.Key_Escape)
+
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "home")
+
+
 # Phase 1 acceptance: exactly one accent button per screen (ADHD rule 1) --------------------------
 
 
@@ -336,17 +483,17 @@ def _visible_primary_buttons(root: QQuickItem) -> list[str]:
     [WithRooms(QUIET), WithRooms(QUIET, (DNS, NewRoom(name="Older", task_count=2)))],
     indirect=True,
 )
-@pytest.mark.parametrize("screen", ["home", "settings"])
+@pytest.mark.parametrize(("screen", "accents"), [("home", 1), ("start", 1), ("settings", 0)])
 def test_no_main_window_screen_has_more_than_one_accent_button(
-    running: Running, screen: str
+    running: Running, screen: str, accents: int
 ) -> None:
     running.navigation.open(screen)
     wait(50)
 
     buttons = _visible_primary_buttons(running.main.contentItem())
 
-    # Home always has its one; Settings has no action of its own until task 1.14.
-    assert len(buttons) == (1 if screen == "home" else 0), buttons
+    # Settings has no action of its own until task 1.14.
+    assert len(buttons) == accents, buttons
 
 
 def test_panel_has_at_most_one_accent_button(running: Running) -> None:

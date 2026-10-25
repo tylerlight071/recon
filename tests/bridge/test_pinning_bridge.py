@@ -5,8 +5,9 @@ from collections.abc import Callable, Iterator
 import pytest
 from PySide6.QtCore import QObject
 
-from recon.bridge.pinning import REAPPLY_DELAY_MS, PinningBridge, thread_pool_submit
+from recon.bridge.pinning import REAPPLY_DELAY_MS, PinningBridge
 from recon.bridge.settings import SettingsBridge
+from recon.bridge.workers import thread_pool_submit
 from recon.config import PinningChoice, Settings
 from recon.services.kwin import Method, PanelGeometry
 from tests.ui.qml_harness import SignalCounter, app, wait, wait_until
