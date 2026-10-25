@@ -114,6 +114,7 @@ class BlockListModel(QAbstractListModel):
     TextRole: Final = Qt.ItemDataRole.UserRole + 3
     LabelRole: Final = Qt.ItemDataRole.UserRole + 4
     HintRole: Final = Qt.ItemDataRole.UserRole + 5
+    AnswerRole: Final = Qt.ItemDataRole.UserRole + 6
 
     def __init__(self, parent: QObject | None = None) -> None:
         """Start empty."""
@@ -132,6 +133,7 @@ class BlockListModel(QAbstractListModel):
             self.TextRole: QByteArray(b"text"),
             self.LabelRole: QByteArray(b"typeLabel"),
             self.HintRole: QByteArray(b"hint"),
+            self.AnswerRole: QByteArray(b"answer"),
         }
 
     def data(self, index: Index, role: int = Qt.ItemDataRole.DisplayRole) -> object:
@@ -146,6 +148,7 @@ class BlockListModel(QAbstractListModel):
             self.TextRole: block.content.text,
             self.LabelRole: kind.label,
             self.HintRole: kind.hint,
+            self.AnswerRole: block.content.answer or "",
         }
         return values.get(role)
 
@@ -186,6 +189,26 @@ class BlockListModel(QAbstractListModel):
             index = self.index(row)
             self.dataChanged.emit(index, index, [self.TextRole])
         return True
+
+    def move(self, block_id: int, position: int) -> int | None:
+        """Move a block to `position` (clamped); the others close up around it.
+
+        Returns:
+            The position it ended at, or None if it isn't here or didn't move.
+        """
+        row = self._row(block_id)
+        if row is None:
+            return None
+        target = max(0, min(position, len(self._blocks) - 1))
+        if target == row:
+            return None
+        # Qt's destination is the row to insert *before*, counted before the move.
+        self.beginMoveRows(
+            QModelIndex(), row, row, QModelIndex(), target + 1 if target > row else target
+        )
+        self._blocks.insert(target, self._blocks.pop(row))
+        self.endMoveRows()
+        return target
 
     def first_id(self) -> int | None:
         """The first block's ID (the one to focus), or None."""

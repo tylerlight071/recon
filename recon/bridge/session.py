@@ -14,7 +14,7 @@ worker thread, and the result comes back to the UI thread as a signal.
 import logging
 import time
 from collections.abc import Callable
-from typing import Final, Protocol
+from typing import Final, Literal, Protocol
 
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
@@ -30,6 +30,8 @@ TITLE_SAVE_MS: Final = 500
 """The task title saves this long after the last keystroke (hard rule 7)."""
 TICK_MS: Final = 1000
 
+type Field = Literal["text", "answer"]
+"""A block's editable text fields."""
 type Then = Callable[[], None]
 """What to do on the UI thread once a background job has finished."""
 
@@ -56,8 +58,8 @@ class RoomSessionBridge(QObject):
     """A task (or room) was opened: refill the title field."""
     focusBlock = Signal(int)  # noqa: N815 - Qt naming, used from QML
     """Put the cursor in this block (a task opened, or a block was added)."""
-    replaceText = Signal(int, str)  # noqa: N815 - Qt naming, used from QML
-    """Show this text in a block's editor ("Not a flag, keep it" restored a string)."""
+    replaceText = Signal(int, str, str)  # noqa: N815 - Qt naming, used from QML
+    """(block, "text" or "answer", text): show this in that editor ("Not a flag, keep it")."""
     taskCompleted = Signal()  # noqa: N815 - Qt naming, used from QML
     """Tyler finished a task with Next: play the tick."""
     finishRequested = Signal(int)  # noqa: N815 - Qt naming; the room ID (Finish, task 1.13)
@@ -97,8 +99,8 @@ class RoomSessionBridge(QObject):
         self._busy = False
         self._opened_at = 0.0
         self._pending_title: str | None = None
-        # Block ID -> (text as typed, text after a hex lookalike was skipped).
-        self._skipped: dict[int, tuple[str, str]] = {}
+        # Block ID -> (field, text as typed, text after a hex lookalike was skipped).
+        self._skipped: dict[int, tuple[Field, str, str]] = {}
         self._model = BlockListModel(self)
         self._title_timer = QTimer(self, singleShot=True, interval=TITLE_SAVE_MS)
         self._title_timer.timeout.connect(self._save_title)
@@ -228,13 +230,21 @@ class RoomSessionBridge(QObject):
         Returns:
             The text the editor should show (flags removed).
         """
+        return self._edit(block_id, "text", text)
+
+    @Slot(int, str, result=str)
+    def editAnswer(self, block_id: int, text: str) -> str:  # noqa: N802 - Qt naming, used from QML
+        """Tyler typed a Room question's answer: same rules as `edit` (answers attract flags)."""
+        return self._edit(block_id, "answer", text)
+
+    def _edit(self, block_id: int, field: Field, text: str) -> str:
         content = self._model.content(block_id)
         if content is None:
             return text
         shown = self._guard.clean(block_id, text, list(content.kept))
         if shown != text:
-            self._skipped[block_id] = (text, shown)
-        updated = content.model_copy(update={"text": shown})
+            self._skipped[block_id] = (field, text, shown)
+        updated = content.model_copy(update={field: shown})
         self._model.set_content(block_id, updated, notify=False)
         self._autosave.put(block_id, updated)
         return shown
@@ -243,15 +253,16 @@ class RoomSessionBridge(QObject):
         # "Not a flag, keep it": put the string back where it was, if nothing changed
         # since; otherwise at the end, so newer typing is never lost.
         content = self._model.content(block_id)
-        typed, shown = self._skipped.pop(block_id, ("", ""))
+        field, typed, shown = self._skipped.pop(block_id, ("text", "", ""))
         if content is None or kept not in typed:
             return
-        text = typed if content.text == shown else f"{content.text.rstrip()} {kept}".lstrip()
+        now = (content.answer or "") if field == "answer" else content.text
+        text = typed if now == shown else f"{now.rstrip()} {kept}".lstrip()
         keep = content.kept if kept in content.kept else (*content.kept, kept)
-        updated = content.model_copy(update={"text": text, "kept": keep})
+        updated = content.model_copy(update={field: text, "kept": keep})
         self._model.set_content(block_id, updated, notify=True)
         self._autosave.put(block_id, updated)
-        self.replaceText.emit(block_id, text)
+        self.replaceText.emit(block_id, field, text)
 
     @Slot(str)
     def setTitle(self, title: str) -> None:  # noqa: N802 - Qt naming, used from QML
@@ -310,6 +321,20 @@ class RoomSessionBridge(QObject):
         if self._task() is not None and self._task_id() == block.task_id:
             self._model.append(block)
             self.focusBlock.emit(block.id)
+
+    @Slot(int, int)
+    def moveBlock(self, block_id: int, position: int) -> None:  # noqa: N802 - Qt naming, used from QML
+        """Move a block within the task (drag, or Alt+Up / Alt+Down); the rest close up."""
+        target = self._model.move(block_id, position)
+        if target is None:
+            return
+
+        def work() -> Then:
+            self._blocks.move(block_id, target)
+            return lambda: None
+
+        self._background(work, busy=False)
+        self.focusBlock.emit(block_id)
 
     def _task_id(self) -> int | None:
         task = self._task()

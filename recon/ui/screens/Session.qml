@@ -1,10 +1,12 @@
 import QtQuick
 import "../components"
+import "../editors"
 import "../theme"
 
 // The room session (task 1.9), shown in the panel while a room is open.
 // Top to bottom: header, task title, blocks, add bar, footer (SPEC.md).
 // Footer: Previous task (Alt+Left), Skip this task, and Next task (Ctrl+Return).
+// Blocks reorder by dragging the grip, or Alt+Up / Alt+Down in a block.
 // Bridge: RoomSession. One accent button: "Next task" / "Finish room".
 FocusScope {
     id: session
@@ -14,6 +16,54 @@ FocusScope {
     // Height of the add bar and footer (the panel keeps toasts above them).
     readonly property real bottomChrome: addBar.height + footer.height
 
+
+    // The block with the cursor (for Alt+Up / Alt+Down), and a drag's landing slot.
+    property int focusedIndex: -1
+    property int dropSlot: -1
+
+    function blockAt(i) { return blockList.itemAt(i) }
+
+    // Move the focused block up or down one place from the keyboard.
+    function nudge(step) {
+        const item = blockAt(focusedIndex)
+        if (!item)
+            return
+        const target = Math.max(0, Math.min(focusedIndex + step, blockList.count - 1))
+        RoomSession.moveBlock(item.blockId, target)
+        // The editor keeps the cursor, so it won't report focus again.
+        focusedIndex = target
+    }
+
+    // While dragging: the slot is how many blocks' middles are above the pointer.
+    function dragTo(from, sceneY) {
+        const y = page.mapFromItem(null, 0, sceneY).y
+        let slot = 0
+        for (let i = 0; i < blockList.count; ++i) {
+            const item = blockAt(i)
+            if (item.y + item.height / 2 < y)
+                slot = i + 1
+        }
+        dropSlot = slot
+        blockAt(from).dragging = true
+        const gap = page.spacing / 2
+        const below = slot < blockList.count ? blockAt(slot) : null
+        const last = blockAt(blockList.count - 1)
+        dropLine.y = page.y + (below ? below.y - gap : last.y + last.height + gap) - dropLine.height / 2
+    }
+
+    function drop(from) {
+        const item = blockAt(from)
+        const slot = dropSlot
+        dropSlot = -1
+        if (!item)
+            return
+        item.dragging = false
+        if (slot < 0)
+            return
+        const target = slot > from ? slot - 1 : slot
+        if (target !== from)
+            RoomSession.moveBlock(item.blockId, target)
+    }
 
     // Keep the block with the cursor in view as blocks are added.
     function reveal(item) {
@@ -37,6 +87,18 @@ FocusScope {
         sequences: ["Ctrl+Return", "Ctrl+Enter"]
         enabled: session.visible
         onActivated: RoomSession.next()
+    }
+
+    Shortcut {
+        sequence: "Alt+Up"
+        enabled: session.visible && session.focusedIndex > 0
+        onActivated: session.nudge(-1)
+    }
+
+    Shortcut {
+        sequence: "Alt+Down"
+        enabled: session.visible && session.focusedIndex >= 0 && session.focusedIndex < blockList.count - 1
+        onActivated: session.nudge(1)
     }
 
     Shortcut {
@@ -206,64 +268,25 @@ FocusScope {
                 objectName: "blockList"
                 model: RoomSession.blocks
 
-                Block {
-                    id: block
-
-                    required property int blockId
-                    required property string blockType
-                    required property string text
-                    required property string typeLabel
-                    required property string hint
-
-                    objectName: "block-" + blockId
+                BlockEditor {
                     width: page.width
-                    type: blockType
-                    label: typeLabel
-                    showHandle: false
-
-                    TextArea {
-                        id: editor
-                        objectName: "editor"
-                        width: parent.width
-                        hint: block.hint
-                        accessibleName: block.typeLabel
-                        mono: block.blockType === "command"
-
-                        property bool ready: false
-
-                        Component.onCompleted: {
-                            text = block.text
-                            ready = true
-                        }
-
-                        // Every keystroke: flags out, autosave queued (hard rules 2 and 7).
-                        onTextChanged: {
-                            if (!ready)
-                                return
-                            const shown = RoomSession.edit(block.blockId, text)
-                            if (shown !== text) {
-                                const at = cursorPosition
-                                text = shown
-                                cursorPosition = Math.min(at, length)
-                            }
-                        }
-
-                        onActiveFocusChanged: if (activeFocus) session.reveal(block)
-                    }
-
-                    Connections {
-                        target: RoomSession
-                        function onFocusBlock(id) {
-                            if (id === block.blockId)
-                                editor.forceActiveFocus()
-                        }
-                        function onReplaceText(id, value) {
-                            if (id === block.blockId && editor.text !== value)
-                                editor.text = value
-                        }
-                    }
+                    onFocused: session.focusedIndex = index
+                    onDragMovedTo: sceneY => session.dragTo(index, sceneY)
+                    onDragFinished: session.drop(index)
                 }
             }
+        }
+
+        // Where a dragged block will land.
+        Rectangle {
+            id: dropLine
+            objectName: "dropLine"
+            x: page.x
+            width: page.width
+            height: Theme.focusRingWidth
+            radius: height / 2
+            color: Theme.accent
+            visible: session.dropSlot >= 0
         }
     }
 

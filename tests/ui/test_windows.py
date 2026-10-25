@@ -5,11 +5,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject, QPoint, QPointF, Qt
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtTest import QTest
 
 from recon.app import QmlEngine, create_engine, load_windows, root_window
+from recon.bridge.editors import EditorsBridge
 from recon.bridge.flags import FlagGuard
 from recon.bridge.flow import connect_room_flow
 from recon.bridge.home import HomeBridge
@@ -115,6 +116,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "HomeModel": home,
             "StartRoom": start,
             "RoomSession": session,
+            "Editors": EditorsBridge(parent=owner),
         }
     )
     warnings: list[str] = []
@@ -763,3 +765,137 @@ def test_previous_task_from_the_footer_and_the_keyboard(running: Running) -> Non
     assert label.property("text") == "Task 1 of 3"
     assert back.property("enabled") is False
     assert running.find(running.panel, "nextTask").property("text") == "Next task"
+
+
+# Task 1.10: block editors -------------------------------------------------------------------
+
+
+def _blocks(running: Running) -> list[QQuickItem]:
+    found: list[QQuickItem] = []
+    pending: list[QQuickItem] = [running.panel.contentItem()]
+    while pending:
+        item = pending.pop()
+        if item.objectName().startswith("block-") and item.isVisible():
+            found.append(item)
+        pending.extend(item.childItems())
+    return sorted(found, key=lambda b: b.mapToScene(b.position()).y())
+
+
+def _in(item: QQuickItem, name: str) -> QQuickItem:
+    pending = [item]
+    while pending:
+        current = pending.pop()
+        if current.objectName() == name:
+            return current
+        pending.extend(current.childItems())
+    raise AssertionError(name)
+
+
+def _add(running: Running, block_type: str) -> QQuickItem:
+    QMetaObject.invokeMethod(running.find(running.panel, f"add-{block_type}"), "clicked")
+    wait(20)
+    return _blocks(running)[-1]
+
+
+def test_table_block_shows_a_grid_preview(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    block = _add(running, "table")
+    preview = _in(block, "tablePreview")
+    assert preview.property("visible") is False
+
+    _in(block, "editor").setProperty("text", "Port, Service\n53, DNS\n80, HTTP")
+    wait(20)
+
+    assert preview.property("visible") is True
+    assert preview.property("columns") == 2
+    assert len(preview.property("rows")) == 3
+    assert running.warnings == []
+
+
+def test_command_block_is_monospace(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    block = _add(running, "command")
+
+    editor = _in(block, "editor")
+
+    assert editor.property("mono") is True
+    assert editor.property("font").family() == "JetBrains Mono"
+    assert _in(block, "tablePreview").property("visible") is False
+    assert _in(block, "answerArea").property("visible") is False
+
+
+def test_room_question_answer_is_hidden_on_return(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    block = _add(running, "room_question")
+    answer = _in(block, "answerEditor")
+    toggle = _in(block, "answerToggle")
+    assert answer.property("visible") is True
+    assert toggle.property("visible") is False
+
+    _in(block, "editor").setProperty("text", "Which port does DNS use?")
+    answer.setProperty("text", "53 THM{n0}")
+    wait(20)
+    assert answer.property("text") == "53 "
+    assert toggle.property("text") == "Hide answer"
+
+    QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+    QMetaObject.invokeMethod(running.find(running.panel, "previousTask"), "clicked")
+    wait(20)
+
+    block = _blocks(running)[1]
+    assert _in(block, "answerEditor").property("visible") is False
+    toggle = _in(block, "answerToggle")
+    assert toggle.property("text") == "Show answer"
+    QMetaObject.invokeMethod(toggle, "clicked")
+    wait(20)
+    assert _in(block, "answerEditor").property("visible") is True
+    assert _in(block, "answerEditor").property("text") == "53 "
+
+
+def _ids(running: Running) -> list[int]:
+    return [int(b.property("blockId")) for b in _blocks(running)]
+
+
+def test_alt_up_and_down_move_the_block_with_the_cursor(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    _add(running, "command")
+    question = _add(running, "question")
+    key, command, q = _ids(running)
+    assert wait_until(lambda: _in(question, "editor").property("activeFocus") is True)
+    running.panel.requestActivate()
+
+    QTest.keyClick(running.panel, Qt.Key.Key_Up, Qt.KeyboardModifier.AltModifier)
+    wait(20)
+    assert _ids(running) == [key, q, command]
+    QTest.keyClick(running.panel, Qt.Key.Key_Up, Qt.KeyboardModifier.AltModifier)
+    wait(20)
+    assert _ids(running) == [q, key, command]
+    QTest.keyClick(running.panel, Qt.Key.Key_Down, Qt.KeyboardModifier.AltModifier)
+    wait(20)
+
+    assert _ids(running) == [key, q, command]
+    task = running.tasks.for_room(running.rooms.current().id)[0]  # type: ignore[union-attr]
+    assert [b.id for b in running.blocks.for_task(task.id)] == [key, q, command]
+
+
+def test_dragging_the_grip_moves_a_block(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    _add(running, "command")
+    _add(running, "question")
+    key, command, question = _ids(running)
+    first, _second, third = _blocks(running)
+    grip = _in(first, "grip")
+    start = grip.mapToScene(QPointF(grip.width() / 2, grip.height() / 2)).toPoint()
+    end = third.mapToScene(QPointF(third.width() / 2, third.height() - 2)).toPoint()
+
+    QTest.mousePress(running.panel, Qt.MouseButton.LeftButton, pos=start)
+    for step in range(1, 11):
+        y = start.y() + (end.y() - start.y()) * step // 10
+        QTest.mouseMove(running.panel, QPoint(start.x(), y))
+        wait(10)
+    assert running.find(running.panel, "dropLine").property("visible") is True
+    QTest.mouseRelease(running.panel, Qt.MouseButton.LeftButton, pos=QPoint(start.x(), end.y()))
+    wait(20)
+
+    assert _ids(running) == [command, question, key]
+    assert running.find(running.panel, "dropLine").property("visible") is False
