@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject
@@ -9,12 +10,25 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow
 
 from recon.app import QmlEngine, create_engine, load_windows, root_window
 from recon.bridge.flags import FlagGuard
+from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.settings import SettingsBridge
 from recon.config import Settings
+from recon.db.connection import Database
+from recon.db.migrate import migrate
+from recon.db.models import NewRoom
+from recon.db.repositories import BlockRepository, RoomRepository, utc_now
 from tests.bridge.test_pinning_bridge import FakePinner
 from tests.ui.qml_harness import app, wait, wait_until
+
+
+@dataclass(frozen=True)
+class WithRooms:
+    """Fixture parameter: settings plus rooms to create before the windows load."""
+
+    settings: Settings
+    rooms: tuple[NewRoom, ...] = ()
 
 
 @dataclass
@@ -48,10 +62,16 @@ class Running:
 
 
 @pytest.fixture
-def running(request: pytest.FixtureRequest) -> Iterator[Running]:
+def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]:
     app()
+    (tmp_path / "recon").mkdir(mode=0o700)
+    db = Database.open(tmp_path / "recon" / "app.db")
+    migrate(db)
     # Most tests don't want the first-launch pin question in the way.
-    initial: Settings = getattr(request, "param", Settings(kwin_pinning="off"))
+    param = getattr(request, "param", Settings(kwin_pinning="off"))
+    initial = param.settings if isinstance(param, WithRooms) else param
+    for room in param.rooms if isinstance(param, WithRooms) else ():
+        RoomRepository(db).create(room)
     owner = QObject()
     saved: list[Settings] = []
     settings = SettingsBridge(initial, saved.append, parent=owner)
@@ -68,6 +88,7 @@ def running(request: pytest.FixtureRequest) -> Iterator[Running]:
             "Navigation": navigation,
             "Pinning": pinning,
             "FlagGuard": flag_guard,
+            "HomeModel": HomeBridge(RoomRepository(db), BlockRepository(db), utc_now, parent=owner),
         }
     )
     warnings: list[str] = []
@@ -84,6 +105,7 @@ def running(request: pytest.FixtureRequest) -> Iterator[Running]:
     qml.engine.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     owner.deleteLater()
+    db.close()
 
 
 def test_two_windows_load_cleanly(running: Running) -> None:
@@ -261,3 +283,74 @@ def test_hash_notice_offers_not_a_flag_keep_it(running: Running) -> None:
     assert running.kept == [(7, MD5)]
     assert restored == [(7, MD5)]
     assert toast.property("shown") is False
+
+
+# Task 1.7: Home --------------------------------------------------------------------------
+
+QUIET = Settings(kwin_pinning="off")
+DNS = NewRoom(name="DNS in Detail", task_count=7)
+
+
+def test_home_first_launch_shows_one_calm_start(running: Running) -> None:
+    assert running.find(running.main, "emptyState").property("visible") is True
+    assert running.find(running.main, "whereWasI").property("visible") is False
+    assert running.find(running.main, "primaryAction").property("text") == "Start a room"
+    assert running.find(running.main, "startNew").property("visible") is False
+    assert running.warnings == []
+
+
+@pytest.mark.parametrize("running", [WithRooms(QUIET, (DNS,))], indirect=True)
+def test_home_with_a_room_in_progress(running: Running) -> None:
+    assert running.find(running.main, "whereWasI").property("visible") is True
+    assert running.find(running.main, "currentName").property("text") == "DNS in Detail"
+    assert (
+        running.find(running.main, "currentProgress").property("text") == "Task 1 of 7 · just now"
+    )
+    assert (
+        running.find(running.main, "primaryAction").property("text")
+        == "Carry on with DNS in Detail"
+    )
+    assert running.find(running.main, "startNew").property("visible") is True
+    assert running.find(running.main, "emptyState").property("visible") is False
+    assert running.warnings == []
+
+
+# Phase 1 acceptance: exactly one accent button per screen (ADHD rule 1) --------------------------
+
+
+def _visible_primary_buttons(root: QQuickItem) -> list[str]:
+    found: list[str] = []
+    pending = [root]
+    while pending:
+        item = pending.pop()
+        if not item.isVisible():
+            continue
+        if item.property("variant") == "primary":
+            found.append(item.objectName() or str(item.property("text")))
+        pending.extend(item.childItems())
+    return found
+
+
+@pytest.mark.parametrize(
+    "running",
+    [WithRooms(QUIET), WithRooms(QUIET, (DNS, NewRoom(name="Older", task_count=2)))],
+    indirect=True,
+)
+@pytest.mark.parametrize("screen", ["home", "settings"])
+def test_no_main_window_screen_has_more_than_one_accent_button(
+    running: Running, screen: str
+) -> None:
+    running.navigation.open(screen)
+    wait(50)
+
+    buttons = _visible_primary_buttons(running.main.contentItem())
+
+    # Home always has its one; Settings has no action of its own until task 1.14.
+    assert len(buttons) == (1 if screen == "home" else 0), buttons
+
+
+def test_panel_has_at_most_one_accent_button(running: Running) -> None:
+    running.navigation.showPanel()
+    wait_until(running.panel.isVisible)
+
+    assert len(_visible_primary_buttons(running.panel.contentItem())) <= 1
