@@ -18,10 +18,18 @@ Window {
     minimumHeight: Theme.mainWindowMinHeight
     visible: true
 
+    // `under`: a screen reached from another one, with no sidebar entry of its own.
     readonly property var screens: [
         { "key": "home", "label": qsTr("Home"), "icon": "home", "file": "screens/Home.qml" },
+        { "key": "start", "under": "home", "file": "screens/Start.qml" },
         { "key": "settings", "label": qsTr("Settings"), "icon": "sliders", "file": "screens/Settings.qml" }
     ]
+
+    // The sidebar entry that lights up for a screen (Start lights up Home).
+    function sidebarKey(key) {
+        const match = screens.find(s => s.key === key)
+        return match && match.under ? match.under : key
+    }
 
     function screenFile(key) {
         const match = screens.find(s => s.key === key)
@@ -90,7 +98,7 @@ Window {
                 spacing: Theme.space1
 
                 Repeater {
-                    model: main.screens
+                    model: main.screens.filter(s => !s.under)
 
                     SidebarItem {
                         required property var modelData
@@ -98,7 +106,7 @@ Window {
                         width: parent.width
                         text: modelData.label
                         iconName: modelData.icon
-                        selected: Navigation.currentScreen === modelData.key
+                        selected: main.sidebarKey(Navigation.currentScreen) === modelData.key
                         onClicked: Navigation.open(modelData.key)
                     }
                 }

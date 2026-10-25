@@ -3,15 +3,15 @@
 from collections.abc import Callable
 from typing import Protocol
 
-from PySide6.QtCore import Property, QObject, QThreadPool, QTimer, Signal, Slot
+from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
 from recon.bridge.settings import SettingsBridge
+from recon.bridge.workers import Submit, thread_pool_submit
 from recon.services.kwin import Method, PanelGeometry
 
 REAPPLY_DELAY_MS = 500
 """A width change while pinned rewrites the rule once the change settles."""
 
-type Submit = Callable[[Callable[[], None]], None]
 type ScreenArea = Callable[[], tuple[int, int, int, int]]
 
 
@@ -23,11 +23,6 @@ class Pinner(Protocol):
 
     def unpin(self) -> bool:
         """Remove the pin; return whether it's gone."""
-
-
-def thread_pool_submit(job: Callable[[], None]) -> None:
-    """Run `job` on Qt's global thread pool, off the UI thread."""
-    QThreadPool.globalInstance().start(job)
 
 
 class PinningBridge(QObject):

@@ -90,6 +90,22 @@ Window {
                 TextArea { width: Theme.toastWidth; mono: true; hint: "Paste or type the command. Add what it does after a #."; text: "nmap -sV 10.10.0.5  # versions of open services" }
             }
 
+            Heading { text: "Text fields" }
+            Row {
+                spacing: Theme.space3
+                TextField { width: Theme.toastWidth; hint: "e.g. DNS in Detail"; accessibleName: "Room name" }
+                TextField { width: Theme.numberFieldWidth; hint: "e.g. 7"; accessibleName: "Number of tasks" }
+            }
+
+            Heading { text: "Choices and list rows" }
+            Column {
+                width: Theme.toastWidth
+                Choice { width: parent.width; text: "New room"; detail: "Take notes as you go, one task at a time."; checked: true }
+                Choice { width: parent.width; text: "From memory"; detail: "For a room you've already done. Coming soon."; enabled: false }
+                ListRow { width: parent.width; title: "Linux Basics"; detail: "Pre Security · Linux · Done"; trailing: "9 days ago"; interactive: false }
+                ListRow { width: parent.width; title: "DNS in Detail"; detail: "Task 4 of 7"; trailing: "2 days ago" }
+            }
+
             Heading { text: "Blocks" }
             Note { text: "Each type has its own muted edge colour. Reordering arrives in task 1.10." }
             Repeater {

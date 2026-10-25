@@ -38,7 +38,7 @@ Rules that the structure enforces:
 
 `recon/ui/components/` holds Recon's own controls, built on `QtQuick.Templates` so they follow the design system rather than the system theme:
 
-- **Controls:** `Button` (primary, secondary and quiet), `IconButton`, `TextArea` (the hint fades while typing), `SidebarItem`, `TimerChip`.
+- **Controls:** `Button` (primary, secondary and quiet), `IconButton`, `TextArea` (the hint fades while typing), `TextField` (single line, same hint; Return accepts), `Choice` (a radio option with a detail line), `SidebarItem`, `TimerChip`.
 - **Surfaces:** `Card`, `ListRow` (title, detail and a trailing note; clickable only when it leads somewhere), and `Block` (a coloured edge per type, a type label, a drag handle).
 - **Feedback:** `ProgressRing`, `Toast` (an optional Undo; 10 s by default), `Dialog`, `Tooltip` (with a shortcut).
 - **Helpers:** `Icon` (Recon's own line icons drawn with QtQuick.Shapes, no icon font) and `FocusRing`.
@@ -61,7 +61,15 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 
 ## Home
 
-`bridge/home.py` (`HomeModel`) reads rooms each time Home is shown. The one accent button reads "Start a room", or "Carry on with <room>" when a room is still being captured (`RoomRepository.current()`: the most recently updated room in `capturing`). The "Where was I?" card shows the room, "Task 4 of 7", how long ago in calm words (`ago()`: "2 days ago", never an overdue count) and the last line written (`BlockRepository.latest_written()`). Recent rooms list up to five others; only rooms still being captured can be resumed from the list. "Carry on" emits `resumeRequested`, which shows the panel; "Start a room" emits `startRequested`.
+`bridge/home.py` (`HomeModel`) reads rooms each time Home is shown. The one accent button reads "Start a room", or "Carry on with <room>" when a room is still being captured (`RoomRepository.current()`: the most recently updated room in `capturing`). The "Where was I?" card shows the room, "Task 4 of 7", how long ago in calm words (`ago()`: "2 days ago", never an overdue count) and the last line written (`BlockRepository.latest_written()`). Recent rooms list up to five others; only rooms still being captured can be resumed from the list. "Carry on" emits `resumeRequested`; "Start a room" emits `startRequested`.
+
+## Start a room
+
+`screens/Start.qml` sits under Home (no sidebar entry; Home stays lit) and asks for two things: the room name and the number of tasks. Path and module are prefilled from the last room and sit behind "More". The mode choice shows New room, with From memory disabled as "Coming soon" until Phase 4, so the choice never moves. Return in any field starts; Escape goes back.
+
+`bridge/start.py` (`StartRoom`) checks the fields (a name, and a whole number of tasks from 1 to 50) and says what to fix in one plain sentence, moving focus to that field. Lengths are capped (name 120, path and module 80), and the repository strips flags as usual. The room is created on Qt's thread pool (`bridge/workers.py`); a storage failure comes back as the error's calm message.
+
+`bridge/flow.py` wires the hand-overs once, for the app and its tests: Home's "Start a room" opens Start; a new room switches the main window back to Home without raising it and shows the panel; "Carry on" shows the panel. Task 1.9 loads the room into the panel.
 
 Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with `tomllib`, written with `tomli-w`). An unreadable file falls back to the defaults rather than stopping start-up. Every write goes through `recon/fs.py` (temp file, fsync, replace, fsync the folder).
 

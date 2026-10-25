@@ -4,8 +4,11 @@ from typing import Final
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
-MAIN_SCREENS: Final = ("home", "settings")
-"""Main-window screens that exist so far. Later tasks add review, cards, revise, ask, library."""
+MAIN_SCREENS: Final = ("home", "start", "settings")
+"""Main-window screens that exist so far. Later tasks add review, cards, revise, ask, library.
+
+"start" (Start a room) has no sidebar entry of its own: it's reached from Home.
+"""
 
 
 class NavigationBridge(QObject):
@@ -31,12 +34,21 @@ class NavigationBridge(QObject):
 
         Unknown screen names are ignored, so a stray call can't blank the window.
         """
+        if self.switch_to(screen):
+            self.mainWindowRequested.emit()
+
+    def switch_to(self, screen: str) -> bool:
+        """Change the main window's screen without bringing the window forward.
+
+        Returns:
+            False if `screen` isn't a known screen (nothing changes).
+        """
         if screen not in MAIN_SCREENS:
-            return
+            return False
         if screen != self._screen:
             self._screen = screen
             self.currentScreenChanged.emit()
-        self.mainWindowRequested.emit()
+        return True
 
     @Slot()
     def showPanel(self) -> None:  # noqa: N802 - Qt naming, used from QML

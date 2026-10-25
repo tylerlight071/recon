@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Start a room: the room name and number of tasks, with path and module remembered from the last room behind "More", and From memory shown as "Coming soon". Missing or unusable fields get one plain sentence and the cursor goes to the field. The room is saved off the UI thread, then the panel opens. New `TextField` and `Choice` components.
 - Home screen: one accent button ("Start a room" or "Carry on with <room>"), a "Where was I?" card with the room, "Task 4 of 7", how long ago and the last line written, and up to five recent rooms. Times read calmly ("2 days ago"); nothing counts as overdue. A test checks that no main-window screen shows more than one accent button.
 - Flag filter (hard rule 2): `THM{…}`, `flag{…}`, `HTB{…}` and lone 32+ character hex strings are stripped from every text field before it reaches the database, including flags still being typed. The panel shows "Flag skipped", and "Not a flag, keep it" is offered for example hashes only. Mutation testing kills 111 of 111 mutants. ADR 0005.
 - Database layer: `app.db` in WAL mode, private, with numbered migrations (the Phase 1 tables as STRICT tables with constraints); repositories for rooms, tasks and blocks; an autosave queue that writes every edit within half a second, even during continuous typing; and a daily snapshot through SQLite's online backup API, keeping 14. A `kill -9` test confirms at most half a second of typing is lost.

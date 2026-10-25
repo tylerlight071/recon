@@ -35,6 +35,8 @@ DEFAULT_BODIES = {
     "Tooltip": 'Item { Tooltip { objectName: "subject"; text: "Add"; visible: true; delay: 0 } }',
     "FocusRing": 'Item { width: 10; height: 10; FocusRing { objectName: "subject" } }',
     "ListRow": 'ListRow { objectName: "subject"; title: "DNS in Detail"; detail: "Task 4 of 7" }',
+    "TextField": 'TextField { objectName: "subject"; hint: "e.g. DNS in Detail" }',
+    "Choice": 'Choice { objectName: "subject"; text: "New room"; detail: "As you go." }',
 }
 
 
@@ -347,3 +349,63 @@ def test_list_row_reads_as_one_line_and_only_clicks_when_interactive() -> None:
     assert clicks.count == 0
     assert row.property("enabled") is False
     assert loaded.find("rowTitle").property("text") == "Linux Basics"
+
+
+# TextField ------------------------------------------------------------------------
+
+
+def test_text_field_hint_hides_while_typed_in() -> None:
+    loaded = load('TextField { objectName: "subject"; hint: "e.g. 7" }')
+    hint = _child(loaded, "hint")
+    assert hint.property("opacity") == 1
+
+    loaded.subject.setProperty("text", "7")
+    wait(20)
+
+    assert hint.property("opacity") == 0
+    assert loaded.subject.property("accessibleName") == "e.g. 7"
+
+
+def test_text_field_return_accepts() -> None:
+    loaded = load('TextField { objectName: "subject"; hint: "Room name" }')
+    field = loaded.subject
+    accepted = SignalCounter(field, "accepted()")
+    field.forceActiveFocus()
+
+    QTest.keyClick(loaded.window, Qt.Key.Key_Return)
+
+    assert accepted.count == 1
+
+
+# Choice ---------------------------------------------------------------------------
+
+
+def test_choices_are_exclusive_and_keyboard_picks() -> None:
+    loaded = load(
+        'Column { Choice { objectName: "subject"; text: "New room"; checked: true }\n'
+        'Choice { objectName: "other"; text: "From memory" } }'
+    )
+    first, other = loaded.subject, loaded.find("other")
+    other.forceActiveFocus()
+
+    QTest.keyClick(loaded.window, Qt.Key.Key_Return)
+    wait(20)
+
+    assert (first.property("checked"), other.property("checked")) == (False, True)
+    assert loaded.find("dot").property("visible") is False
+
+
+def test_a_disabled_choice_cannot_be_picked() -> None:
+    loaded = load(
+        'Column { Choice { objectName: "first"; text: "New room"; checked: true }\n'
+        'Choice { objectName: "subject"; text: "From memory"; enabled: false } }'
+    )
+    choice = loaded.subject
+
+    QTest.mouseClick(loaded.window, Qt.MouseButton.LeftButton, pos=centre(choice).toPoint())
+    QMetaObject.invokeMethod(choice, "click")
+    wait(20)
+
+    assert choice.property("checked") is False
+    assert loaded.find("first").property("checked") is True
+    assert choice.property("opacity") == loaded.theme.property("disabledOpacity")

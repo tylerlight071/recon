@@ -117,6 +117,7 @@ QtObject {
     readonly property int ringSize: 28
     readonly property real ringStroke: 3
     readonly property int textAreaMinHeight: 64
+    readonly property int numberFieldWidth: 96
     readonly property int toastWidth: 360
     readonly property int dialogWidth: 400
     readonly property int sidebarItemHeight: 36
