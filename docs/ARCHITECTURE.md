@@ -67,6 +67,14 @@ Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with
 
 ## Storage
 
+`recon/db/` (task 1.5):
+- **`connection.py`:** a single `Database` connection to `app.db`, guarded by a lock so there's only ever one writer. Pragmas: WAL, `synchronous=FULL`, `foreign_keys=ON`, `secure_delete=ON`. The file is created 0600, and SQLite gives the `-wal` and `-shm` files the same mode.
+- **`migrate.py`:** applies `migrations/NNNN_name.sql` in order, tracked in `PRAGMA user_version`. Each migration runs in one transaction with its version bump. A database from a newer Recon is refused.
+- **`0001_initial.sql`:** the Phase 1 tables as STRICT tables, with CHECK constraints on every enum, JSON-validated `content`, cascading deletes, and one task per index per room.
+- **`models.py` and `repositories.py`:** rooms, tasks and blocks go in and out as pydantic models through literal, parameterised SQL. Every change bumps the room's `updated_at`; block positions stay 0..n-1; `ensure_starter_block` places the empty Key idea block.
+- **`autosave.py`:** a writer thread. Edits coalesce per block, and each is written at most 0.5 s after its *first* unsaved change, so continuous typing can't postpone saving. `flush()` runs on task switch and window close, and failed writes are retried. The `kill -9` crash test loses 0.5 s, within the 1 s budget.
+- **`backup.py`:** a daily snapshot through SQLite's online backup API into `backups/db/app-YYYY-MM-DD.db`. It's written to a temp file, fsynced and renamed, and the newest 14 are kept. It's taken at launch; a failed snapshot is logged and start-up continues.
+
 | Store | Location | Notes |
 | --- | --- | --- |
 | `app.db` | `$XDG_DATA_HOME/recon/` | Rooms, tasks, blocks, sessions, cards, reviews, settings; WAL; one writer |
