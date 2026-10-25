@@ -37,6 +37,10 @@ DEFAULT_BODIES = {
     "ListRow": 'ListRow { objectName: "subject"; title: "DNS in Detail"; detail: "Task 4 of 7" }',
     "TextField": 'TextField { objectName: "subject"; hint: "e.g. DNS in Detail" }',
     "Choice": 'Choice { objectName: "subject"; text: "New room"; detail: "As you go." }',
+    "PopupMenu": (
+        'Item { PopupMenu { objectName: "subject"; title: "Focus"; '
+        'items: [{ "text": "Focus for 25 minutes", "key": 25 }] } }'
+    ),
 }
 
 
@@ -409,3 +413,45 @@ def test_a_disabled_choice_cannot_be_picked() -> None:
     assert choice.property("checked") is False
     assert loaded.find("first").property("checked") is True
     assert choice.property("opacity") == loaded.theme.property("disabledOpacity")
+
+
+# PopupMenu ------------------------------------------------------------------------
+
+
+def test_popup_menu_picks_with_the_keyboard_and_closes() -> None:
+    loaded = load(
+        'Item { width: 300; height: 300; PopupMenu { objectName: "subject"; title: "Focus"; '
+        'items: [{ "text": "Focus for 15 minutes", "key": 15 }, '
+        '{ "text": "Focus for 25 minutes", "key": 25, "detail": "A pomodoro" }] } }'
+    )
+    menu = loaded.subject
+    picked: list[object] = []
+    menu.chosen.connect(picked.append)
+
+    QMetaObject.invokeMethod(menu, "open")
+    assert wait_until(lambda: menu.property("opened") is True)
+    QTest.keyClick(loaded.window, Qt.Key.Key_Down)
+    QTest.keyClick(loaded.window, Qt.Key.Key_Return)
+
+    assert picked == [25]
+    assert wait_until(lambda: menu.property("visible") is False)
+    assert loaded.warnings == []
+
+
+# TimerChip focus line ---------------------------------------------------------------
+
+
+def test_timer_chip_focus_line_fills_and_hides() -> None:
+    loaded = load(
+        'TimerChip { objectName: "subject"; seconds: 90; progress: 0.5; '
+        'focusText: "in a 25 minute focus block" }'
+    )
+    line = loaded.find("focusLine")
+
+    assert line.property("visible") is True
+    full = loaded.subject.property("width") - 2 * loaded.subject.property("height") / 2
+    assert line.property("width") == pytest.approx(full * 0.5, abs=1)
+
+    loaded.subject.setProperty("progress", -1)
+    wait(20)
+    assert line.property("visible") is False

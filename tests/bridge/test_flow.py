@@ -7,6 +7,7 @@ import pytest
 
 from recon.bridge.flags import FlagGuard
 from recon.bridge.flow import connect_room_flow
+from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.session import RoomSessionBridge
@@ -44,7 +45,8 @@ def flow(tmp_path: Path) -> Iterator[Flow]:
         FlagGuard(blocks.keep_lookalike),
         submit=lambda job: job(),
     )
-    connect_room_flow(navigation, home, start, session)
+    focus = FocusBridge(TaskRepository(db), lambda: None, lambda: False, submit=lambda job: job())
+    connect_room_flow(navigation, home, start, session, focus)
     yield navigation, home, start, session
     db.close()
 

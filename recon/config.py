@@ -44,6 +44,8 @@ class Settings(BaseModel):
     panel_width: int = Field(default=PANEL_WIDTH_DEFAULT, ge=PANEL_WIDTH_MIN, le=PANEL_WIDTH_MAX)
     kwin_pinning: PinningChoice = "ask"
     """Pin the panel with a KWin rule: "ask" (first launch asks once), "on" or "off"."""
+    chime: bool = False
+    """Play a soft chime when a focus block ends (calm by default: off)."""
 
 
 def clamp_panel_width(width: float) -> int:

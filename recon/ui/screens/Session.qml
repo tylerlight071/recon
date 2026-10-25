@@ -225,10 +225,27 @@ FocusScope {
                 }
 
                 TimerChip {
+                    id: timerChip
                     objectName: "timerChip"
                     anchors.verticalCenter: parent.verticalCenter
-                    seconds: RoomSession.elapsed
-                    running: true
+                    seconds: Focus.seconds
+                    running: Focus.running
+                    progress: Focus.focusing ? Focus.focusProgress : -1
+                    focusText: Focus.focusing ? qsTr("in a %1 minute focus block").arg(Focus.focusMinutes) : ""
+                    onClicked: focusMenu.open()
+
+                    PopupMenu {
+                        id: focusMenu
+                        objectName: "focusMenu"
+                        y: timerChip.height + Theme.space1
+                        x: timerChip.width - width
+                        title: qsTr("Focus")
+                        items: (Focus.focusing
+                                ? [{ "text": qsTr("Stop focusing"), "key": 0,
+                                     "detail": qsTr("%1 minute block").arg(Focus.focusMinutes) }]
+                                : []).concat(Focus.presets.map(m => ({ "text": qsTr("Focus for %1 minutes").arg(m), "key": m })))
+                        onChosen: key => key === 0 ? Focus.stopFocus() : Focus.startFocus(key)
+                    }
                 }
 
                 IconButton {

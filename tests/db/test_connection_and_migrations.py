@@ -83,12 +83,12 @@ def test_fresh_database_migrates_to_the_latest_schema(db: Database) -> None:
     with db.read() as conn:
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
-    assert current_version(db) == len(available()) == 1
+    assert current_version(db) == len(available()) == 2
     assert tables == TABLES
 
 
 def test_migrating_twice_changes_nothing(db: Database) -> None:
-    assert migrate(db) == 1
+    assert migrate(db) == 2
 
 
 def test_database_from_a_newer_recon_is_refused(db: Database) -> None:
@@ -129,3 +129,34 @@ def test_failing_migration_is_rolled_back_whole(data_dir: Path, tmp_path: Path) 
 def test_migration_files_are_numbered_from_one() -> None:
     assert [m.version for m in available()] == list(range(1, len(available()) + 1))
     assert available()[0].path.name == "0001_initial.sql"
+
+
+def test_0002_adds_task_time_to_a_version_1_database_with_rooms(
+    data_dir: Path, tmp_path: Path
+) -> None:
+    folder = tmp_path / "v1"
+    folder.mkdir()
+    shutil.copy(MIGRATIONS_DIR / "0001_initial.sql", folder / "0001_initial.sql")
+    db = Database.open(data_dir / "app.db")
+    migrate(db, folder)
+    with db.transaction() as conn:
+        conn.execute(
+            "INSERT INTO rooms (platform, path, module, name, task_count, mode, created_at,"
+            " updated_at, time_spent_s) VALUES ('TryHackMe', '', '', 'Old room', 2, 'new',"
+            " '2026-10-01T09:00:00+00:00', '2026-10-01T09:00:00+00:00', 600)"
+        )
+        conn.executemany(
+            "INSERT INTO tasks (room_id, task_index, title, status) VALUES (1, ?, ?, 'done')",
+            [(1, "First"), (2, "Second")],
+        )
+
+    assert migrate(db) == 2
+
+    with db.read() as conn:
+        rows = conn.execute("SELECT title, status, time_spent_s FROM tasks ORDER BY id").fetchall()
+        room = conn.execute("SELECT name, time_spent_s FROM rooms").fetchone()
+    assert rows == [("First", "done", 0), ("Second", "done", 0)]
+    assert room == ("Old room", 600)
+    with pytest.raises(StorageError), db.transaction() as conn:
+        conn.execute("UPDATE tasks SET time_spent_s = -1")
+    db.close()

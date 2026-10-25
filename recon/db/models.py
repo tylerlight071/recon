@@ -67,6 +67,7 @@ class Task(_Row):
     task_index: int
     title: str
     status: TaskStatus
+    time_spent_s: int = 0
 
 
 class Block(_Row):

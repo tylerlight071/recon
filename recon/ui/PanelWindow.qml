@@ -79,6 +79,16 @@ Window {
         }
     }
 
+    Connections {
+        target: Focus
+        function onFocusDone(minutes) {
+            panel.notify(qsTr("That's %1 minutes of focus. Keep going, or take a short break.").arg(minutes))
+        }
+        function onBreakSuggested() {
+            panel.notify(qsTr("You've been at this for an hour and a half. Time for a short break?"))
+        }
+    }
+
     Item {
         id: content
         anchors.fill: parent

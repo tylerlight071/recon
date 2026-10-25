@@ -6,6 +6,7 @@ jumping in front, so the panel and the browser stay where Tyler's eyes are,
 and Home keeps "Where was I?" current as he moves through tasks.
 """
 
+from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.session import RoomSessionBridge
@@ -17,8 +18,9 @@ def connect_room_flow(
     home: HomeBridge,
     start: StartRoomBridge,
     session: RoomSessionBridge,
+    focus: FocusBridge,
 ) -> None:
-    """Connect Home, Start and the room session to navigation."""
+    """Connect Home, Start, the room session and its timer to navigation."""
     home.startRequested.connect(lambda: navigation.open("start"))
 
     def open_room(room_id: int) -> None:
@@ -32,3 +34,5 @@ def connect_room_flow(
     home.resumeRequested.connect(open_room)
     start.started.connect(on_started)
     session.changed.connect(home.refresh)
+    session.taskShown.connect(lambda: focus.set_task(session.current_task()))
+    session.activity.connect(focus.activity)

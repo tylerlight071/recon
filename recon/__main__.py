@@ -15,6 +15,7 @@ from recon.app import GALLERY_QML, create_application, create_engine, load_qml, 
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.flags import FlagGuard
 from recon.bridge.flow import connect_room_flow
+from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
@@ -37,6 +38,7 @@ from recon.db.repositories import (
 from recon.errors import StorageError
 from recon.logging_setup import configure_logging
 from recon.paths import AppPaths
+from recon.services.chime import Chime
 from recon.services.kwin import KWinPinning, run_command
 
 _log = logging.getLogger(__name__)
@@ -151,10 +153,18 @@ def _create_bridges(
         submit=serial_submit(app),
         parent=app,
     )
-    connect_room_flow(navigation, home, start, session)
+    focus = FocusBridge(
+        tasks,
+        Chime(parent=app).play,
+        lambda: settings_bridge.settings.chime,
+        submit=serial_submit(app),
+        parent=app,
+    )
+    connect_room_flow(navigation, home, start, session, focus)
     # In order: settings, the last title, then every queued keystroke (hard rule 7).
     app.aboutToQuit.connect(settings_bridge.flush)
     app.aboutToQuit.connect(session.close)
+    app.aboutToQuit.connect(focus.close)
     app.aboutToQuit.connect(autosave.close)
     bridges: dict[str, QObject] = {
         "AppSettings": settings_bridge,
@@ -164,6 +174,7 @@ def _create_bridges(
         "HomeModel": home,
         "StartRoom": start,
         "RoomSession": session,
+        "Focus": focus,
         "Editors": EditorsBridge(parent=app),
     }
     return bridges, pinning

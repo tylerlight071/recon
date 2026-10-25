@@ -121,6 +121,8 @@ QtObject {
     readonly property int numberFieldWidth: 96
     readonly property int toastWidth: 360
     readonly property int dialogWidth: 400
+    readonly property int menuWidth: 220
+    readonly property int focusLineHeight: 2
     readonly property int sidebarItemHeight: 36
     readonly property real disabledOpacity: 0.4
     readonly property real draggingOpacity: 0.5

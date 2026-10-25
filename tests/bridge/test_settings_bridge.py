@@ -89,3 +89,18 @@ def test_pinning_choice_is_saved(bridge: SettingsBridge, saved: list[Settings]) 
     bridge.flush()
 
     assert saved == [Settings(kwin_pinning="on")]
+
+
+def test_chime_is_off_by_default_and_saved_when_turned_on(
+    bridge: SettingsBridge, saved: list[Settings]
+) -> None:
+    changed = SignalCounter(bridge, "chimeChanged()")
+    assert bridge.property("chime") is False
+
+    bridge.setProperty("chime", True)
+    bridge.setProperty("chime", True)
+    bridge.flush()
+
+    assert bridge.property("chime") is True
+    assert changed.count == 1
+    assert saved == [Settings(chime=True)]

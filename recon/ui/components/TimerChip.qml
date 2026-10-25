@@ -3,12 +3,15 @@ import QtQuick.Templates as T
 import "../theme"
 
 // Quiet time-on-task chip for the panel header: shows elapsed time, never a
-// countdown (ADHD rule 10). Clicking it opens the focus presets (task 1.12).
+// countdown (ADHD rule 10). During a focus block a thin line along the bottom
+// fills up (`progress` 0..1; below 0 hides it). Clicking it opens the focus presets.
 T.Button {
     id: control
 
     property int seconds: 0
     property bool running: false
+    property real progress: -1
+    property string focusText: ""
     readonly property string elapsed: format(seconds)
 
     function format(total) {
@@ -33,6 +36,7 @@ T.Button {
 
     Accessible.role: Accessible.Button
     Accessible.name: "Time on task, " + spoken(seconds) + (running ? "" : ", paused")
+                     + (focusText === "" ? "" : ", " + focusText)
     Accessible.onPressAction: clicked()
 
     Keys.onReturnPressed: clicked()
@@ -65,5 +69,17 @@ T.Button {
         border.width: Theme.hairline
 
         FocusRing { shown: control.visualFocus; baseRadius: parent.radius }
+
+        Rectangle {
+            objectName: "focusLine"
+            x: parent.radius
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: Theme.hairline
+            width: Math.max(0, parent.width - parent.radius * 2) * Math.max(0, Math.min(1, control.progress))
+            height: Theme.focusLineHeight
+            radius: height / 2
+            color: Theme.accent
+            visible: control.progress >= 0
+        }
     }
 }

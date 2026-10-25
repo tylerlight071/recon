@@ -13,6 +13,7 @@ from recon.app import QmlEngine, create_engine, load_windows, root_window
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.flags import FlagGuard
 from recon.bridge.flow import connect_room_flow
+from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
@@ -43,6 +44,16 @@ class WithRooms:
     rooms: tuple[NewRoom, ...] = ()
 
 
+class FakeMonotonic:
+    """Seconds that only move when a test says so."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
 @dataclass
 class Running:
     qml: QmlEngine
@@ -60,6 +71,9 @@ class Running:
     autosave: FakeAutosave
     blocks: BlockRepository
     tasks: TaskRepository
+    focus: FocusBridge
+    clock: "FakeMonotonic"
+    chimes: list[int]
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -112,7 +126,17 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         submit=lambda job: job(),
         parent=owner,
     )
-    connect_room_flow(navigation, home, start, session)
+    clock = FakeMonotonic()
+    chimes: list[int] = []
+    focus = FocusBridge(
+        tasks,
+        lambda: chimes.append(1),
+        lambda: True,
+        submit=lambda job: job(),
+        monotonic=clock,
+        parent=owner,
+    )
+    connect_room_flow(navigation, home, start, session, focus)
     qml = create_engine(
         {
             "AppSettings": settings,
@@ -122,6 +146,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "HomeModel": home,
             "StartRoom": start,
             "RoomSession": session,
+            "Focus": focus,
             "Editors": EditorsBridge(parent=owner),
         }
     )
@@ -148,6 +173,9 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         autosave,
         blocks,
         tasks,
+        focus,
+        clock,
+        chimes,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -980,3 +1008,72 @@ def test_ctrl_shift_backspace_deletes_the_block_with_the_cursor(running: Running
     wait(20)
 
     assert [b.property("blockType") for b in _blocks(running)] == ["key_idea"]
+
+
+# Task 1.12: focus timer ------------------------------------------------------------------
+
+
+def test_the_chip_shows_time_on_task(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    chip = running.find(running.panel, "timerChip")
+
+    for _ in range(65):
+        running.clock.now += 1
+        running.focus.tick()
+    wait(20)
+
+    assert chip.property("seconds") == 65
+    assert chip.property("elapsed") == "1:05"
+    assert chip.property("progress") == -1
+    assert running.find(running.panel, "focusLine").property("visible") is False
+
+
+def test_choose_a_focus_block_from_the_chip(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    chip = running.find(running.panel, "timerChip")
+    menu = running.find_object(running.panel, "focusMenu")
+
+    QMetaObject.invokeMethod(chip, "clicked")
+    assert wait_until(lambda: menu.property("visible") is True)
+    assert [i["text"] for i in menu.property("items").toVariant()] == [
+        "Focus for 15 minutes",
+        "Focus for 25 minutes",
+        "Focus for 45 minutes",
+    ]
+    # Popup rows live in the window's overlay, not the content tree.
+    QMetaObject.invokeMethod(_in(menu.property("contentItem"), "menuItem-25"), "clicked")
+    assert wait_until(lambda: menu.property("visible") is False)
+
+    assert running.focus.property("focusMinutes") == 25
+    running.clock.now += 25 * 30
+    running.focus.tick()
+    wait(20)
+    assert chip.property("progress") == pytest.approx(0.5)
+    assert running.find(running.panel, "focusLine").property("visible") is True
+    assert chip.property("focusText") == "in a 25 minute focus block"
+
+    QMetaObject.invokeMethod(chip, "clicked")
+    assert wait_until(lambda: menu.property("visible") is True)
+    assert menu.property("items").toVariant()[0]["text"] == "Stop focusing"
+    assert running.warnings == []
+
+
+def test_a_finished_focus_block_and_the_break_nudge_are_gentle_toasts(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    toast = running.find(running.panel, "panelToast")
+    running.focus.startFocus(15)
+
+    running.clock.now += 15 * 60
+    running.focus.tick()
+
+    assert wait_until(lambda: toast.property("shown") is True)
+    assert toast.property("message") == (
+        "That's 15 minutes of focus. Keep going, or take a short break."
+    )
+    assert running.chimes == [1]
+
+    running.focus.breakSuggested.emit()
+    wait(20)
+    assert toast.property("message") == (
+        "You've been at this for an hour and a half. Time for a short break?"
+    )
