@@ -130,3 +130,9 @@ only_mutate = [
     "recon/engine/factcheck/*",
 ]
 pytest_add_cli_args = ["-m", "not ollama and not gpu"]
+# Run only the tests aimed at the mutated modules, so each mutant is quick.
+pytest_add_cli_args_test_selection = [
+    "tests/engine/test_flags_filter.py",
+    "tests/db/test_flags_never_stored.py",
+    "tests/bridge/test_flag_guard.py",
+]

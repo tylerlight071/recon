@@ -26,6 +26,10 @@ Rules that the structure enforces:
 - Only `services/ollama.py` may import networking modules, and it refuses non-loopback hosts. Hugging Face libraries are allowed only in `services/whisper.py`, `subprocess` only in `services/kwin.py`, and `QDesktopServices` only in `services/open_url.py`. Dynamic imports are banned, and QML may not reference remote URLs or network APIs. `tests/test_network_imports.py` checks all of this, with self-tests for each bypass form.
 - Dependencies (Ollama client, Whisper, clock, filesystem roots, ID generation) are passed in, so tests can fake them.
 
+## Flag filter (hard rule 2)
+
+`recon/engine/flags_filter.py` (pure Python) finds and strips `THM{…}`, `flag{…}` and `HTB{…}` flags and lone hex strings of 32 or more characters, repeating until the text is stable. The database layer always strips flags that are still being typed, too. Every repository write passes through it, so nothing flag-shaped can reach `app.db`, its snapshots, or anything built from it later. `bridge/flags.py` (`FlagGuard`) cleans editor text and signals the panel's "Flag skipped" toast. The toast offers "Not a flag, keep it" only for a single lone hex string, which is then recorded in the block's `kept` list. Rules and reasons: [ADR 0005](adr/0005-flag-filter-rules.md).
+
 ## Design tokens
 
 `recon/ui/theme/Theme.qml` is a QML singleton (`qmldir`; screens import it with `import "../theme"`). It holds every colour, type size and weight, spacing step, radius, panel width and duration from CLAUDE.md's design system. It also loads the bundled Inter (400/500/600) and JetBrains Mono fonts. `accentName` ("violet", "cyan" or "green") and `reduceMotion` are the two settable properties; Settings binds them in task 1.14. Tests check the tokens against CLAUDE.md, 4.5:1 contrast for every text token on every surface and on every accent fill, and that no QML outside `ui/theme/` uses literal colours or sizes.

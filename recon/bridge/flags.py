@@ -1,0 +1,58 @@
+"""The flag filter exposed to QML as `FlagGuard` (hard rule 2, task 1.6).
+
+Block editors pass each edit through `clean()`, so a flag disappears from the
+screen as well as from storage, and the panel shows a calm "Flag skipped"
+notice. A lone hex string (an example hash) can be kept with "Not a flag,
+keep it"; braced flags never can. Flag text is never logged: only counts.
+"""
+
+import logging
+from collections.abc import Callable
+
+from PySide6.QtCore import QObject, Signal, Slot
+
+from recon.engine.flags_filter import strip_flags
+
+type Keep = Callable[[int, str], bool]
+
+_log = logging.getLogger(__name__)
+
+
+class FlagGuard(QObject):
+    """Cleans editor text and handles "Not a flag, keep it"."""
+
+    flagSkipped = Signal(int, str)  # noqa: N815 - Qt naming, used from QML
+    """(block id, keepable): `keepable` is the one hex string Tyler may keep, else ""."""
+    keptRestored = Signal(int, str)  # noqa: N815 - Qt naming, used from QML
+    """(block id, text): put the kept string back in that block's editor."""
+
+    def __init__(self, keep: Keep, parent: QObject | None = None) -> None:
+        """Use `keep` (normally `BlockRepository.keep_lookalike`) to record kept hex strings."""
+        super().__init__(parent)
+        self._keep = keep
+
+    @Slot(int, str, list, result=str)
+    def clean(self, block_id: int, text: str, kept: list[str]) -> str:
+        """The text with flags removed; tells the panel if anything was skipped.
+
+        Args:
+            block_id: The block being edited.
+            text: What's in the editor now.
+            kept: Hex strings already kept for this block.
+
+        Returns:
+            The text to show and save.
+        """
+        result = strip_flags(text, kept)
+        if result.changed:
+            only = result.removed[0] if len(result.removed) == 1 else None
+            keepable = only.text if only is not None and only.keepable else ""
+            _log.info("skipped %s flag-shaped string(s) in block %s", len(result.removed), block_id)
+            self.flagSkipped.emit(block_id, keepable)
+        return result.text
+
+    @Slot(int, str)
+    def keep(self, block_id: int, text: str) -> None:
+        """Tyler said "Not a flag, keep it": remember it and restore it in the editor."""
+        if self._keep(block_id, text):
+            self.keptRestored.emit(block_id, text)

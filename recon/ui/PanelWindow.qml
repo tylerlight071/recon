@@ -5,7 +5,8 @@ import "theme"
 
 // The slim side panel beside the browser: room session and Finish live here.
 // Its title is what the KWin rule matches (with the app ID), so it never changes.
-// Bridges: AppSettings (panel width), Navigation (open main-window screens).
+// Bridges: AppSettings (panel width), Navigation (open main-window screens),
+// FlagGuard (hard rule 2: the "Flag skipped" notice and "Not a flag, keep it").
 Window {
     id: panel
 
@@ -36,6 +37,23 @@ Window {
     Connections {
         target: Navigation
         function onPanelRequested() { panel.bringForward() }
+    }
+
+    // The hex string (and its block) that "Not a flag, keep it" would keep.
+    property int skippedBlock: -1
+    property string skippedText: ""
+
+    Connections {
+        target: FlagGuard
+        function onFlagSkipped(blockId, keepable) {
+            panel.skippedBlock = blockId
+            panel.skippedText = keepable
+            if (keepable === "")
+                flagToast.show(qsTr("Flag skipped. Recon never saves flags."))
+            else
+                flagToast.show(qsTr("Skipped something that looks like a flag. If it's an example hash, you can keep it."),
+                               qsTr("Not a flag, keep it"))
+        }
     }
 
     NumberAnimation {
@@ -85,5 +103,15 @@ Window {
                 onClicked: Navigation.open("home")
             }
         }
+    }
+
+    Toast {
+        id: flagToast
+        objectName: "flagToast"
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.space6
+        width: parent.width - Theme.space4 * 2
+        onAction: FlagGuard.keep(panel.skippedBlock, panel.skippedText)
     }
 }

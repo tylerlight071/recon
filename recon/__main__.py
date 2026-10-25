@@ -11,6 +11,7 @@ from pathlib import Path
 from PySide6.QtGui import QGuiApplication
 
 from recon.app import GALLERY_QML, create_application, create_engine, load_qml, load_windows
+from recon.bridge.flags import FlagGuard
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.settings import SettingsBridge
@@ -18,6 +19,7 @@ from recon.config import Settings, load_settings, save_settings
 from recon.db import backup
 from recon.db.connection import Database
 from recon.db.migrate import migrate
+from recon.db.repositories import BlockRepository
 from recon.errors import StorageError
 from recon.logging_setup import configure_logging
 from recon.paths import AppPaths
@@ -56,7 +58,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(StorageError.user_message, file=sys.stderr)  # noqa: T201 - no window yet
         return 1
     try:
-        return _run(args, paths, settings)
+        return _run(args, paths, settings, db)
     finally:
         db.close()
 
@@ -85,7 +87,7 @@ def open_database(paths: AppPaths, today: dt.date | None = None) -> Database | N
     return db
 
 
-def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings) -> int:
+def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings, db: Database) -> int:
     """Create the app and its windows, then run the event loop."""
     app = create_application(sys.argv[:1])
     settings_bridge = SettingsBridge(
@@ -98,9 +100,15 @@ def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings) -> int:
         lambda: _screen_area(app),
         parent=app,
     )
+    flag_guard = FlagGuard(BlockRepository(db).keep_lookalike, parent=app)
     app.aboutToQuit.connect(settings_bridge.flush)
     qml = create_engine(
-        {"AppSettings": settings_bridge, "Navigation": navigation, "Pinning": pinning}
+        {
+            "AppSettings": settings_bridge,
+            "Navigation": navigation,
+            "Pinning": pinning,
+            "FlagGuard": flag_guard,
+        }
     )
 
     loaded = load_qml(qml.engine, GALLERY_QML) if args.gallery else load_windows(qml.engine)
