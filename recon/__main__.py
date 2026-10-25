@@ -12,6 +12,7 @@ from PySide6.QtGui import QGuiApplication
 
 from recon.app import GALLERY_QML, create_application, create_engine, load_qml, load_windows
 from recon.bridge.flags import FlagGuard
+from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.settings import SettingsBridge
@@ -19,7 +20,7 @@ from recon.config import Settings, load_settings, save_settings
 from recon.db import backup
 from recon.db.connection import Database
 from recon.db.migrate import migrate
-from recon.db.repositories import BlockRepository
+from recon.db.repositories import BlockRepository, RoomRepository, utc_now
 from recon.errors import StorageError
 from recon.logging_setup import configure_logging
 from recon.paths import AppPaths
@@ -100,7 +101,11 @@ def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings, db: Data
         lambda: _screen_area(app),
         parent=app,
     )
-    flag_guard = FlagGuard(BlockRepository(db).keep_lookalike, parent=app)
+    blocks = BlockRepository(db)
+    flag_guard = FlagGuard(blocks.keep_lookalike, parent=app)
+    home = HomeBridge(RoomRepository(db), blocks, utc_now, parent=app)
+    # Carrying on opens the panel; task 1.9 loads the room into it.
+    home.resumeRequested.connect(lambda _room_id: navigation.showPanel())
     app.aboutToQuit.connect(settings_bridge.flush)
     qml = create_engine(
         {
@@ -108,6 +113,7 @@ def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings, db: Data
             "Navigation": navigation,
             "Pinning": pinning,
             "FlagGuard": flag_guard,
+            "HomeModel": home,
         }
     )
 

@@ -130,6 +130,8 @@ QtObject {
     readonly property int mainWindowMinWidth: 640
     readonly property int mainWindowMinHeight: 420
     readonly property int sidebarWidth: 200
+    // Readable column width for main-window screens.
+    readonly property int contentWidth: 560
 
     // ---- Developer gallery (--gallery only) -------------------------------
     readonly property int galleryWidth: 960

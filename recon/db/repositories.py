@@ -46,6 +46,10 @@ _SELECT_RECENT_ROOMS: Final = """
     SELECT id, platform, path, module, name, task_count, mode, status,
            created_at, updated_at, time_spent_s, last_task_index
     FROM rooms ORDER BY updated_at DESC, id DESC LIMIT ?"""
+_SELECT_CURRENT_ROOM: Final = """
+    SELECT id, platform, path, module, name, task_count, mode, status,
+           created_at, updated_at, time_spent_s, last_task_index
+    FROM rooms WHERE status = 'capturing' ORDER BY updated_at DESC, id DESC LIMIT 1"""
 _INSERT_ROOM: Final = """
     INSERT INTO rooms (platform, path, module, name, task_count, mode, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
@@ -82,6 +86,11 @@ _INSERT_BLOCK: Final = """
 _UPDATE_BLOCK_CONTENT: Final = "UPDATE blocks SET content = ?, updated_at = ? WHERE id = ?"
 _SET_BLOCK_POSITION: Final = "UPDATE blocks SET position = ? WHERE id = ?"
 _DELETE_BLOCK: Final = "DELETE FROM blocks WHERE id = ?"
+_SELECT_LATEST_WRITTEN: Final = """
+    SELECT b.id, b.task_id, b.type, b.position, b.content, b.pass, b.created_at, b.updated_at
+    FROM blocks b JOIN tasks t ON t.id = b.task_id
+    WHERE t.room_id = ? AND trim(json_extract(b.content, '$.text')) != ''
+    ORDER BY b.updated_at DESC, b.id DESC LIMIT 1"""
 
 
 def clean_text(text: str) -> str:
@@ -162,6 +171,12 @@ class RoomRepository:
         with self._db.read() as conn:
             rows = conn.execute(_SELECT_RECENT_ROOMS, (limit,)).fetchall()
         return [_room(row) for row in rows]
+
+    def current(self) -> Room | None:
+        """The room Tyler is in the middle of: the most recently touched one still capturing."""
+        with self._db.read() as conn:
+            row = conn.execute(_SELECT_CURRENT_ROOM).fetchone()
+        return _room(row) if row else None
 
     def update_progress(
         self,
@@ -270,6 +285,12 @@ class BlockRepository:
         if block is None:  # just committed, so only a broken database gets here
             raise StorageError
         return block
+
+    def latest_written(self, room_id: int) -> Block | None:
+        """The room's most recently edited block that has text (for "Last note")."""
+        with self._db.read() as conn:
+            row = conn.execute(_SELECT_LATEST_WRITTEN, (room_id,)).fetchone()
+        return _block(row) if row else None
 
     def ensure_starter_block(self, task_id: int, phase: BlockPass = "fill") -> Block:
         """Never a blank page: give an empty task its first, empty Key idea block."""

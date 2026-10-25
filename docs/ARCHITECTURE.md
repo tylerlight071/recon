@@ -39,7 +39,7 @@ Rules that the structure enforces:
 `recon/ui/components/` holds Recon's own controls, built on `QtQuick.Templates` so they follow the design system rather than the system theme:
 
 - **Controls:** `Button` (primary, secondary and quiet), `IconButton`, `TextArea` (the hint fades while typing), `SidebarItem`, `TimerChip`.
-- **Surfaces:** `Card`, and `Block` (a coloured edge per type, a type label, a drag handle).
+- **Surfaces:** `Card`, `ListRow` (title, detail and a trailing note; clickable only when it leads somewhere), and `Block` (a coloured edge per type, a type label, a drag handle).
 - **Feedback:** `ProgressRing`, `Toast` (an optional Undo; 10 s by default), `Dialog`, `Tooltip` (with a shortcut).
 - **Helpers:** `Icon` (Recon's own line icons drawn with QtQuick.Shapes, no icon font) and `FocusRing`.
 
@@ -58,6 +58,10 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 - **Opening a full-view screen from the panel** (`Navigation.open(screen)`) shows or raises the main window, with a quick fade of its content (Wayland ignores window opacity). Closing the main window hides it and never closes the panel.
 - **Network:** the engine's network access manager (`services/qml_network.py`) refuses every URL scheme except `file:`, `qrc:` and `data:`.
 - **Pinning** (opt-in, [ADR 0004](adr/0004-panel-pinning.md)): asked once at first launch. `services/kwin.py` writes Recon's KWin rule (exact app ID and title, position forced, width forced, height from vertical maximise), with a session KWin script as the fallback. `bridge/pinning.py` runs it on Qt's thread pool and re-pins when the width setting changes. While pinned, the width comes from Settings only.
+
+## Home
+
+`bridge/home.py` (`HomeModel`) reads rooms each time Home is shown. The one accent button reads "Start a room", or "Carry on with <room>" when a room is still being captured (`RoomRepository.current()`: the most recently updated room in `capturing`). The "Where was I?" card shows the room, "Task 4 of 7", how long ago in calm words (`ago()`: "2 days ago", never an overdue count) and the last line written (`BlockRepository.latest_written()`). Recent rooms list up to five others; only rooms still being captured can be resumed from the list. "Carry on" emits `resumeRequested`, which shows the panel; "Start a room" emits `startRequested`.
 
 Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with `tomllib`, written with `tomli-w`). An unreadable file falls back to the defaults rather than stopping start-up. Every write goes through `recon/fs.py` (temp file, fsync, replace, fsync the folder).
 

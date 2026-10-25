@@ -34,6 +34,7 @@ DEFAULT_BODIES = {
     "TimerChip": 'TimerChip { objectName: "subject"; seconds: 754 }',
     "Tooltip": 'Item { Tooltip { objectName: "subject"; text: "Add"; visible: true; delay: 0 } }',
     "FocusRing": 'Item { width: 10; height: 10; FocusRing { objectName: "subject" } }',
+    "ListRow": 'ListRow { objectName: "subject"; title: "DNS in Detail"; detail: "Task 4 of 7" }',
 }
 
 
@@ -62,7 +63,8 @@ def test_component_loads_without_warnings(name: str) -> None:
 def test_interactive_components_declare_role_and_name(name: str) -> None:
     source = (COMPONENTS_DIR / f"{name}.qml").read_text(encoding="utf-8")
 
-    assert re.search(r"Accessible\.role:\s*Accessible\.\w+", source)
+    # The role may be an expression, e.g. Button when clickable, StaticText when not.
+    assert re.search(r"Accessible\.role:[^\n]*Accessible\.\w+", source)
     assert re.search(r"Accessible\.name:", source)
 
 
@@ -329,3 +331,19 @@ def test_timer_chip_never_shows_a_countdown() -> None:
 
     assert "remaining" not in source.lower()
     assert "left" not in re.sub(r"leftPadding|Text\.AlignLeft", "", source)
+
+
+def test_list_row_reads_as_one_line_and_only_clicks_when_interactive() -> None:
+    loaded = load(
+        'ListRow { objectName: "subject"; title: "Linux Basics"; detail: "Done"; '
+        'trailing: "2 days ago"; interactive: false }'
+    )
+    row = loaded.subject
+    clicks = SignalCounter(row, "clicked()")
+
+    QTest.mouseClick(loaded.window, Qt.MouseButton.LeftButton, pos=centre(row).toPoint())
+    wait(20)
+
+    assert clicks.count == 0
+    assert row.property("enabled") is False
+    assert loaded.find("rowTitle").property("text") == "Linux Basics"
