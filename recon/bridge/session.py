@@ -1,0 +1,391 @@
+"""The room session in the panel, exposed to QML as `RoomSession` (task 1.9).
+
+One task at a time: header (room, "Task 3 of 7", ring, time), an optional
+task title, the task's blocks (never a blank page: a Key idea block is always
+there), the add bar, and one primary button, "Next task" or "Finish room".
+
+Edits pass through the flag filter and into the autosave queue on every
+keystroke (hard rules 2 and 7). Everything else that writes (opening a task,
+adding a block, saving the title, moving on) runs in order on a private
+worker thread, and the result comes back to the UI thread as a signal.
+"""
+
+import logging
+import time
+from collections.abc import Callable
+from typing import Final, Protocol
+
+from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
+
+from recon.bridge.blocks_model import BlockListModel, add_bar_entries, kind_named
+from recon.bridge.flags import FlagGuard
+from recon.bridge.workers import Submit
+from recon.db.models import Block, BlockContent, Room, Task, TaskStatus
+from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository
+from recon.errors import ReconError
+from recon.logging_setup import Safe
+
+TITLE_SAVE_MS: Final = 500
+"""The task title saves this long after the last keystroke (hard rule 7)."""
+TICK_MS: Final = 1000
+
+type Then = Callable[[], None]
+"""What to do on the UI thread once a background job has finished."""
+
+_log = logging.getLogger(__name__)
+
+
+class Autosave(Protocol):
+    """What the session needs from `recon.db.autosave.AutosaveQueue`."""
+
+    def put(self, block_id: int, content: BlockContent) -> None:
+        """Queue a block's latest content."""
+
+    def flush(self, timeout_s: float = 5.0) -> bool:
+        """Write everything queued now."""
+
+
+class RoomSessionBridge(QObject):
+    """Loads a room into the panel and moves through its tasks."""
+
+    changed = Signal()
+    busyChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    elapsedChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    taskShown = Signal()  # noqa: N815 - Qt naming, used from QML
+    """A task (or room) was opened: refill the title field."""
+    focusBlock = Signal(int)  # noqa: N815 - Qt naming, used from QML
+    """Put the cursor in this block (a task opened, or a block was added)."""
+    replaceText = Signal(int, str)  # noqa: N815 - Qt naming, used from QML
+    """Show this text in a block's editor ("Not a flag, keep it" restored a string)."""
+    taskCompleted = Signal()  # noqa: N815 - Qt naming, used from QML
+    """Tyler finished a task with Next: play the tick."""
+    finishRequested = Signal(int)  # noqa: N815 - Qt naming; the room ID (Finish, task 1.13)
+    failed = Signal(str)
+    """Something couldn't be saved: a calm message for a toast."""
+    _done = Signal(object)
+
+    def __init__(  # noqa: PLR0913 - every collaborator is injected (CLAUDE.md)
+        self,
+        repos: tuple[RoomRepository, TaskRepository, BlockRepository],
+        autosave: Autosave,
+        flag_guard: FlagGuard,
+        *,
+        submit: Submit,
+        monotonic: Callable[[], float] = time.monotonic,
+        parent: QObject | None = None,
+    ) -> None:
+        """Wire the session to storage.
+
+        Args:
+            repos: Rooms, tasks and blocks.
+            autosave: Saves block edits within half a second.
+            flag_guard: Strips flags from edits and offers "Not a flag, keep it".
+            submit: Runs a job off the UI thread, in order (tests pass a synchronous one).
+            monotonic: Seconds, for the time shown in the header.
+            parent: Qt parent.
+        """
+        super().__init__(parent)
+        self._rooms, self._tasks_repo, self._blocks = repos
+        self._autosave = autosave
+        self._guard = flag_guard
+        self._submit = submit
+        self._monotonic = monotonic
+        self._room: Room | None = None
+        self._tasks: list[Task] = []
+        self._index = 0
+        self._busy = False
+        self._opened_at = 0.0
+        self._pending_title: str | None = None
+        # Block ID -> (text as typed, text after a hex lookalike was skipped).
+        self._skipped: dict[int, tuple[str, str]] = {}
+        self._model = BlockListModel(self)
+        self._title_timer = QTimer(self, singleShot=True, interval=TITLE_SAVE_MS)
+        self._title_timer.timeout.connect(self._save_title)
+        self._tick = QTimer(self, interval=TICK_MS)
+        self._tick.timeout.connect(self.elapsedChanged)
+        # A bound method, so Qt queues worker results back to the UI thread.
+        self._done.connect(self._finish_job)
+        flag_guard.keptRestored.connect(self._restore_kept)
+
+    # ---- Properties ------------------------------------------------------------
+
+    def _task(self) -> Task | None:
+        return self._tasks[self._index - 1] if self._room and self._tasks else None
+
+    def _has_room(self) -> bool:
+        return self._room is not None
+
+    def _room_name(self) -> str:
+        return self._room.name if self._room else ""
+
+    def _task_index(self) -> int:
+        return self._index
+
+    def _task_count(self) -> int:
+        return len(self._tasks)
+
+    def _task_label(self) -> str:
+        return f"Task {self._index} of {len(self._tasks)}" if self._room else ""
+
+    def _task_title(self) -> str:
+        task = self._task()
+        return task.title if task else ""
+
+    def _title_hint(self) -> str:
+        return f"Task {self._index}" if self._room else ""
+
+    def _progress(self) -> float:
+        finished = sum(task.status != "open" for task in self._tasks)
+        return finished / len(self._tasks) if self._tasks else 0.0
+
+    def _is_last(self) -> bool:
+        return bool(self._tasks) and self._index == len(self._tasks)
+
+    def _primary_text(self) -> str:
+        return "Finish room" if self._is_last() else "Next task"
+
+    def _get_busy(self) -> bool:
+        return self._busy
+
+    def _elapsed(self) -> int:
+        return int(self._monotonic() - self._opened_at) if self._room else 0
+
+    def _get_blocks(self) -> BlockListModel:
+        return self._model
+
+    def _get_add_bar(self) -> list[dict[str, object]]:
+        return add_bar_entries()
+
+    hasRoom = Property(bool, _has_room, notify=changed)  # noqa: N815
+    roomName = Property(str, _room_name, notify=changed)  # noqa: N815
+    taskIndex = Property(int, _task_index, notify=changed)  # noqa: N815
+    taskCount = Property(int, _task_count, notify=changed)  # noqa: N815
+    taskLabel = Property(str, _task_label, notify=changed)  # noqa: N815
+    taskTitle = Property(str, _task_title, notify=changed)  # noqa: N815
+    titleHint = Property(str, _title_hint, notify=changed)  # noqa: N815
+    progress = Property(float, _progress, notify=changed)
+    isLastTask = Property(bool, _is_last, notify=changed)  # noqa: N815
+    primaryText = Property(str, _primary_text, notify=changed)  # noqa: N815
+    busy = Property(bool, _get_busy, notify=busyChanged)
+    elapsed = Property(int, _elapsed, notify=elapsedChanged)
+    blocks = Property(QObject, _get_blocks, constant=True)
+    addBar = Property(list, _get_add_bar, constant=True)  # noqa: N815
+
+    # ---- Opening a room ------------------------------------------------------------
+
+    @Slot(int)
+    def open(self, room_id: int) -> None:
+        """Load a room still being captured, at the task Tyler was on."""
+        # A title still waiting to save belongs to the task on screen now.
+        self._save_title()
+
+        def work() -> Then:
+            room = self._rooms.get(room_id)
+            if room is None or room.status != "capturing":
+                _log.warning("room %s can't be opened for capture", room_id)
+                return lambda: None
+            tasks = self._tasks_repo.for_room(room_id)
+            index = max(1, min(room.last_task_index, len(tasks)))
+            blocks = self._starter_blocks(tasks[index - 1])
+            return lambda: self._show(room, tasks, index, blocks)
+
+        self._background(work)
+
+    def _starter_blocks(self, task: Task) -> list[Block]:
+        # Worker thread. Never a blank page: a Key idea block is always there.
+        self._blocks.ensure_starter_block(task.id)
+        return self._blocks.for_task(task.id)
+
+    def _show(self, room: Room, tasks: list[Task], index: int, blocks: list[Block]) -> None:
+        if self._room is None or self._room.id != room.id:
+            self._opened_at = self._monotonic()
+            self._tick.start()
+        self._room, self._tasks, self._index = room, tasks, index
+        self._skipped.clear()
+        self._model.reset(blocks)
+        self.changed.emit()
+        self.taskShown.emit()
+        self.elapsedChanged.emit()
+        first = self._model.first_id()
+        if first is not None:
+            self.focusBlock.emit(first)
+
+    # ---- Editing ------------------------------------------------------------------------
+
+    @Slot(int, str, result=str)
+    def edit(self, block_id: int, text: str) -> str:
+        """Tyler typed in a block: strip flags, queue the save, return what to show.
+
+        Args:
+            block_id: The block.
+            text: Everything in its editor now.
+
+        Returns:
+            The text the editor should show (flags removed).
+        """
+        content = self._model.content(block_id)
+        if content is None:
+            return text
+        shown = self._guard.clean(block_id, text, list(content.kept))
+        if shown != text:
+            self._skipped[block_id] = (text, shown)
+        updated = content.model_copy(update={"text": shown})
+        self._model.set_content(block_id, updated, notify=False)
+        self._autosave.put(block_id, updated)
+        return shown
+
+    def _restore_kept(self, block_id: int, kept: str) -> None:
+        # "Not a flag, keep it": put the string back where it was, if nothing changed
+        # since; otherwise at the end, so newer typing is never lost.
+        content = self._model.content(block_id)
+        typed, shown = self._skipped.pop(block_id, ("", ""))
+        if content is None or kept not in typed:
+            return
+        text = typed if content.text == shown else f"{content.text.rstrip()} {kept}".lstrip()
+        keep = content.kept if kept in content.kept else (*content.kept, kept)
+        updated = content.model_copy(update={"text": text, "kept": keep})
+        self._model.set_content(block_id, updated, notify=True)
+        self._autosave.put(block_id, updated)
+        self.replaceText.emit(block_id, text)
+
+    @Slot(str)
+    def setTitle(self, title: str) -> None:  # noqa: N802 - Qt naming, used from QML
+        """Tyler typed the task title; it saves half a second after he stops."""
+        if self._task() is None:
+            return
+        self._pending_title = title
+        self._title_timer.start()
+
+    def _save_title(self) -> None:
+        task, title = self._task(), self._take_title()
+        if task is None or title is None:
+            return
+
+        def work() -> Then:
+            self._tasks_repo.set_title(task.id, title)
+            return lambda: None
+
+        self._background(work, busy=False)
+
+    def _take_title(self) -> str | None:
+        # The unsaved title (trimmed), now also shown as this task's title.
+        self._title_timer.stop()
+        title, self._pending_title = self._pending_title, None
+        task = self._task()
+        if title is None or task is None:
+            return None
+        title = title.strip()
+        self._tasks[self._index - 1] = task.model_copy(update={"title": title})
+        return title
+
+    def close(self) -> None:
+        """Save an unsaved title now (at quit; the event loop has stopped)."""
+        task, title = self._task(), self._take_title()
+        if task is not None and title is not None:
+            try:
+                self._tasks_repo.set_title(task.id, title)
+            except ReconError as exc:
+                _log.warning("title not saved at quit: %s", Safe(type(exc).__name__))
+        self._tick.stop()
+
+    @Slot(str)
+    def addBlock(self, block_type: str) -> None:  # noqa: N802 - Qt naming, used from QML
+        """Add a block of this type at the end of the task and put the cursor in it."""
+        task, kind = self._task(), kind_named(block_type)
+        if task is None or kind is None or not kind.available or self._busy:
+            return
+
+        def work() -> Then:
+            block = self._blocks.add(task.id, kind.type)
+            return lambda: self._added(block)
+
+        self._background(work)
+
+    def _added(self, block: Block) -> None:
+        if self._task() is not None and self._task_id() == block.task_id:
+            self._model.append(block)
+            self.focusBlock.emit(block.id)
+
+    def _task_id(self) -> int | None:
+        task = self._task()
+        return task.id if task else None
+
+    # ---- Moving on ---------------------------------------------------------------------
+
+    @Slot()
+    def next(self) -> None:
+        """Finish this task and open the next (or finish the room on the last one)."""
+        self._advance("done")
+
+    @Slot()
+    def skip(self) -> None:
+        """Skip this task: no shame, it's just marked skipped and the next one opens."""
+        self._advance("skipped")
+
+    def _advance(self, status: TaskStatus) -> None:
+        room, task = self._room, self._task()
+        if room is None or task is None or self._busy:
+            return
+        title, index, tasks = self._take_title(), self._index, list(self._tasks)
+
+        def work() -> Then:
+            self._autosave.flush()
+            if title is not None:
+                self._tasks_repo.set_title(task.id, title)
+            self._tasks_repo.set_status(task.id, status)
+            if index >= len(tasks):
+                done = self._tasks_repo.for_room(room.id)
+                return lambda: self._room_finished(room, done, status)
+            self._rooms.update_progress(room.id, last_task_index=index + 1)
+            blocks = self._starter_blocks(tasks[index])
+            fresh = self._tasks_repo.for_room(room.id)
+            return lambda: self._moved_on(room, fresh, index + 1, blocks, status)
+
+        self._background(work)
+
+    def _moved_on(
+        self, room: Room, tasks: list[Task], index: int, blocks: list[Block], status: TaskStatus
+    ) -> None:
+        if status == "done":
+            self.taskCompleted.emit()
+        self._show(room, tasks, index, blocks)
+
+    def _room_finished(self, room: Room, tasks: list[Task], status: TaskStatus) -> None:
+        self._tasks = tasks
+        self.changed.emit()
+        if status == "done":
+            self.taskCompleted.emit()
+        self.finishRequested.emit(room.id)
+
+    # ---- Background jobs -------------------------------------------------------------
+
+    def _background(self, work: Callable[[], Then], *, busy: bool = True) -> None:
+        if busy:
+            self._set_busy(value=True)
+
+        def job() -> None:
+            try:
+                then = work()
+            except ReconError as exc:
+                _log.warning("session write failed: %s", Safe(type(exc).__name__))
+                then = self._failure(exc.user_message)
+            except Exception as exc:  # thread boundary: report, never leave the panel stuck
+                _log.error("session write failed: %s", Safe(type(exc).__name__))
+                then = self._failure(ReconError.user_message)
+            self._done.emit((then, busy))
+
+        self._submit(job)
+
+    def _failure(self, message: str) -> Then:
+        return lambda: self.failed.emit(message)
+
+    def _finish_job(self, result: tuple[Then, bool]) -> None:
+        then, was_busy = result
+        if was_busy:
+            self._set_busy(value=False)
+        then()
+
+    def _set_busy(self, *, value: bool) -> None:
+        if self._busy != value:
+            self._busy = value
+            self.busyChanged.emit()
