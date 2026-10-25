@@ -57,6 +57,7 @@ T.Pane {
 
             Icon {
                 id: grip
+                objectName: "grip"
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 name: "grip"

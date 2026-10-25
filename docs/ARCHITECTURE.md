@@ -92,6 +92,17 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 - **Last task:** finishing it emits `finishRequested` for task 1.13.
 - **Failures:** a calm toast, never a stuck panel.
 
+## Block editors
+
+`ui/editors/BlockEditor.qml` gives each block the editor its type needs:
+
+- **Key idea, Question, Confused by:** plain text with SPEC.md's hint, which fades on typing and returns when the block is cleared.
+- **Command:** monospace. `Editors.dimComments` attaches a `QSyntaxHighlighter` (owned by the editor's document) that colours shell-style `# comments` with `engine/parse.comment_start`, ignoring `#` inside quotes or words.
+- **Table:** free text, plus a grid preview (`TablePreview.qml`) from `Editors.tablePreview`, built on `engine/parse.parse_table`. That reads tab, pipe (Markdown included) or comma rows (CSV quoting), whichever appears on the most lines. The preview shows up to 12 rows and 6 columns and says how many more are in the note. Phase 2's templates use the same parser.
+- **Room question:** the question, then the answer (`RoomSession.editAnswer`, flag-filtered like everything else). The answer shows while empty and is hidden behind "Show answer" when the task is opened again.
+
+**Reordering:** drag a block's grip (an accent line shows where it will land), or press Alt+Up / Alt+Down in a block. `RoomSession.moveBlock` moves the model row at once and saves the new order on the worker thread.
+
 Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with `tomllib`, written with `tomli-w`). An unreadable file falls back to the defaults rather than stopping start-up. Every write goes through `recon/fs.py` (temp file, fsync, replace, fsync the folder).
 
 ## Data flow for a room

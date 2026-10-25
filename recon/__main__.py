@@ -12,6 +12,7 @@ from PySide6.QtCore import QObject
 from PySide6.QtGui import QGuiApplication
 
 from recon.app import GALLERY_QML, create_application, create_engine, load_qml, load_windows
+from recon.bridge.editors import EditorsBridge
 from recon.bridge.flags import FlagGuard
 from recon.bridge.flow import connect_room_flow
 from recon.bridge.home import HomeBridge
@@ -153,6 +154,7 @@ def _create_bridges(
         "HomeModel": home,
         "StartRoom": start,
         "RoomSession": session,
+        "Editors": EditorsBridge(parent=app),
     }
     return bridges, pinning
 

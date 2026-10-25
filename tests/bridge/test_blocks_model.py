@@ -36,7 +36,7 @@ def model() -> BlockListModel:
 def test_roles_as_qml_sees_them(model: BlockListModel) -> None:
     names = {bytes(name.data()).decode() for name in model.roleNames().values()}
 
-    assert names == {"blockId", "blockType", "text", "typeLabel", "hint"}
+    assert names == {"blockId", "blockType", "text", "typeLabel", "hint", "answer"}
 
 
 def test_data_for_each_role(model: BlockListModel) -> None:
@@ -84,3 +84,23 @@ def test_catalogue_matches_the_spec() -> None:
     assert BLOCK_KINDS[0].hint == (
         "What's the one thing this task is teaching? Your words, one line is fine."
     )
+
+
+def test_move_rows(model: BlockListModel) -> None:
+    model.append(_block(3, "question"))
+    moved = SignalCounter(model, "rowsMoved(QModelIndex,int,int,QModelIndex,int)")
+
+    assert model.move(1, 2) == 2
+    assert [model.data(model.index(i), BlockListModel.IdRole) for i in range(3)] == [2, 3, 1]
+    assert model.move(1, 0) == 0
+    assert [model.data(model.index(i), BlockListModel.IdRole) for i in range(3)] == [1, 2, 3]
+    assert model.move(1, 0) is None
+    assert model.move(99, 0) is None
+    assert moved.count == 2
+
+
+def test_answer_role(model: BlockListModel) -> None:
+    model.set_content(1, BlockContent(text="Q", answer="53"), notify=False)
+
+    assert model.data(model.index(0), BlockListModel.AnswerRole) == "53"
+    assert model.data(model.index(1), BlockListModel.AnswerRole) == ""

@@ -122,6 +122,7 @@ QtObject {
     readonly property int dialogWidth: 400
     readonly property int sidebarItemHeight: 36
     readonly property real disabledOpacity: 0.4
+    readonly property real draggingOpacity: 0.5
     readonly property real pressedOpacity: 0.85
 
     // ---- Main window (size only: KWin decides where it goes) ----------------

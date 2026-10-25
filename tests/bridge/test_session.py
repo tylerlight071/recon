@@ -225,7 +225,7 @@ def test_not_a_flag_keep_it_restores_the_hash_in_place(world: World) -> None:
     block = world.shown()[0]
     world.session.edit(block.id, f"md5 of hello is {MD5} ok")
     replaced: list[tuple[int, str]] = []
-    world.session.replaceText.connect(lambda i, t: replaced.append((i, t)))
+    world.session.replaceText.connect(lambda i, _field, t: replaced.append((i, t)))
 
     world.guard.keep(block.id, MD5)
 
@@ -244,7 +244,7 @@ def test_keep_after_more_typing_adds_the_hash_at_the_end(world: World) -> None:
     world.session.edit(block.id, f"hash {MD5}")
     world.session.edit(block.id, "hash  and more")
     replaced: list[tuple[int, str]] = []
-    world.session.replaceText.connect(lambda i, t: replaced.append((i, t)))
+    world.session.replaceText.connect(lambda i, _field, t: replaced.append((i, t)))
 
     world.guard.keep(block.id, MD5)
 
@@ -255,7 +255,7 @@ def test_keep_without_a_skip_changes_nothing(world: World) -> None:
     world.opened()
     block = world.shown()[0]
     world.session.edit(block.id, "plain")
-    replaced = SignalCounter(world.session, "replaceText(int,QString)")
+    replaced = SignalCounter(world.session, "replaceText(int,QString,QString)")
 
     world.guard.keep(block.id, MD5)
 
@@ -561,3 +561,89 @@ def test_previous_without_a_room_does_nothing(world: World) -> None:
     world.session.previous()
 
     assert world.session.property("canGoBack") is False
+
+
+# Task 1.10: answers and moving blocks ---------------------------------------------------
+
+
+def _room_question(world: World) -> Block:
+    world.opened()
+    world.session.addBlock("room_question")
+    return world.shown()[1]
+
+
+def test_answers_are_flag_filtered_and_autosaved(world: World) -> None:
+    block = _room_question(world)
+    world.session.edit(block.id, "What port does DNS use?")
+
+    shown = world.session.editAnswer(block.id, "53, THM{d0nt}")
+
+    assert shown == "53, "
+    pending = world.autosave.pending[block.id]
+    assert (pending.text, pending.answer) == ("What port does DNS use?", "53, ")
+    assert world.session.editAnswer(9999, "x") == "x"
+
+
+def test_keep_restores_a_hash_in_the_answer(world: World) -> None:
+    block = _room_question(world)
+    world.session.editAnswer(block.id, f"the hash is {MD5}")
+    replaced: list[tuple[int, str, str]] = []
+    world.session.replaceText.connect(lambda i, f, t: replaced.append((i, f, t)))
+
+    world.guard.keep(block.id, MD5)
+
+    assert replaced == [(block.id, "answer", f"the hash is {MD5}")]
+    assert world.autosave.pending[block.id].answer == f"the hash is {MD5}"
+
+
+def test_answers_come_back_with_the_task(world: World) -> None:
+    block = _room_question(world)
+    world.session.editAnswer(block.id, "53")
+    world.session.next()
+
+    world.session.previous()
+
+    model = world.session.property("blocks")
+    assert model.data(model.index(1), BlockListModel.AnswerRole) == "53"
+    assert model.data(model.index(0), BlockListModel.AnswerRole) == ""
+
+
+def test_move_block_reorders_the_task(world: World) -> None:
+    world.opened()
+    world.session.addBlock("command")
+    world.session.addBlock("question")
+    key, command, question = (b.id for b in world.shown())
+
+    world.session.moveBlock(question, 0)
+
+    assert [b.id for b in world.shown()] == [question, key, command]
+    model = world.session.property("blocks")
+    assert [model.data(model.index(i), BlockListModel.IdRole) for i in range(3)] == [
+        question,
+        key,
+        command,
+    ]
+    assert world.focused[-1] == question
+
+
+@pytest.mark.parametrize(("position", "order"), [(9, [1, 2, 0]), (-3, [0, 1, 2]), (1, [1, 0, 2])])
+def test_move_block_clamps_and_moves_down(world: World, position: int, order: list[int]) -> None:
+    world.opened()
+    world.session.addBlock("command")
+    world.session.addBlock("question")
+    ids = [b.id for b in world.shown()]
+
+    world.session.moveBlock(ids[0], position)
+
+    assert [b.id for b in world.shown()] == [ids[i] for i in order]
+
+
+def test_moving_nowhere_writes_nothing(world: World) -> None:
+    world.opened()
+    block = world.shown()[0]
+    focused = len(world.focused)
+
+    world.session.moveBlock(block.id, 0)
+    world.session.moveBlock(9999, 0)
+
+    assert len(world.focused) == focused
