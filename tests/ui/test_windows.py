@@ -8,6 +8,7 @@ from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 
 from recon.app import QmlEngine, create_engine, load_windows, root_window
+from recon.bridge.flags import FlagGuard
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.settings import SettingsBridge
@@ -26,6 +27,8 @@ class Running:
     warnings: list[str]
     saved: list[Settings]
     pinner: "FakePinner"
+    flag_guard: FlagGuard
+    kept: list[tuple[int, str]]
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -57,7 +60,16 @@ def running(request: pytest.FixtureRequest) -> Iterator[Running]:
     pinning = PinningBridge(
         settings, pinner, lambda: (0, 0, 1280, 720), lambda job: job(), parent=owner
     )
-    qml = create_engine({"AppSettings": settings, "Navigation": navigation, "Pinning": pinning})
+    kept: list[tuple[int, str]] = []
+    flag_guard = FlagGuard(lambda block, text: kept.append((block, text)) is None, parent=owner)
+    qml = create_engine(
+        {
+            "AppSettings": settings,
+            "Navigation": navigation,
+            "Pinning": pinning,
+            "FlagGuard": flag_guard,
+        }
+    )
     warnings: list[str] = []
     qml.engine.warnings.connect(lambda errors: warnings.extend(e.toString() for e in errors))
     assert load_windows(qml.engine)
@@ -65,7 +77,7 @@ def running(request: pytest.FixtureRequest) -> Iterator[Running]:
     assert main is not None
     assert panel is not None
     wait(50)
-    yield Running(qml, settings, navigation, main, panel, warnings, saved, pinner)
+    yield Running(qml, settings, navigation, main, panel, warnings, saved, pinner, flag_guard, kept)
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
         window.close()
@@ -217,3 +229,35 @@ def test_pin_failure_shows_a_calm_toast(running: Running) -> None:
 
     assert wait_until(lambda: toast.property("shown") is True)
     assert toast.property("message").startswith("Couldn't pin the panel.")
+
+
+# Task 1.6: the "Flag skipped" notice --------------------------------------------------------
+
+MD5 = "5d41402abc4b2a76b9719d911017c592"
+
+
+def test_braced_flag_notice_has_no_keep_button(running: Running) -> None:
+    toast = running.find(running.panel, "flagToast")
+
+    running.flag_guard.clean(7, "answer THM{x}", [])
+
+    assert wait_until(lambda: toast.property("shown") is True)
+    assert toast.property("message") == "Flag skipped. Recon never saves flags."
+    assert toast.property("actionText") == ""
+
+
+def test_hash_notice_offers_not_a_flag_keep_it(running: Running) -> None:
+    toast = running.find(running.panel, "flagToast")
+    restored: list[tuple[int, str]] = []
+    running.flag_guard.keptRestored.connect(lambda block, text: restored.append((block, text)))
+
+    running.flag_guard.clean(7, f"md5 {MD5}", [])
+    assert wait_until(lambda: toast.property("shown") is True)
+    assert toast.property("actionText") == "Not a flag, keep it"
+
+    QMetaObject.invokeMethod(running.find(running.panel, "action"), "clicked")
+    wait(20)
+
+    assert running.kept == [(7, MD5)]
+    assert restored == [(7, MD5)]
+    assert toast.property("shown") is False

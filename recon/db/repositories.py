@@ -1,7 +1,9 @@
 """Repositories for rooms, tasks and blocks. Parameterised SQL only; models out.
 
 Every query is a complete literal (no SQL built from strings), so nothing
-Tyler types can change a query's shape. Every change to a room's tasks or
+Tyler types can change a query's shape. Every text field passes through the
+flag filter here, the last stop before the database (hard rule 2), so no
+caller can store a flag by forgetting to filter. Every change to a room's tasks or
 blocks also bumps the room's `updated_at`, which "recent rooms" and
 "Where was I?" sort by.
 """
@@ -23,6 +25,7 @@ from recon.db.models import (
     Task,
     TaskStatus,
 )
+from recon.engine.flags_filter import LONE_HEX, strip_flags
 from recon.errors import StorageError
 
 type Clock = Callable[[], datetime]
@@ -81,6 +84,21 @@ _SET_BLOCK_POSITION: Final = "UPDATE blocks SET position = ? WHERE id = ?"
 _DELETE_BLOCK: Final = "DELETE FROM blocks WHERE id = ?"
 
 
+def clean_text(text: str) -> str:
+    """Text with every flag removed, finished or not (no exceptions: names, titles)."""
+    return strip_flags(text, unfinished=True).text
+
+
+def clean_content(content: BlockContent) -> BlockContent:
+    """Block content with flags removed (finished or not), except hex strings Tyler kept."""
+    kept = set(content.kept)
+    text = strip_flags(content.text, kept, unfinished=True).text
+    answer = (
+        None if content.answer is None else strip_flags(content.answer, kept, unfinished=True).text
+    )
+    return content.model_copy(update={"text": text, "answer": answer})
+
+
 def utc_now() -> datetime:
     """The real clock (tests pass their own)."""
     return datetime.now(UTC)
@@ -116,7 +134,16 @@ class RoomRepository:
         with self._db.transaction() as conn:
             cursor = conn.execute(
                 _INSERT_ROOM,
-                (new.platform, new.path, new.module, new.name, new.task_count, new.mode, now, now),
+                (
+                    clean_text(new.platform),
+                    clean_text(new.path),
+                    clean_text(new.module),
+                    clean_text(new.name) or "Untitled room",
+                    new.task_count,
+                    new.mode,
+                    now,
+                    now,
+                ),
             )
             room_id = _inserted_id(cursor)
             conn.executemany(
@@ -179,7 +206,7 @@ class TaskRepository:
 
     def set_title(self, task_id: int, title: str) -> bool:
         """Rename a task ("" means the default "Task n"). Returns whether it exists."""
-        return self._update(_SET_TASK_TITLE, task_id, title)
+        return self._update(_SET_TASK_TITLE, task_id, clean_text(title))
 
     def set_status(self, task_id: int, status: TaskStatus) -> bool:
         """Mark a task open, done or skipped. Returns whether it exists."""
@@ -231,7 +258,7 @@ class BlockRepository:
             The new block.
         """
         now = self._clock().isoformat()
-        body = (content or BlockContent()).model_dump_json()
+        body = clean_content(content or BlockContent()).model_dump_json()
         with self._db.transaction() as conn:
             position = conn.execute(_COUNT_BLOCKS, (task_id,)).fetchone()[0]
             cursor = conn.execute(
@@ -253,9 +280,28 @@ class BlockRepository:
         """Save a block's content (what autosave calls). Returns whether it exists."""
         now = self._clock().isoformat()
         with self._db.transaction() as conn:
-            cursor = conn.execute(_UPDATE_BLOCK_CONTENT, (content.model_dump_json(), now, block_id))
+            cursor = conn.execute(
+                _UPDATE_BLOCK_CONTENT, (clean_content(content).model_dump_json(), now, block_id)
+            )
             conn.execute(_TOUCH_ROOM_OF_BLOCK, (now, block_id))
         return cursor.rowcount == 1
+
+    def keep_lookalike(self, block_id: int, text: str) -> bool:
+        """Record "Not a flag, keep it" for one hex string in a block.
+
+        Only lone hex strings (an example hash) can be kept; THM{...},
+        flag{...} and HTB{...} never can (hard rule 2).
+
+        Returns:
+            Whether it was recorded (the block exists and the text is a hex lookalike).
+        """
+        block = self.get(block_id)
+        if block is None or LONE_HEX.fullmatch(text) is None:
+            return False
+        if text in block.content.kept:
+            return True
+        kept = (*block.content.kept, text)
+        return self.update_content(block_id, block.content.model_copy(update={"kept": kept}))
 
     def move(self, block_id: int, new_position: int) -> bool:
         """Move a block within its task; the others close up around it.

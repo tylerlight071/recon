@@ -27,6 +27,8 @@ class BlockContent(_Row):
     text: str = ""
     answer: str | None = None
     """Room question blocks: the answer, kept hidden in the note."""
+    kept: tuple[str, ...] = ()
+    """Hex strings Tyler marked "Not a flag, keep it" (hard rule 2's one exception)."""
 
 
 class NewRoom(_Row):
