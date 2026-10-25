@@ -760,17 +760,16 @@ def _visible_primary_buttons(root: QQuickItem) -> list[str]:
     [WithRooms(QUIET), WithRooms(QUIET, (DNS, NewRoom(name="Older", task_count=2)))],
     indirect=True,
 )
-@pytest.mark.parametrize(("screen", "accents"), [("home", 1), ("start", 1), ("settings", 0)])
-def test_no_main_window_screen_has_more_than_one_accent_button(
-    running: Running, screen: str, accents: int
+@pytest.mark.parametrize("screen", ["home", "start", "settings"])
+def test_every_main_window_screen_has_exactly_one_accent_button(
+    running: Running, screen: str
 ) -> None:
     running.navigation.open(screen)
     wait(50)
 
     buttons = _visible_primary_buttons(running.main.contentItem())
 
-    # Settings has no action of its own until task 1.14.
-    assert len(buttons) == accents, buttons
+    assert len(buttons) == 1, buttons
 
 
 def test_panel_has_at_most_one_accent_button(running: Running) -> None:
@@ -1188,3 +1187,102 @@ def test_an_open_focus_menu_closes_when_the_room_finishes(running: Running) -> N
 
     assert wait_until(lambda: menu.property("visible") is False)
     assert running.find(running.panel, "finishTitle").property("visible") is True
+
+
+# Task 1.14: Settings -------------------------------------------------------------------
+
+
+def _settings_screen(running: Running) -> None:
+    QMetaObject.invokeMethod(running.find(running.main, "nav-settings"), "clicked")
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "settings")
+    wait(50)
+
+
+def test_settings_shows_every_first_pass_setting(running: Running) -> None:
+    _settings_screen(running)
+    find = running.find
+
+    assert find(running.main, "vaultShown").property("text") == "~/Cyber Vault"
+    assert find(running.main, "accent-violet").property("checked") is True
+    assert find(running.main, "reduceMotion").property("checked") is False
+    assert find(running.main, "pinPanel").property("checked") is False
+    assert find(running.main, "panelWidthValue").property("text") == "420 px"
+    assert find(running.main, "chime").property("checked") is False
+    assert running.find_object(running.main, "vaultDialog").property("title") == (
+        "Choose the folder for your vault"
+    )
+    assert running.warnings == []
+
+
+def test_accent_changes_the_theme_everywhere(running: Running) -> None:
+    _settings_screen(running)
+    done = running.find(running.main, "settingsDone")
+    before = done.property("background").property("color").name()
+
+    QMetaObject.invokeMethod(running.find(running.main, "accent-cyan"), "click")
+    wait(50)
+
+    assert running.settings.property("accent") == "cyan"
+    assert wait_until(lambda: done.property("background").property("color").name() == "#4fb3c9")
+    assert before == "#7c74d9"
+    assert running.find(running.main, "accent-violet").property("checked") is False
+
+
+@pytest.mark.parametrize("reduced", [True, False])
+def test_reduce_motion_makes_animations_instant(running: Running, reduced: bool) -> None:
+    _settings_screen(running)
+    if reduced:
+        QMetaObject.invokeMethod(running.find(running.main, "reduceMotion"), "click")
+        wait(20)
+    assert running.settings.property("reduceMotion") is reduced
+    _start_room(running, "DNS in Detail", 2)
+    ring = running.find(running.panel, "progressRing")
+
+    QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+    wait(20)
+
+    # The ring eases over 400 ms normally; with Reduce motion it's there at once.
+    assert ring.property("value") == 0.5
+    assert (ring.property("shownValue") == 0.5) is reduced
+
+
+def test_pinning_and_width_from_settings(running: Running) -> None:
+    _settings_screen(running)
+    pin = running.find(running.main, "pinPanel")
+
+    QMetaObject.invokeMethod(pin, "click")
+    wait(20)
+    assert running.settings.property("pinning") == "on"
+    assert len(running.pinner.pinned) == 1
+
+    slider = running.find(running.main, "panelWidth")
+    slider.setProperty("value", 480)
+    QMetaObject.invokeMethod(slider, "moved")
+    wait(20)
+    assert running.settings.property("panelWidth") == 480
+    assert running.find(running.main, "panelWidthValue").property("text") == "480 px"
+    assert wait_until(lambda: len(running.pinner.pinned) == 2, timeout_ms=1500)
+
+    QMetaObject.invokeMethod(pin, "click")
+    wait(20)
+    assert running.settings.property("pinning") == "off"
+    assert running.pinner.unpinned == 1
+
+
+def test_chime_toggle_and_play(running: Running) -> None:
+    _settings_screen(running)
+
+    QMetaObject.invokeMethod(running.find(running.main, "playChime"), "clicked")
+    QMetaObject.invokeMethod(running.find(running.main, "chime"), "click")
+    wait(20)
+
+    assert running.chimes == [1]
+    assert running.settings.property("chime") is True
+
+
+def test_done_goes_home(running: Running) -> None:
+    _settings_screen(running)
+
+    QMetaObject.invokeMethod(running.find(running.main, "settingsDone"), "clicked")
+
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "home")

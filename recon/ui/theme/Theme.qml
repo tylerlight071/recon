@@ -47,6 +47,10 @@ QtObject {
     readonly property color accent: accentName === "cyan" ? accentCyan
                                   : accentName === "green" ? accentGreen
                                   : accentViolet
+    function accentFor(name) {
+        return name === "cyan" ? accentCyan : name === "green" ? accentGreen : accentViolet
+    }
+
     readonly property color accentHover: accentName === "cyan" ? accentCyanHover
                                        : accentName === "green" ? accentGreenHover
                                        : accentVioletHover
@@ -117,6 +121,11 @@ QtObject {
     readonly property real iconStroke: 2
     readonly property int ringSize: 28
     readonly property int badgeSize: 48
+    readonly property int toggleWidth: 36
+    readonly property int toggleHeight: 20
+    readonly property int sliderTrack: 4
+    readonly property int sliderHandle: 16
+    readonly property int swatchSize: 12
     readonly property real ringStroke: 3
     readonly property int textAreaMinHeight: 64
     readonly property int numberFieldWidth: 96

@@ -29,12 +29,16 @@ PANEL_WIDTH_DEFAULT: Final = 420
 
 type PinningChoice = Literal["ask", "on", "off"]
 PINNING_CHOICES: Final = ("ask", "on", "off")
+type Accent = Literal["violet", "cyan", "green"]
+ACCENTS: Final = ("violet", "cyan", "green")
+VAULT_DEFAULT: Final = "Cyber Vault"
+"""The vault's folder name under the home folder, unless Settings says otherwise."""
 
 _log = logging.getLogger(__name__)
 
 
 class Settings(BaseModel):
-    """Tyler's preferences. Task 1.14 adds the rest of the Settings screen's fields.
+    """Tyler's preferences (the Settings screen, task 1.14).
 
     Unknown keys are ignored, so a newer settings file still loads.
     """
@@ -48,6 +52,16 @@ class Settings(BaseModel):
     """Play a soft chime when a focus block ends (calm by default: off)."""
     export_folder: str = ""
     """Where the last Markdown export went ("" until the first one)."""
+    vault_path: str = ""
+    """The vault folder; "" means ~/Cyber Vault."""
+    accent: Accent = "violet"
+    reduce_motion: bool = False
+    """Make every animation instant (Theme.reduceMotion)."""
+
+
+def vault_folder(settings: Settings, home: Path) -> Path:
+    """Where the vault lives: the chosen folder, or ~/Cyber Vault."""
+    return Path(settings.vault_path) if settings.vault_path else home / VAULT_DEFAULT
 
 
 def clamp_panel_width(width: float) -> int:

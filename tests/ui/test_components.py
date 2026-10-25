@@ -37,6 +37,8 @@ DEFAULT_BODIES = {
     "ListRow": 'ListRow { objectName: "subject"; title: "DNS in Detail"; detail: "Task 4 of 7" }',
     "TextField": 'TextField { objectName: "subject"; hint: "e.g. DNS in Detail" }',
     "Choice": 'Choice { objectName: "subject"; text: "New room"; detail: "As you go." }',
+    "Toggle": 'Toggle { objectName: "subject"; text: "Reduce motion" }',
+    "Slider": 'Slider { objectName: "subject"; from: 0; to: 10; value: 3; accessibleName: "W" }',
     "PopupMenu": (
         'Item { PopupMenu { objectName: "subject"; title: "Focus"; '
         'items: [{ "text": "Focus for 25 minutes", "key": 25 }] } }'
@@ -455,3 +457,71 @@ def test_timer_chip_focus_line_fills_and_hides() -> None:
     loaded.subject.setProperty("progress", -1)
     wait(20)
     assert line.property("visible") is False
+
+
+# Toggle -------------------------------------------------------------------------
+
+
+def test_toggle_flips_by_click_and_keyboard() -> None:
+    loaded = load('Toggle { objectName: "subject"; width: 300; text: "Reduce motion" }')
+    toggle = loaded.subject
+    toggled = SignalCounter(toggle, "toggled()")
+
+    QTest.mouseClick(loaded.window, Qt.MouseButton.LeftButton, pos=centre(toggle).toPoint())
+    wait(20)
+    assert toggle.property("checked") is True
+    toggle.forceActiveFocus()
+    QTest.keyClick(loaded.window, Qt.Key.Key_Space)
+    wait(20)
+    assert toggle.property("checked") is False
+    QTest.keyClick(loaded.window, Qt.Key.Key_Return)
+    wait(20)
+
+    assert toggle.property("checked") is True
+    assert toggled.count == 3
+    assert _colour(loaded.find("track"), "color") == _colour(loaded.theme, "accent")
+
+
+# Slider -------------------------------------------------------------------------
+
+
+def test_slider_steps_with_the_keyboard() -> None:
+    loaded = load(
+        'Slider { objectName: "subject"; width: 300; from: 360; to: 520; stepSize: 4; '
+        'value: 420; accessibleName: "Panel width" }'
+    )
+    slider = loaded.subject
+    moved = SignalCounter(slider, "moved()")
+    slider.forceActiveFocus()
+
+    QTest.keyClick(loaded.window, Qt.Key.Key_Right)
+    assert slider.property("value") == 424
+    QTest.keyClick(loaded.window, Qt.Key.Key_PageUp)
+    assert slider.property("value") == 464
+    QTest.keyClick(loaded.window, Qt.Key.Key_PageDown)
+    QTest.keyClick(loaded.window, Qt.Key.Key_PageDown)
+    assert slider.property("value") == 384
+    for _ in range(3):
+        QTest.keyClick(loaded.window, Qt.Key.Key_PageDown)
+
+    assert slider.property("value") == 360
+    assert moved.count >= 6
+    assert slider.property("valueText") == "360"
+
+
+# Choice swatch ------------------------------------------------------------------
+
+
+def test_choice_swatch_shows_only_when_set() -> None:
+    loaded = load(
+        'Column { Choice { objectName: "subject"; text: "Cyan"; swatch: Theme.accentCyan }\n'
+        'Choice { objectName: "plain"; text: "New room" } }'
+    )
+
+    swatches, pending = [], [loaded.window.contentItem()]
+    while pending:
+        item = pending.pop()
+        if item.objectName() == "swatch":
+            swatches.append(item.property("visible"))
+        pending.extend(item.childItems())
+    assert sorted(swatches) == [False, True]

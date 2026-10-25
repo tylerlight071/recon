@@ -108,7 +108,7 @@ def open_database(paths: AppPaths, today: dt.date | None = None) -> Database | N
 def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings, db: Database) -> int:
     """Create the app and its windows, then run the event loop."""
     app = create_application(sys.argv[:1])
-    bridges, pinning = _create_bridges(app, paths, settings, db)
+    bridges, pinning = create_bridges(app, paths, settings, db)
     qml = create_engine(bridges)
 
     loaded = load_qml(qml.engine, GALLERY_QML) if args.gallery else load_windows(qml.engine)
@@ -122,7 +122,7 @@ def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings, db: Data
     return code
 
 
-def _create_bridges(
+def create_bridges(
     app: QGuiApplication, paths: AppPaths, settings: Settings, db: Database
 ) -> tuple[dict[str, QObject], PinningBridge]:
     """The objects QML binds to, by context-property name, wired to each other.

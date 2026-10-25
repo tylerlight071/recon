@@ -8,6 +8,7 @@ T.RadioButton {
     id: control
 
     property string detail: ""
+    property color swatch: Theme.clear
 
     implicitWidth: implicitContentWidth + leftPadding + rightPadding
     implicitHeight: implicitContentHeight + topPadding + bottomPadding
@@ -55,11 +56,26 @@ T.RadioButton {
         leftPadding: Theme.iconSize + control.spacing
         spacing: Theme.space1
 
-        Text {
-            objectName: "label"
-            text: control.text
-            font: control.font
-            color: Theme.textPrimary
+        Row {
+            spacing: Theme.space2
+
+            // Optional colour swatch (e.g. the accent choices in Settings).
+            Rectangle {
+                objectName: "swatch"
+                anchors.verticalCenter: parent.verticalCenter
+                width: Theme.swatchSize
+                height: Theme.swatchSize
+                radius: width / 2
+                color: control.swatch
+                visible: control.swatch.a > 0
+            }
+
+            Text {
+                objectName: "label"
+                text: control.text
+                font: control.font
+                color: Theme.textPrimary
+            }
         }
 
         Text {

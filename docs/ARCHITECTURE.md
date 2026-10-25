@@ -130,6 +130,19 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 
 The room, its tasks' time and the export all go through one serial worker (`room_worker` in `__main__`), so a save always lands before the next read.
 
+## Settings (first pass, task 1.14)
+
+`screens/Settings.qml` in the main window. Every change saves on its own (`SettingsBridge` saves 500 ms after the last change), and "Done" (the screen's one accent button) goes back to Home.
+
+- **Vault folder:** `vault_path`, where "" means `~/Cyber Vault` (`config.vault_folder`). It's shown with `~`, and changed with the system folder picker. Nothing is created yet; Phase 2 sets the vault up.
+- **Accent colour:** violet, cyan or green (`accent`). `MainWindow` binds `Theme.accentName` and `Theme.reduceMotion` to `AppSettings` once; the engine is shared, so both windows follow live.
+- **Reduce motion:** `reduce_motion` makes every theme duration 0.
+- **Pin the panel:** a toggle calling `Pinning.pin()` / `unpin()` (ADR 0004). A failed unpin gets a calm toast.
+- **Panel width:** a slider from 360 to 520 px in 4 px steps. While pinned, the rule is rewritten once the width settles.
+- **Chime:** a toggle, with "Play" (`Focus.previewChime`) to hear it first.
+
+New components: `Toggle` (a switch with its label) and `Slider`. `Choice` gains an optional colour swatch.
+
 ## Undo
 
 Ctrl+Z / Ctrl+Shift+Z undo and redo within the task on screen.
@@ -190,3 +203,4 @@ All deliberate errors derive from `ReconError` (`recon/errors.py`), each with a 
 - Pre-commit: ruff, ruff format, mypy, fast tests, gitleaks, Conventional Commits, and a git pre-push hook (`scripts/hooks/pre-push`, installed by `scripts/install-hooks`) that reads every ref being pushed and refuses any update or deletion of `main` (GitHub Free has no rulesets for private repos).
 - CI (`.github/workflows/ci.yml`): `uv lock --check`, ruff, mypy, tests with branch coverage, per-package gates (`scripts/coverage_gates.py`), `uv audit`, gitleaks over full history, PR title check.
 - Releases (`release.yml`): a `v*.*.*` tag publishes a GitHub Release from that version's `CHANGELOG.md` section.
+- Screenshots for gates: `uv run python -m scripts.screenshots tests/screenshots` builds the app with the real wiring (`create_bridges`) against a throwaway, seeded data folder and saves every screen. `tests/test_screenshots_script.py` keeps it working.

@@ -58,10 +58,19 @@ Window {
         function onPinFailed() {
             toast.show(qsTr("Couldn't pin the panel. It opens as a normal window for now. You can try again in Settings."))
         }
+        function onUnpinFailed() {
+            toast.show(qsTr("Couldn't remove the panel's KDE rule. Turn pinning on and off again to retry."))
+        }
     }
 
+    // The theme follows Settings (one engine, so this covers the panel too).
     // Asked once, at first launch (Tyler's choice), before any room starts.
-    Component.onCompleted: if (Pinning.askNeeded) pinQuestion.open()
+    Component.onCompleted: {
+        Theme.accentName = Qt.binding(() => AppSettings.accent)
+        Theme.reduceMotion = Qt.binding(() => AppSettings.reduceMotion)
+        if (Pinning.askNeeded)
+            pinQuestion.open()
+    }
 
     NumberAnimation {
         id: fadeIn
