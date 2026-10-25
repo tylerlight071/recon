@@ -1,6 +1,8 @@
 """Start-up: the entry point, the app identity and QML loading."""
 
 import logging
+import os
+import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -185,3 +187,69 @@ def test_screen_area_comes_from_the_primary_screen() -> None:
     area = app.primaryScreen().geometry()
 
     assert entry._screen_area(app) == (area.x(), area.y(), area.width(), area.height())
+
+
+def test_main_creates_the_database_and_todays_snapshot(
+    private_home: Path, fake_app: _FakeApp
+) -> None:
+    assert entry.main([]) == 0
+
+    data = private_home / "xdg_data_home/recon"
+    assert (data / "app.db").exists()
+    assert len(list((data / "backups/db").glob("app-*.db"))) == 1
+    assert fake_app.ran
+
+
+def test_unopenable_database_stops_with_a_plain_message(
+    private_home: Path, fake_app: _FakeApp, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data = private_home / "xdg_data_home/recon"
+    data.mkdir(parents=True, mode=0o700)
+    (data / "app.db").mkdir()  # a folder where the database should be
+
+    assert entry.main([]) == 1
+    assert "Couldn't save to Recon's data folder" in capsys.readouterr().err
+    assert not fake_app.ran
+
+
+def test_failed_snapshot_still_starts(
+    private_home: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from recon.errors import StorageError  # noqa: PLC0415 - only this test raises it
+
+    def broken(*_args: object, **_kwargs: object) -> None:
+        raise StorageError
+
+    monkeypatch.setattr(entry.backup, "snapshot_if_due", broken)
+    paths = entry.AppPaths.from_environ(dict(os.environ), Path.home())
+    paths.ensure()
+
+    with caplog.at_level(logging.WARNING, logger="recon"):
+        db = entry.open_database(paths)
+
+    assert db is not None
+    db.close()
+    assert any("without today's database snapshot" in r.getMessage() for r in caplog.records)
+    assert private_home.exists()
+
+
+def test_migration_failure_returns_none(
+    private_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from recon.errors import StorageError  # noqa: PLC0415 - only this test raises it
+
+    seen: list[object] = []
+
+    def broken(db: object) -> int:
+        seen.append(db)
+        raise StorageError
+
+    monkeypatch.setattr(entry, "migrate", broken)
+    paths = entry.AppPaths.from_environ(dict(os.environ), Path.home())
+    paths.ensure()
+
+    assert entry.open_database(paths) is None
+    # The half-opened database was closed, not leaked.
+    with pytest.raises(sqlite3.ProgrammingError), seen[0]._conn:  # type: ignore[attr-defined]  # private, for this check
+        pass
+    assert private_home.exists()
