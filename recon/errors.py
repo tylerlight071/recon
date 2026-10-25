@@ -80,3 +80,17 @@ class ApplyConflict(ReconError):  # noqa: N818 - name fixed by CLAUDE.md
         "A note changed in Obsidian since this review was prepared, so nothing was written. "
         "Re-check to see the latest version."
     )
+
+
+class ExportFolderMissingError(ReconError):
+    """The folder chosen for an export doesn't exist (any more)."""
+
+    user_message = "That folder isn't there any more. Pick another one and try again."
+
+
+class ExportFailedError(ReconError):
+    """An export couldn't be written."""
+
+    user_message = (
+        "Couldn't save the Markdown file. Check you can write to that folder, then try again."
+    )

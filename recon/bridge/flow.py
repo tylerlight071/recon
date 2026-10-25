@@ -6,6 +6,7 @@ jumping in front, so the panel and the browser stay where Tyler's eyes are,
 and Home keeps "Where was I?" current as he moves through tasks.
 """
 
+from recon.bridge.finish import FinishBridge
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
@@ -36,3 +37,27 @@ def connect_room_flow(
     session.changed.connect(home.refresh)
     session.taskShown.connect(lambda: focus.set_task(session.current_task()))
     session.activity.connect(focus.activity)
+
+
+def connect_finish(
+    navigation: NavigationBridge,
+    home: HomeBridge,
+    session: RoomSessionBridge,
+    focus: FocusBridge,
+    finish: FinishBridge,
+) -> None:
+    """Finish room hands over to Finish; "Back to the room" and "Done" hand back."""
+
+    def finish_room(room_id: int) -> None:
+        focus.set_task(None)  # saves the last seconds first (same worker, so in order)
+        session.closeRoom()
+        finish.open(room_id)
+
+    def reopen(room_id: int) -> None:
+        session.open(room_id)
+        navigation.showPanel()
+
+    session.finishRequested.connect(finish_room)
+    finish.reopenRequested.connect(reopen)
+    finish.closed.connect(home.refresh)
+    finish.closed.connect(lambda: navigation.open("home"))

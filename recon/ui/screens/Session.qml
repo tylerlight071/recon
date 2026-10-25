@@ -77,6 +77,9 @@ FocusScope {
 
     Component.onCompleted: titleField.text = RoomSession.taskTitle
 
+    // Popups don't hide with their screen: put the focus menu away with the session.
+    onVisibleChanged: if (!visible) focusMenu.close()
+
     Connections {
         target: RoomSession
         function onTaskShown() { titleField.text = RoomSession.taskTitle }
