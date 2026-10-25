@@ -80,7 +80,7 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 - **Reminder:** a quiet one-line note about writing in your own words.
 - **Blocks:** the task's blocks, with a Key idea block always present.
 - **Add bar:** one button per block type, in a fixed order, with Ctrl+1 to Ctrl+7. Screenshot and Voice show "Coming soon" until Phase 5.
-- **Footer:** "Skip this task", and the one accent button, "Next task" ("Finish room" on the last task, Ctrl+Return).
+- **Footer:** "Previous task" (Alt+Left; disabled on task 1), "Skip this task", and the one accent button, "Next task" ("Finish room" on the last task, Ctrl+Return).
 
 `bridge/session.py` (`RoomSession`) holds the open room, its tasks and a `BlockListModel` (`bridge/blocks_model.py`, which also holds SPEC.md's block table: labels, hints, shortcuts, icons).
 
@@ -88,7 +88,7 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 - **"Not a flag, keep it":** restores the string where it was, or at the end if Tyler has typed since.
 - **Task title:** saves half a second after the last keystroke, and immediately on Next, on switching rooms and at quit.
 - **Other writes:** opening a room, adding a block, saving the title, Next and Skip run in order on one private worker thread (`workers.serial_submit`); results come back as signals.
-- **Next and Skip:** flush the autosave queue, mark the task done or skipped, record the position, and open the next task with its starter block. Next plays a tick in the ring.
+- **Next, Skip and Previous:** flush the autosave queue, mark the task done or skipped (Previous marks nothing), record the position, and open the target task with its starter block. Next plays a tick in the ring.
 - **Last task:** finishing it emits `finishRequested` for task 1.13.
 - **Failures:** a calm toast, never a stuck panel.
 

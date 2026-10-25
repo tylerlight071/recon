@@ -99,7 +99,7 @@ The panel shows one task at a time and never an empty page: every task opens wit
 2. **Task title:** typed once, or left as "Task 3".
 3. **Blocks:** the notes for this task, each a card with a coloured edge showing its type.
 4. **Add bar:** one button per block type, always in the same place, each with a keyboard shortcut.
-5. **Footer:** "Next task" as the one primary button; "Finish room" appears on the last task.
+5. **Footer:** "Next task" as the one primary button; "Finish room" appears on the last task. A quiet "Previous task" button (Alt+Left) goes back to add or fix something; it never changes a task's status, and it's greyed out on the first task rather than hidden, so nothing moves.
 
 **Block types:**
 

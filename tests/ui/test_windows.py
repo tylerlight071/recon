@@ -736,3 +736,30 @@ def test_the_title_refills_when_another_room_opens(running: Running) -> None:
     wait(20)
 
     assert title.property("text") == "Zones"
+
+
+def test_previous_task_from_the_footer_and_the_keyboard(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    back = running.find(running.panel, "previousTask")
+    label = running.find(running.panel, "taskLabel")
+    assert back.property("enabled") is False
+    assert back.property("tip") == "Previous task"
+    QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+    QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+    wait(20)
+    assert label.property("text") == "Task 3 of 3"
+
+    QMetaObject.invokeMethod(back, "clicked")
+    wait(20)
+    assert label.property("text") == "Task 2 of 3"
+
+    # From inside a block's editor, too.
+    editor = _editors(running)[0]
+    assert wait_until(lambda: editor.property("activeFocus") is True)
+    running.panel.requestActivate()
+    QTest.keyClick(running.panel, Qt.Key.Key_Left, Qt.KeyboardModifier.AltModifier)
+    wait(20)
+
+    assert label.property("text") == "Task 1 of 3"
+    assert back.property("enabled") is False
+    assert running.find(running.panel, "nextTask").property("text") == "Next task"

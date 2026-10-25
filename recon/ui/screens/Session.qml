@@ -4,6 +4,7 @@ import "../theme"
 
 // The room session (task 1.9), shown in the panel while a room is open.
 // Top to bottom: header, task title, blocks, add bar, footer (SPEC.md).
+// Footer: Previous task (Alt+Left), Skip this task, and Next task (Ctrl+Return).
 // Bridge: RoomSession. One accent button: "Next task" / "Finish room".
 FocusScope {
     id: session
@@ -36,6 +37,12 @@ FocusScope {
         sequences: ["Ctrl+Return", "Ctrl+Enter"]
         enabled: session.visible
         onActivated: RoomSession.next()
+    }
+
+    Shortcut {
+        sequence: "Alt+Left"
+        enabled: session.visible && RoomSession.canGoBack
+        onActivated: RoomSession.previous()
     }
 
     Repeater {
@@ -311,10 +318,24 @@ FocusScope {
             color: Theme.border
         }
 
-        Button {
-            objectName: "skipTask"
+        // Disabled (not hidden) on task 1, so Skip never shifts (ADHD rule 5).
+        IconButton {
+            id: previousTask
+            objectName: "previousTask"
             anchors.left: parent.left
             anchors.leftMargin: Theme.space2
+            anchors.verticalCenter: parent.verticalCenter
+            iconName: "chevronLeft"
+            tip: qsTr("Previous task")
+            shortcutHint: qsTr("Alt+Left")
+            enabled: RoomSession.canGoBack
+            onClicked: RoomSession.previous()
+        }
+
+        Button {
+            objectName: "skipTask"
+            anchors.left: previousTask.right
+            anchors.leftMargin: Theme.space1
             anchors.verticalCenter: parent.verticalCenter
             variant: "quiet"
             text: qsTr("Skip this task")

@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- "Previous task" in the panel footer (Alt+Left) to go back and add or fix something. It saves first, never changes a task's status, and is greyed out on task 1.
 - Room session in the panel: room name, "Task n of N", progress ring and time in the header; an optional task title; the task's blocks with a Key idea block always ready and focused; an add bar with all eight block types in a fixed order (Ctrl+1 to Ctrl+7; Screenshot and Voice "Coming soon"); "Skip this task"; and one primary button, "Next task" or "Finish room" (Ctrl+Return), with a small tick. Every keystroke is flag-filtered and autosaved; other writes run in order off the UI thread. Starting a room or "Carry on" opens it here.
 - Start a room: the room name and number of tasks, with path and module remembered from the last room behind "More", and From memory shown as "Coming soon". Missing or unusable fields get one plain sentence and the cursor goes to the field. The room is saved off the UI thread, then the panel opens. New `TextField` and `Choice` components.
 - Home screen: one accent button ("Start a room" or "Carry on with <room>"), a "Where was I?" card with the room, "Task 4 of 7", how long ago and the last line written, and up to five recent rooms. Times read calmly ("2 days ago"); nothing counts as overdue. A test checks that no main-window screen shows more than one accent button.

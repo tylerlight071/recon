@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QObject
 
+from recon.bridge.blocks_model import BlockListModel
 from recon.bridge.flags import FlagGuard
 from recon.bridge.session import RoomSessionBridge
 from recon.db.connection import Database
@@ -508,3 +509,55 @@ def test_switching_rooms_saves_the_title_to_the_right_task(world: World) -> None
     assert world.tasks.for_room(second.id)[0].title == ""
     assert world.session.property("taskTitle") == ""
     assert shown.count == 1
+
+
+def test_previous_task_goes_back_without_changing_statuses(world: World) -> None:
+    room = world.opened()
+    world.session.next()
+    world.session.skip()
+    third = world.shown()[0]
+    world.session.edit(third.id, "half a thought")
+    world.session.setTitle("Zones")
+    ticks = SignalCounter(world.session, "taskCompleted()")
+
+    world.session.previous()
+
+    assert world.session.property("taskLabel") == "Task 2 of 3"
+    assert [t.status for t in world.tasks.for_room(room.id)] == ["done", "skipped", "open"]
+    assert world.tasks.for_room(room.id)[2].title == "Zones"
+    assert world.blocks.get(third.id).content.text == "half a thought"  # type: ignore[union-attr]
+    assert world.rooms.get(room.id).last_task_index == 2  # type: ignore[union-attr]
+    assert ticks.count == 0
+    assert world.session.property("canGoBack") is True
+    assert world.focused[-1] == world.shown()[0].id
+
+
+def test_next_from_a_revisited_task_returns_to_its_notes(world: World) -> None:
+    world.opened()
+    world.session.next()
+    second = world.shown()[0]
+    world.session.edit(second.id, "kept")
+    world.session.previous()
+
+    world.session.next()
+
+    assert world.session.property("taskLabel") == "Task 2 of 3"
+    assert [b.id for b in world.shown()] == [second.id]
+    model = world.session.property("blocks")
+    assert model.data(model.index(0), BlockListModel.TextRole) == "kept"
+
+
+def test_no_going_back_from_task_one(world: World) -> None:
+    world.opened()
+
+    assert world.session.property("canGoBack") is False
+    world.session.previous()
+
+    assert world.session.property("taskLabel") == "Task 1 of 3"
+    assert world.autosave.flushes == 0
+
+
+def test_previous_without_a_room_does_nothing(world: World) -> None:
+    world.session.previous()
+
+    assert world.session.property("canGoBack") is False
