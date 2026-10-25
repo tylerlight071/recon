@@ -69,7 +69,28 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 
 `bridge/start.py` (`StartRoom`) checks the fields (a name, and a whole number of tasks from 1 to 50) and says what to fix in one plain sentence, moving focus to that field. Lengths are capped (name 120, path and module 80), and the repository strips flags as usual. The room is created on Qt's thread pool (`bridge/workers.py`); a storage failure comes back as the error's calm message.
 
-`bridge/flow.py` wires the hand-overs once, for the app and its tests: Home's "Start a room" opens Start; a new room switches the main window back to Home without raising it and shows the panel; "Carry on" shows the panel. Task 1.9 loads the room into the panel.
+`bridge/flow.py` wires the hand-overs once, for the app and its tests: Home's "Start a room" opens Start; a new room switches the main window back to Home without raising it and shows the panel; "Carry on" shows the panel. Home refreshes whenever the session changes, so "Where was I?" stays current.
+
+## Room session (panel)
+
+`screens/Session.qml` fills the panel while a room is open; with none open, the panel says so and offers Home. Top to bottom:
+
+- **Header:** room name, "Task 3 of 7", the progress ring (tasks done or skipped), time since the room was opened, and a Home button.
+- **Task title:** optional; its hint is "Task 3".
+- **Reminder:** a quiet one-line note about writing in your own words.
+- **Blocks:** the task's blocks, with a Key idea block always present.
+- **Add bar:** one button per block type, in a fixed order, with Ctrl+1 to Ctrl+7. Screenshot and Voice show "Coming soon" until Phase 5.
+- **Footer:** "Skip this task", and the one accent button, "Next task" ("Finish room" on the last task, Ctrl+Return).
+
+`bridge/session.py` (`RoomSession`) holds the open room, its tasks and a `BlockListModel` (`bridge/blocks_model.py`, which also holds SPEC.md's block table: labels, hints, shortcuts, icons).
+
+- **Keystrokes:** each one goes through `edit()`, which strips flags via `FlagGuard`, queues the content in the autosave queue and returns the text to show. The model is updated without notifying QML, so the cursor stays put.
+- **"Not a flag, keep it":** restores the string where it was, or at the end if Tyler has typed since.
+- **Task title:** saves half a second after the last keystroke, and immediately on Next, on switching rooms and at quit.
+- **Other writes:** opening a room, adding a block, saving the title, Next and Skip run in order on one private worker thread (`workers.serial_submit`); results come back as signals.
+- **Next and Skip:** flush the autosave queue, mark the task done or skipped, record the position, and open the next task with its starter block. Next plays a tick in the ring.
+- **Last task:** finishing it emits `finishRequested` for task 1.13.
+- **Failures:** a calm toast, never a stuck panel.
 
 Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with `tomllib`, written with `tomli-w`). An unreadable file falls back to the defaults rather than stopping start-up. Every write goes through `recon/fs.py` (temp file, fsync, replace, fsync the folder).
 

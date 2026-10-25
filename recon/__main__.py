@@ -8,6 +8,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from PySide6.QtCore import QObject
 from PySide6.QtGui import QGuiApplication
 
 from recon.app import GALLERY_QML, create_application, create_engine, load_qml, load_windows
@@ -16,13 +17,16 @@ from recon.bridge.flow import connect_room_flow
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
+from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
+from recon.bridge.workers import serial_submit
 from recon.config import Settings, load_settings, save_settings
 from recon.db import backup
+from recon.db.autosave import AutosaveQueue
 from recon.db.connection import Database
 from recon.db.migrate import migrate
-from recon.db.repositories import BlockRepository, RoomRepository, utc_now
+from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, utc_now
 from recon.errors import StorageError
 from recon.logging_setup import configure_logging
 from recon.paths import AppPaths
@@ -93,33 +97,8 @@ def open_database(paths: AppPaths, today: dt.date | None = None) -> Database | N
 def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings, db: Database) -> int:
     """Create the app and its windows, then run the event loop."""
     app = create_application(sys.argv[:1])
-    settings_bridge = SettingsBridge(
-        settings, lambda changed: save_settings(paths.settings_file, changed), parent=app
-    )
-    navigation = NavigationBridge(parent=app)
-    pinning = PinningBridge(
-        settings_bridge,
-        KWinPinning(run_command, paths.data / "kwin-panel.js"),
-        lambda: _screen_area(app),
-        parent=app,
-    )
-    blocks = BlockRepository(db)
-    flag_guard = FlagGuard(blocks.keep_lookalike, parent=app)
-    rooms = RoomRepository(db)
-    home = HomeBridge(rooms, blocks, utc_now, parent=app)
-    start = StartRoomBridge(rooms, parent=app)
-    connect_room_flow(navigation, home, start)
-    app.aboutToQuit.connect(settings_bridge.flush)
-    qml = create_engine(
-        {
-            "AppSettings": settings_bridge,
-            "Navigation": navigation,
-            "Pinning": pinning,
-            "FlagGuard": flag_guard,
-            "HomeModel": home,
-            "StartRoom": start,
-        }
-    )
+    bridges, pinning = _create_bridges(app, paths, settings, db)
+    qml = create_engine(bridges)
 
     loaded = load_qml(qml.engine, GALLERY_QML) if args.gallery else load_windows(qml.engine)
     if not loaded:
@@ -130,6 +109,52 @@ def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings, db: Data
     # Engine first: its bindings must never re-run against already-deleted bridges.
     del qml
     return code
+
+
+def _create_bridges(
+    app: QGuiApplication, paths: AppPaths, settings: Settings, db: Database
+) -> tuple[dict[str, QObject], PinningBridge]:
+    """The objects QML binds to, by context-property name, wired to each other.
+
+    Returns:
+        The bridges, and the pinning bridge again (start-up re-applies the pin).
+    """
+    settings_bridge = SettingsBridge(
+        settings, lambda changed: save_settings(paths.settings_file, changed), parent=app
+    )
+    navigation = NavigationBridge(parent=app)
+    pinning = PinningBridge(
+        settings_bridge,
+        KWinPinning(run_command, paths.data / "kwin-panel.js"),
+        lambda: _screen_area(app),
+        parent=app,
+    )
+    rooms, tasks, blocks = RoomRepository(db), TaskRepository(db), BlockRepository(db)
+    flag_guard = FlagGuard(blocks.keep_lookalike, parent=app)
+    home = HomeBridge(rooms, blocks, utc_now, parent=app)
+    start = StartRoomBridge(rooms, parent=app)
+    autosave = AutosaveQueue(
+        blocks.update_content,
+        on_error=lambda _exc: session.failed.emit(StorageError.user_message),
+    )
+    session = RoomSessionBridge(
+        (rooms, tasks, blocks), autosave, flag_guard, submit=serial_submit(app), parent=app
+    )
+    connect_room_flow(navigation, home, start, session)
+    # In order: settings, the last title, then every queued keystroke (hard rule 7).
+    app.aboutToQuit.connect(settings_bridge.flush)
+    app.aboutToQuit.connect(session.close)
+    app.aboutToQuit.connect(autosave.close)
+    bridges: dict[str, QObject] = {
+        "AppSettings": settings_bridge,
+        "Navigation": navigation,
+        "Pinning": pinning,
+        "FlagGuard": flag_guard,
+        "HomeModel": home,
+        "StartRoom": start,
+        "RoomSession": session,
+    }
+    return bridges, pinning
 
 
 def _screen_area(app: QGuiApplication) -> tuple[int, int, int, int]:

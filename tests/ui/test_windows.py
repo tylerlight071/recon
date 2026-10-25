@@ -15,13 +15,15 @@ from recon.bridge.flow import connect_room_flow
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
+from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
 from recon.config import Settings
 from recon.db.connection import Database
 from recon.db.migrate import migrate
 from recon.db.models import NewRoom
-from recon.db.repositories import BlockRepository, RoomRepository, utc_now
+from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, utc_now
+from tests.bridge.fakes import FakeAutosave
 from tests.bridge.test_pinning_bridge import FakePinner
 from tests.ui.qml_harness import app, wait, wait_until
 
@@ -47,6 +49,10 @@ class Running:
     flag_guard: FlagGuard
     kept: list[tuple[int, str]]
     rooms: RoomRepository
+    session: RoomSessionBridge
+    autosave: FakeAutosave
+    blocks: BlockRepository
+    tasks: TaskRepository
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -87,9 +93,19 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     )
     kept: list[tuple[int, str]] = []
     flag_guard = FlagGuard(lambda block, text: kept.append((block, text)) is None, parent=owner)
-    home = HomeBridge(rooms, BlockRepository(db), utc_now, parent=owner)
+    blocks = BlockRepository(db)
+    home = HomeBridge(rooms, blocks, utc_now, parent=owner)
     start = StartRoomBridge(rooms, lambda job: job(), parent=owner)
-    connect_room_flow(navigation, home, start)
+    autosave = FakeAutosave(blocks)
+    tasks = TaskRepository(db)
+    session = RoomSessionBridge(
+        (rooms, tasks, blocks),
+        autosave,
+        flag_guard,
+        submit=lambda job: job(),
+        parent=owner,
+    )
+    connect_room_flow(navigation, home, start, session)
     qml = create_engine(
         {
             "AppSettings": settings,
@@ -98,6 +114,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "FlagGuard": flag_guard,
             "HomeModel": home,
             "StartRoom": start,
+            "RoomSession": session,
         }
     )
     warnings: list[str] = []
@@ -108,7 +125,21 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     assert panel is not None
     wait(50)
     yield Running(
-        qml, settings, navigation, main, panel, warnings, saved, pinner, flag_guard, kept, rooms
+        qml,
+        settings,
+        navigation,
+        main,
+        panel,
+        warnings,
+        saved,
+        pinner,
+        flag_guard,
+        kept,
+        rooms,
+        session,
+        autosave,
+        blocks,
+        tasks,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -462,6 +493,189 @@ def test_escape_goes_back_home(running: Running) -> None:
     assert wait_until(lambda: running.navigation.property("currentScreen") == "home")
 
 
+# Task 1.9: the room session in the panel --------------------------------------------------
+
+
+def _start_room(running: Running, name: str, tasks: int) -> None:
+    start = running.qml.engine.rootContext().contextProperty("StartRoom")
+    start.start(name, str(tasks), "", "")
+    assert wait_until(running.panel.isVisible)
+    wait(50)
+
+
+def _editors(running: Running) -> list[QQuickItem]:
+    found: list[QQuickItem] = []
+    pending: list[QQuickItem] = [running.panel.contentItem()]
+    while pending:
+        item = pending.pop()
+        if item.objectName() == "editor" and item.isVisible():
+            found.append(item)
+        pending.extend(item.childItems())
+    return sorted(found, key=lambda e: e.mapToScene(e.position()).y())
+
+
+def test_a_new_room_opens_on_task_one_ready_to_type(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    find = running.find
+
+    assert find(running.panel, "noRoom").property("visible") is False
+    assert find(running.panel, "roomName").property("text") == "DNS in Detail"
+    assert find(running.panel, "taskLabel").property("text") == "Task 1 of 3"
+    assert find(running.panel, "taskTitle").property("hint") == "Task 1"
+    assert find(running.panel, "nextTask").property("text") == "Next task"
+    editors = _editors(running)
+    assert len(editors) == 1
+    assert editors[0].property("hint").startswith("What's the one thing")
+    assert wait_until(lambda: editors[0].property("activeFocus") is True)
+    assert running.warnings == []
+
+
+def test_add_bar_has_eight_buttons_with_two_coming_soon(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    types = [
+        "key_idea",
+        "command",
+        "table",
+        "screenshot",
+        "question",
+        "confused",
+        "room_question",
+        "voice",
+    ]
+
+    buttons = {t: running.find(running.panel, f"add-{t}") for t in types}
+
+    assert {t for t, b in buttons.items() if not b.property("enabled")} == {"screenshot", "voice"}
+    assert buttons["voice"].property("tip") == "Voice · Coming soon"
+    assert buttons["command"].property("shortcutHint") == "Ctrl+2"
+
+
+def test_typing_saves_and_flags_vanish(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    editor = _editors(running)[0]
+
+    editor.setProperty("text", "TXT records hold text THM{n0pe}")
+    wait(20)
+
+    assert editor.property("text") == "TXT records hold text "
+    (content,) = running.autosave.pending.values()
+    assert content.text == "TXT records hold text "
+    toast = running.find(running.panel, "flagToast")
+    assert wait_until(lambda: toast.property("shown") is True)
+
+
+def test_adding_a_block_from_the_bar_and_by_shortcut(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+
+    QMetaObject.invokeMethod(running.find(running.panel, "add-command"), "clicked")
+    wait(20)
+    running.panel.requestActivate()
+    QTest.keyClick(running.panel, Qt.Key.Key_5, Qt.KeyboardModifier.ControlModifier)
+    wait(20)
+
+    editors = _editors(running)
+    assert [e.property("mono") for e in editors] == [False, True, False]
+    assert editors[2].property("hint") == "Something you want answered later."
+    assert wait_until(lambda: editors[2].property("activeFocus") is True)
+
+
+def test_next_task_moves_on_and_finish_room_on_the_last(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 2)
+    _editors(running)[0].setProperty("text", "Records map names to data")
+    title = running.find(running.panel, "taskTitle")
+    finished: list[int] = []
+    running.session.finishRequested.connect(finished.append)
+
+    QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+    wait(20)
+
+    assert running.find(running.panel, "taskLabel").property("text") == "Task 2 of 2"
+    assert running.find(running.panel, "nextTask").property("text") == "Finish room"
+    assert title.property("hint") == "Task 2"
+    assert _editors(running)[0].property("text") == ""
+    assert running.find(running.panel, "progressRing").property("value") == 0.5
+
+    QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+    wait(20)
+
+    assert len(finished) == 1
+    assert running.warnings == []
+
+
+def test_next_plays_the_tick(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    tick = running.find(running.panel, "tick")
+
+    QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+
+    assert wait_until(lambda: tick.property("opacity") > 0)
+    assert wait_until(lambda: tick.property("opacity") == 0, timeout_ms=3000)
+
+
+def test_skip_this_task(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+
+    QMetaObject.invokeMethod(running.find(running.panel, "skipTask"), "clicked")
+    wait(20)
+
+    assert running.find(running.panel, "taskLabel").property("text") == "Task 2 of 3"
+
+
+def test_ctrl_return_is_next_task(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    running.panel.requestActivate()
+
+    QTest.keyClick(running.panel, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    wait(20)
+
+    assert running.find(running.panel, "taskLabel").property("text") == "Task 2 of 3"
+
+
+def test_the_task_title_is_kept_per_task(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    title = running.find(running.panel, "taskTitle")
+    title.forceActiveFocus()
+    running.panel.requestActivate()
+    for char in "Zones":
+        QTest.keyClick(running.panel, char)
+
+    QMetaObject.invokeMethod(running.find(running.panel, "nextTask"), "clicked")
+    wait(20)
+
+    assert title.property("text") == ""
+    room = running.rooms.current()
+    assert room is not None
+    assert running.tasks.for_room(room.id)[0].title == "Zones"
+
+
+@pytest.mark.parametrize("running", [WithRooms(QUIET, (DNS,))], indirect=True)
+def test_carry_on_opens_the_room_in_the_panel(running: Running) -> None:
+    QMetaObject.invokeMethod(running.find(running.main, "primaryAction"), "clicked")
+
+    assert wait_until(running.panel.isVisible)
+    assert running.find(running.panel, "roomName").property("text") == "DNS in Detail"
+    assert running.find(running.panel, "taskLabel").property("text") == "Task 1 of 7"
+
+
+def test_home_button_in_the_session_opens_home(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    running.main.close()
+
+    QMetaObject.invokeMethod(running.find(running.panel, "sessionHome"), "clicked")
+
+    assert wait_until(running.main.isVisible)
+
+
+def test_a_failed_save_shows_a_calm_toast(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+
+    running.session.failed.emit("Couldn't save to Recon's data folder.")
+
+    toast = running.find(running.panel, "flagToast")
+    assert wait_until(lambda: toast.property("shown") is True)
+    assert toast.property("message") == "Couldn't save to Recon's data folder."
+
+
 # Phase 1 acceptance: exactly one accent button per screen (ADHD rule 1) --------------------------
 
 
@@ -501,3 +715,24 @@ def test_panel_has_at_most_one_accent_button(running: Running) -> None:
     wait_until(running.panel.isVisible)
 
     assert len(_visible_primary_buttons(running.panel.contentItem())) <= 1
+
+
+def test_panel_with_a_room_open_has_exactly_one_accent_button(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+
+    assert _visible_primary_buttons(running.panel.contentItem()) == ["nextTask"]
+
+
+def test_the_title_refills_when_another_room_opens(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    first = running.rooms.current()
+    assert first is not None
+    running.tasks.set_title(running.tasks.for_room(first.id)[0].id, "Zones")
+    _start_room(running, "Linux Basics", 3)
+    title = running.find(running.panel, "taskTitle")
+    assert title.property("text") == ""
+
+    running.session.open(first.id)
+    wait(20)
+
+    assert title.property("text") == "Zones"

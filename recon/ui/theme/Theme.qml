@@ -151,6 +151,8 @@ QtObject {
     // The progress ring and completion moment are the only "showy" motion (SPEC.md).
     readonly property int durationSlow: reduceMotion ? 0 : 400
     readonly property int tooltipDelay: 500
+    // The tick after "Next task" stays this long before it fades (a small win).
+    readonly property int tickHoldMs: 700
     // Deletions show an Undo toast for 10 s (ADHD rule 4).
     readonly property int undoToastMs: 10000
     readonly property int easing: Easing.OutCubic

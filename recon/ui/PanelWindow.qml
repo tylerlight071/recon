@@ -1,12 +1,14 @@
 import QtQuick
 import QtQuick.Window
 import "components"
+import "screens"
 import "theme"
 
 // The slim side panel beside the browser: room session and Finish live here.
 // Its title is what the KWin rule matches (with the app ID), so it never changes.
 // Bridges: AppSettings (panel width), Navigation (open main-window screens),
-// FlagGuard (hard rule 2: the "Flag skipped" notice and "Not a flag, keep it").
+// FlagGuard (hard rule 2: the "Flag skipped" notice and "Not a flag, keep it"),
+// RoomSession (the open room; task 1.9).
 Window {
     id: panel
 
@@ -66,11 +68,25 @@ Window {
         easing.type: Theme.easing
     }
 
+    Connections {
+        target: RoomSession
+        function onFailed(message) { flagToast.show(message) }
+    }
+
     Item {
         id: content
         anchors.fill: parent
 
+        Session {
+            id: sessionView
+            anchors.fill: parent
+            visible: RoomSession.hasRoom
+            focus: visible
+        }
+
         Column {
+            objectName: "noRoom"
+            visible: !RoomSession.hasRoom
             anchors.centerIn: parent
             width: parent.width - Theme.space6 * 2
             spacing: Theme.space3
@@ -110,7 +126,8 @@ Window {
         objectName: "flagToast"
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Theme.space6
+        // Above the add bar and footer while a room is open, so it never hides them.
+        anchors.bottomMargin: RoomSession.hasRoom ? sessionView.bottomChrome + Theme.space3 : Theme.space6
         width: parent.width - Theme.space4 * 2
         onAction: FlagGuard.keep(panel.skippedBlock, panel.skippedText)
     }
