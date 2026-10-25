@@ -1,10 +1,11 @@
 """Settings exposed to QML as the `AppSettings` singleton."""
 
 from collections.abc import Callable
+from pathlib import Path
 
-from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
+from PySide6.QtCore import Property, QObject, QTimer, QUrl, Signal, SignalInstance, Slot
 
-from recon.config import PINNING_CHOICES, Settings, clamp_panel_width
+from recon.config import ACCENTS, PINNING_CHOICES, Settings, clamp_panel_width, vault_folder
 
 SAVE_DELAY_MS = 500
 """Saves wait for changes to settle, e.g. while the panel is being dragged wider."""
@@ -21,12 +22,16 @@ class SettingsBridge(QObject):
     pinningChanged = Signal()  # noqa: N815 - Qt naming, used from QML
     chimeChanged = Signal()  # noqa: N815 - Qt naming, used from QML
     exportFolderChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    accentChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    reduceMotionChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    vaultPathChanged = Signal()  # noqa: N815 - Qt naming, used from QML
 
     def __init__(
         self,
         settings: Settings,
         save: Callable[[Settings], None],
         parent: QObject | None = None,
+        home: Path | None = None,
     ) -> None:
         """Wrap `settings`; `save` is called with the new settings after changes.
 
@@ -34,10 +39,12 @@ class SettingsBridge(QObject):
             settings: Settings loaded at start-up.
             save: Persists settings (injected so tests can fake it).
             parent: Qt parent.
+            home: Tyler's home folder, for ~/ paths (defaults to Path.home()).
         """
         super().__init__(parent)
         self._settings = settings
         self._save = save
+        self._home = home or Path.home()
         self._dirty = False
         self._timer = QTimer(self, singleShot=True, interval=SAVE_DELAY_MS)
         self._timer.timeout.connect(self.flush)
@@ -77,27 +84,78 @@ class SettingsBridge(QObject):
         return self._settings.chime
 
     def _set_chime(self, on: bool) -> None:
-        if on == self._settings.chime:
-            return
-        self._update(chime=on)
-        self.chimeChanged.emit()
+        self._change("chime", on, self.chimeChanged)
 
     chime = Property(bool, _get_chime, _set_chime, notify=chimeChanged)
-    """Play the focus chime (Settings, task 1.14)."""
+    """Play the focus chime."""
 
     def _get_export_folder(self) -> str:
         return self._settings.export_folder
 
     def _set_export_folder(self, folder: str) -> None:
-        if folder == self._settings.export_folder:
-            return
-        self._update(export_folder=folder)
-        self.exportFolderChanged.emit()
+        self._change("export_folder", folder, self.exportFolderChanged)
 
     exportFolder = Property(  # noqa: N815 - Qt naming, used from QML
         str, _get_export_folder, _set_export_folder, notify=exportFolderChanged
     )
     """The folder the last Markdown export went to (task 1.13)."""
+
+    def _get_accent(self) -> str:
+        return self._settings.accent
+
+    def _set_accent(self, accent: str) -> None:
+        if accent in ACCENTS:
+            self._change("accent", accent, self.accentChanged)
+
+    def _get_accents(self) -> list[str]:
+        return list(ACCENTS)
+
+    accent = Property(str, _get_accent, _set_accent, notify=accentChanged)
+    accents = Property(list, _get_accents, constant=True)
+    """The accent choices, in order."""
+    """"violet", "cyan" or "green"; anything else is ignored."""
+
+    def _get_reduce_motion(self) -> bool:
+        return self._settings.reduce_motion
+
+    def _set_reduce_motion(self, on: bool) -> None:
+        self._change("reduce_motion", on, self.reduceMotionChanged)
+
+    reduceMotion = Property(  # noqa: N815 - Qt naming, used from QML
+        bool, _get_reduce_motion, _set_reduce_motion, notify=reduceMotionChanged
+    )
+
+    def _get_vault_path(self) -> str:
+        return str(vault_folder(self._settings, self._home))
+
+    def _get_vault_shown(self) -> str:
+        folder = vault_folder(self._settings, self._home)
+        return (
+            f"~/{folder.relative_to(self._home)}"
+            if folder.is_relative_to(self._home)
+            else str(folder)
+        )
+
+    def _get_vault_url(self) -> str:
+        return QUrl.fromLocalFile(self._get_vault_path()).toString()
+
+    vaultPath = Property(str, _get_vault_path, notify=vaultPathChanged)  # noqa: N815
+    vaultUrl = Property(str, _get_vault_url, notify=vaultPathChanged)  # noqa: N815
+    vaultShown = Property(str, _get_vault_shown, notify=vaultPathChanged)  # noqa: N815
+    """The vault folder as Tyler would say it (~/Cyber Vault)."""
+
+    @Slot(str)
+    def chooseVault(self, folder_url: str) -> None:  # noqa: N802 - Qt naming, used from QML
+        """Use the folder picked in Settings (a local file URL) as the vault."""
+        folder = QUrl(folder_url).toLocalFile()
+        if folder:
+            self._change("vault_path", folder, self.vaultPathChanged)
+
+    def _change(self, field: str, value: object, changed: SignalInstance) -> None:
+        if getattr(self._settings, field) == value:
+            return
+        self._update(**{field: value})
+        changed.emit()
 
     def _update(self, **changes: object) -> None:
         self._settings = self._settings.model_copy(update=changes)

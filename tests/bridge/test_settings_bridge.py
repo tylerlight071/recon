@@ -1,9 +1,10 @@
 """SettingsBridge: clamps, notifies, and saves once after changes settle."""
 
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QObject, QUrl
 
 from recon.bridge.settings import SAVE_DELAY_MS, SettingsBridge
 from recon.config import Settings
@@ -115,3 +116,45 @@ def test_export_folder_is_remembered(bridge: SettingsBridge, saved: list[Setting
 
     assert changed.count == 1
     assert saved == [Settings(export_folder="/home/tyler/Documents")]
+
+
+def test_accent_choices_and_validation(bridge: SettingsBridge, saved: list[Settings]) -> None:
+    changed = SignalCounter(bridge, "accentChanged()")
+    assert bridge.property("accents") == ["violet", "cyan", "green"]
+    assert bridge.property("accent") == "violet"
+
+    bridge.setProperty("accent", "pink")
+    bridge.setProperty("accent", "cyan")
+    bridge.flush()
+
+    assert bridge.property("accent") == "cyan"
+    assert changed.count == 1
+    assert saved == [Settings(accent="cyan")]
+
+
+def test_reduce_motion(bridge: SettingsBridge, saved: list[Settings]) -> None:
+    bridge.setProperty("reduceMotion", True)
+    bridge.flush()
+
+    assert bridge.property("reduceMotion") is True
+    assert saved == [Settings(reduce_motion=True)]
+
+
+def test_vault_defaults_to_cyber_vault_and_can_be_chosen(
+    saved: list[Settings], tmp_path: Path
+) -> None:
+    app()
+    home = tmp_path / "home"
+    bridge = SettingsBridge(Settings(), saved.append, home=home)
+    changed = SignalCounter(bridge, "vaultPathChanged()")
+    assert bridge.property("vaultPath") == str(home / "Cyber Vault")
+    assert bridge.property("vaultShown") == "~/Cyber Vault"
+    assert bridge.property("vaultUrl") == QUrl.fromLocalFile(str(home / "Cyber Vault")).toString()
+
+    bridge.chooseVault(QUrl.fromLocalFile("/data/vaults/Cyber").toString())
+    bridge.chooseVault("")
+    bridge.flush()
+
+    assert bridge.property("vaultShown") == "/data/vaults/Cyber"
+    assert changed.count == 1
+    assert saved == [Settings(vault_path="/data/vaults/Cyber")]

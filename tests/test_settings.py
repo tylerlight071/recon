@@ -15,6 +15,7 @@ from recon.config import (
     clamp_panel_width,
     load_settings,
     save_settings,
+    vault_folder,
 )
 from recon.errors import ConfigError
 from recon.paths import AppPaths
@@ -40,6 +41,7 @@ def test_round_trip_is_private(tmp_path: Path) -> None:
     assert (settings.panel_width, problem) == (470, None)
     assert path.read_text() == (
         'panel_width = 470\nkwin_pinning = "ask"\nchime = false\nexport_folder = ""\n'
+        'vault_path = ""\naccent = "violet"\nreduce_motion = false\n'
     )
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
@@ -94,3 +96,18 @@ def test_settings_file_lives_in_the_config_folder(tmp_path: Path) -> None:
     paths = AppPaths.from_environ({}, tmp_path)
 
     assert paths.settings_file == tmp_path / ".config/recon/settings.toml"
+
+
+def test_vault_folder_defaults_to_cyber_vault_in_home(tmp_path: Path) -> None:
+    assert vault_folder(Settings(), tmp_path) == tmp_path / "Cyber Vault"
+    assert vault_folder(Settings(vault_path="/data/v"), tmp_path) == Path("/data/v")
+
+
+def test_unknown_accent_falls_back_to_defaults(tmp_path: Path) -> None:
+    path = tmp_path / "settings.toml"
+    path.write_text('accent = "pink"\n')
+
+    settings, problem = load_settings(path)
+
+    assert settings == Settings()
+    assert problem is not None

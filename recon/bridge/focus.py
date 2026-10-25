@@ -186,6 +186,11 @@ class FocusBridge(QObject):
         self._focus_minutes = 0
         self.changed.emit()
 
+    @Slot()
+    def previewChime(self) -> None:  # noqa: N802 - Qt naming, used from QML
+        """Settings' "Play": let Tyler hear the chime before turning it on."""
+        self._chime()
+
     def _finish_focus(self) -> None:
         minutes, self._focus_minutes = self._focus_minutes, 0
         if self._chime_on():

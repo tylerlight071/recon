@@ -243,3 +243,9 @@ def test_failed_saves_are_logged_not_raised(db: Database) -> None:
 def test_add_time_ignores_nothing_and_unknown_tasks(setup: Setup) -> None:
     assert setup.tasks.add_time(setup.task().id, 0) is False
     assert setup.tasks.add_time(9999, 5) is False
+
+
+def test_preview_plays_the_chime_even_when_it_is_off(setup: Setup) -> None:
+    setup.focus.previewChime()
+
+    assert setup.chimes == [1]
