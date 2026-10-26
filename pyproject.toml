@@ -11,7 +11,7 @@ dependencies = [
     "ollama>=0.6.3",
     "pillow>=13",
     "pydantic>=2.14",
-    "pyside6>=6.11.2,<6.12",
+    "pyside6>=6.12.0,<6.13",
     "tomli-w>=1.2",
 ]
 
