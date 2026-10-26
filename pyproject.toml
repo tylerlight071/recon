@@ -20,7 +20,7 @@ voice = [
     # faster-whisper 1.2.1 passes `metadata_errors` to av.open(), which PyAV 19
     # removed. Fixed upstream (SYSTRAN/faster-whisper#1589) but not released;
     # drop this cap once a faster-whisper release includes the fix.
-    "av>=11,<19",
+    "av>=19.0.1,<20",
     "ctranslate2>=4.6.3",
     "faster-whisper>=1.2.1",
     "nvidia-cublas-cu12>=12.8",
