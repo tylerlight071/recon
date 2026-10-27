@@ -1,5 +1,6 @@
 """RoomSessionBridge: open a room, edit safely, add blocks, move through tasks."""
 
+import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,7 +18,7 @@ from recon.db.repositories import BlockRepository, RoomRepository, TaskRepositor
 from recon.errors import ReconError, StorageError
 from tests.bridge.fakes import FakeAutosave
 from tests.db.conftest import FakeClock
-from tests.ui.qml_harness import SignalCounter, app, wait_until
+from tests.ui.qml_harness import SignalCounter, app, wait, wait_until
 
 MD5 = "5d41402abc4b2a76b9719d911017c592"
 
@@ -897,3 +898,20 @@ def test_close_room_puts_the_room_away_and_saves(world: World) -> None:
     assert world.session.property("blocks").rowCount() == 0
     assert world.blocks.get(block.id).content.text == "last words"  # type: ignore[union-attr]
     assert world.tasks.for_room(world.room_id())[0].title == "Last"
+
+
+def test_a_title_typed_steadily_is_saved_within_a_second(world: World) -> None:
+    # Audit F-02: a trailing debounce never fired while Tyler kept typing.
+    room = world.opened()
+    typed = ""
+    started = time.monotonic()
+    saved_at = None
+    for char in "How DNS resolution works":
+        typed += char
+        world.session.setTitle(typed)
+        wait(100)  # a key every 100 ms, never a half-second pause
+        if saved_at is None and world.tasks.for_room(room.id)[0].title:
+            saved_at = time.monotonic() - started
+
+    assert saved_at is not None
+    assert saved_at < 1.0
