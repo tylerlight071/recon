@@ -1286,3 +1286,32 @@ def test_done_goes_home(running: Running) -> None:
     QMetaObject.invokeMethod(running.find(running.main, "settingsDone"), "clicked")
 
     assert wait_until(lambda: running.navigation.property("currentScreen") == "home")
+
+
+def test_a_flag_typed_in_the_title_vanishes_with_a_notice(running: Running) -> None:
+    # Audit F-14.
+    _start_room(running, "DNS in Detail", 3)
+    title = running.find(running.panel, "taskTitle")
+    title.forceActiveFocus()
+    running.panel.requestActivate()
+    for char in "Answer THM{x}":
+        QTest.keyClick(running.panel, char)
+    wait(20)
+
+    assert title.property("text") == "Answer "
+    toast = running.find(running.panel, "panelToast")
+    assert wait_until(lambda: toast.property("shown") is True)
+    assert toast.property("message") == "Flag skipped. Recon never saves flags."
+
+
+def test_a_flag_in_a_start_field_vanishes_with_a_notice(running: Running) -> None:
+    _open_start(running)
+    name = running.find(running.main, "roomName")
+    running.main.requestActivate()
+    for char in "Crack THM{y}":
+        QTest.keyClick(running.main, char)
+    wait(20)
+
+    assert name.property("text") == "Crack "
+    toast = running.find(running.main, "toast")
+    assert wait_until(lambda: toast.property("shown") is True)

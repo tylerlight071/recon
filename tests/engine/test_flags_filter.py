@@ -10,6 +10,8 @@ from hypothesis import strategies as st
 from recon.engine.flags_filter import BRACED, LONE_HEX, contains_flag, find_flags, strip_flags
 
 MD5_HELLO = "5d41402abc4b2a76b9719d911017c592"
+TYPING_MIN_HEX = 20
+"""A hex run this long ending a line is held back while typing (TYPING_HEX)."""
 
 # Braced flags ------------------------------------------------------------------------
 
@@ -240,7 +242,8 @@ def test_patterns_agree_with_the_finder(value: str) -> None:
         ("Answer: THM{this_is_a_te", "Answer: "),
         ("flag{", ""),
         ("first line THM{abc\nsecond line", "first line \nsecond line"),
-        ("THM{done} and HTB{still typing", " and "),
+        ("THM{done} and HTB{still_typing", " and "),
+        ("THM{done} and HTB{still typing", " and HTB{still typing"),  # a space: not a flag
     ],
 )
 def test_unfinished_flags_are_removed_when_saving(text: str, saved: str) -> None:
@@ -251,10 +254,20 @@ def test_editors_leave_unfinished_flags_alone() -> None:
     assert strip_flags("Answer: THM{this_is_a_te").text == "Answer: THM{this_is_a_te"
 
 
-def test_an_unfinished_brace_mid_line_loses_the_rest_of_that_line_only() -> None:
-    text = "use THM{ then the answer\nnext line stays"
-
-    assert strip_flags(text, unfinished=True).text == "use \nnext line stays"
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Audit F-03: commands and prose that mention a prefix keep every word.
+        'grep -ri "flag{" /home  # find flags',
+        "strings dump.bin | grep THM{ | head",
+        "HTB{ is the HackTheBox prefix, THM{ is TryHackMe",
+        "use THM{ then the answer\nnext line stays",
+        "echo 'flag{x' > /tmp/f",
+        "grep THM{|sort",
+    ],
+)
+def test_text_that_only_mentions_a_prefix_is_kept_whole(text: str) -> None:
+    assert strip_flags(text, unfinished=True).text == text
 
 
 @given(prose)
@@ -311,3 +324,45 @@ def test_positions_after_a_mid_text_flag_are_exact() -> None:
 
     assert [text[f.start : f.end] for f in findings] == [f.text for f in findings]
     assert [f.text for f in findings] == ["THM{x}", MD5_HELLO, "flag{y"]
+
+
+# A hash typed key by key (audit F-07) ------------------------------------------------------
+
+
+def test_a_hash_typed_key_by_key_never_reaches_storage_past_19_characters() -> None:
+    for end in range(1, len(MD5_HELLO)):
+        saved = strip_flags("answer: " + MD5_HELLO[:end], unfinished=True, typing=True).text
+        assert len(saved) - len("answer: ") < TYPING_MIN_HEX, end
+    assert strip_flags("answer: " + MD5_HELLO, unfinished=True, typing=True).text == "answer: "
+
+
+@pytest.mark.parametrize(
+    ("text", "while_typing", "final"),
+    [
+        ("id 507f1f77bcf86cd799439011", "id ", "id 507f1f77bcf86cd799439011"),  # 24 hex
+        ("id 507f1f77bcf86cd799439011 and more", None, None),  # not at the end: kept
+        ("short deadbeef", None, None),  # under 20: kept
+        ("x" + "a" * 25, None, None),  # touches a letter: not a lone run
+    ],
+)
+def test_a_hex_run_ending_a_line_is_held_only_while_typing(
+    text: str, while_typing: str | None, final: str | None
+) -> None:
+    assert strip_flags(text, unfinished=True, typing=True).text == (while_typing or text)
+    assert strip_flags(text, unfinished=True).text == (final or text)
+
+
+def test_a_kept_hash_is_not_held_back_while_typing() -> None:
+    text = f"md5 {MD5_HELLO}"
+
+    assert strip_flags(text, kept={MD5_HELLO}, unfinished=True, typing=True).text == text
+
+
+def test_typing_hex_findings_are_reported_and_off_by_default() -> None:
+    text = "id 507f1f77bcf86cd799439011"
+
+    assert find_flags(text, unfinished=True) == []
+    findings = find_flags(text, unfinished=True, typing=True)
+    assert [(f.kind, f.text, f.start, f.end) for f in findings] == [
+        ("hex", "507f1f77bcf86cd799439011", 3, 27)
+    ]

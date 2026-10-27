@@ -4,6 +4,7 @@ Checked on the raw bytes of the database and its WAL, not just through the
 repositories, so a stray copy anywhere in the file would fail the test.
 """
 
+import time
 from pathlib import Path
 
 import pytest
@@ -155,3 +156,29 @@ def test_a_flag_typed_key_by_key_never_reaches_the_database_even_half_typed(
     with db.read() as conn:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     assert answer.encode() not in _raw_bytes(data_dir)
+
+
+def test_a_hash_typed_key_by_key_never_reaches_the_file(
+    db: Database, data_dir: Path, repos: tuple[RoomRepository, TaskRepository, BlockRepository]
+) -> None:
+    # Audit F-07: each timed save used to store the hash typed so far (31 of 32 characters).
+    rooms, tasks, blocks = repos
+    task = tasks.for_room(rooms.create(NewRoom(name="Hashing", task_count=1)).id)[0]
+    block = blocks.ensure_starter_block(task.id)
+    queue = AutosaveQueue(blocks.update_content, delay_s=0.005)
+    hash_flag = "9e107d9d372bb6826bd81d3542a419d6"
+
+    typed = ""
+    for ch in f"The answer was {hash_flag}":
+        typed += ch
+        queue.put(block.id, BlockContent(answer=typed))
+        time.sleep(0.01)  # slow enough for a timed save between keys
+    queue.close()
+
+    stored = blocks.get(block.id)
+    assert stored is not None
+    assert stored.content.answer == "The answer was "
+    assert hash_flag[:20].encode() not in _raw_bytes(data_dir)  # app.db and its WAL
+    with db.read() as conn:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    assert hash_flag[:20].encode() not in _raw_bytes(data_dir)

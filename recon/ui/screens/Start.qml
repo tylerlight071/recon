@@ -11,6 +11,16 @@ FocusScope {
 
     property bool more: false
 
+    // Flags out of the room's details as they're typed, with the notice (audit F-14).
+    function cleanFlags(field) {
+        const shown = FlagGuard.cleanField(field.text, "main")
+        if (shown !== field.text) {
+            const at = field.cursorPosition
+            field.text = shown
+            field.cursorPosition = Math.min(at, field.length)
+        }
+    }
+
     function submit() {
         StartRoom.start(roomName.text, taskCount.text, pathField.text, moduleField.text)
     }
@@ -74,6 +84,7 @@ FocusScope {
                 TextField {
                     id: roomName
                     objectName: "roomName"
+                    onTextEdited: start.cleanFlags(roomName)
                     width: parent.width
                     hint: qsTr("e.g. DNS in Detail")
                     accessibleName: qsTr("Room name")
@@ -142,6 +153,7 @@ FocusScope {
                         TextField {
                             id: pathField
                             objectName: "pathField"
+                            onTextEdited: start.cleanFlags(pathField)
                             width: parent.width
                             hint: qsTr("e.g. Pre Security")
                             accessibleName: qsTr("Path")
@@ -159,6 +171,7 @@ FocusScope {
                         TextField {
                             id: moduleField
                             objectName: "moduleField"
+                            onTextEdited: start.cleanFlags(moduleField)
                             width: parent.width
                             hint: qsTr("e.g. Network Fundamentals")
                             accessibleName: qsTr("Module")

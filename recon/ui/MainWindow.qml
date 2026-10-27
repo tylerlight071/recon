@@ -54,6 +54,14 @@ Window {
     }
 
     Connections {
+        target: FlagGuard
+        function onFieldFlagSkipped(window) {
+            if (window === "main")
+                toast.show(qsTr("Flag skipped. Recon never saves flags."))
+        }
+    }
+
+    Connections {
         target: Pinning
         function onPinFailed() {
             toast.show(qsTr("Couldn't pin the panel. It opens as a normal window for now. You can try again in Settings."))

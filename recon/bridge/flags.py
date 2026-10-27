@@ -25,6 +25,8 @@ class FlagGuard(QObject):
     """(block id, keepable): `keepable` is the one hex string Tyler may keep, else ""."""
     keptRestored = Signal(int, str)  # noqa: N815 - Qt naming, used from QML
     """(block id, text): put the kept string back in that block's editor."""
+    fieldFlagSkipped = Signal(str)  # noqa: N815 - Qt naming, used from QML
+    """A flag left a title or room detail; the argument names the window ("panel", "main")."""
 
     def __init__(self, keep: Keep, parent: QObject | None = None) -> None:
         """Use `keep` (normally `BlockRepository.keep_lookalike`) to record kept hex strings."""
@@ -49,6 +51,25 @@ class FlagGuard(QObject):
             keepable = only.text if only is not None and only.keepable else ""
             _log.info("skipped %s flag-shaped string(s) in block %s", len(result.removed), block_id)
             self.flagSkipped.emit(block_id, keepable)
+        return result.text
+
+    @Slot(str, str, result=str)
+    def cleanField(self, text: str, window: str) -> str:  # noqa: N802 - Qt naming, used from QML
+        """A task title or room detail with flags removed (audit F-14).
+
+        These are names, not notes, so nothing here can be kept.
+
+        Args:
+            text: What's in the field now.
+            window: Which window shows the notice ("panel" or "main").
+
+        Returns:
+            The text to show and save.
+        """
+        result = strip_flags(text)
+        if result.changed:
+            _log.info("skipped %s flag-shaped string(s) in a field", len(result.removed))
+            self.fieldFlagSkipped.emit(window)
         return result.text
 
     @Slot(int, str)

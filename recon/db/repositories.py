@@ -125,12 +125,17 @@ def clean_text(text: str) -> str:
     return strip_flags(text, unfinished=True).text
 
 
-def clean_content(content: BlockContent) -> BlockContent:
-    """Block content with flags removed (finished or not), except hex strings Tyler kept."""
+def clean_content(content: BlockContent, *, typing: bool = False) -> BlockContent:
+    """Block content with flags removed (finished or not), except hex strings Tyler kept.
+
+    `typing` (timed autosaves, undo snapshots) also holds back a hash still being typed.
+    """
     kept = set(content.kept)
-    text = strip_flags(content.text, kept, unfinished=True).text
+    text = strip_flags(content.text, kept, unfinished=True, typing=typing).text
     answer = (
-        None if content.answer is None else strip_flags(content.answer, kept, unfinished=True).text
+        None
+        if content.answer is None
+        else strip_flags(content.answer, kept, unfinished=True, typing=typing).text
     )
     return content.model_copy(update={"text": text, "answer": answer})
 
@@ -343,13 +348,16 @@ class BlockRepository:
         existing = self.for_task(task_id)
         return existing[0] if existing else self.add(task_id, "key_idea", phase=phase)
 
-    def update_content(self, block_id: int, content: BlockContent) -> bool:
-        """Save a block's content (what autosave calls). Returns whether it exists."""
+    def update_content(self, block_id: int, content: BlockContent, final: bool = True) -> bool:
+        """Save a block's content (what autosave calls). Returns whether it exists.
+
+        `final` is False for timed autosaves while Tyler types: a hash still being
+        typed at a line's end is held back until the next save (audit F-07).
+        """
         now = self._clock().isoformat()
+        body = clean_content(content, typing=not final).model_dump_json()
         with self._db.transaction() as conn:
-            cursor = conn.execute(
-                _UPDATE_BLOCK_CONTENT, (clean_content(content).model_dump_json(), now, block_id)
-            )
+            cursor = conn.execute(_UPDATE_BLOCK_CONTENT, (body, now, block_id))
             conn.execute(_TOUCH_ROOM_OF_BLOCK, (now, block_id))
         return cursor.rowcount == 1
 
@@ -449,9 +457,10 @@ def _renumber(conn: sqlite3.Connection, ids: list[int]) -> None:
 def _clean_action(action: UndoAction) -> UndoAction:
     # Undo history is stored text too: flags never reach it (hard rule 2).
     if isinstance(action, SetContent):
-        return action.model_copy(update={"content": clean_content(action.content)})
+        return action.model_copy(update={"content": clean_content(action.content, typing=True)})
     if isinstance(action, InsertBlock):
-        block = action.block.model_copy(update={"content": clean_content(action.block.content)})
+        cleaned = clean_content(action.block.content, typing=True)
+        block = action.block.model_copy(update={"content": cleaned})
         return action.model_copy(update={"block": block})
     return action
 

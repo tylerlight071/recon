@@ -21,15 +21,17 @@ from recon.errors import StorageError
 class Recorder:
     def __init__(self) -> None:
         self.saved: list[tuple[int, str, float]] = []
+        self.finals: list[bool] = []
         self.fail_next = 0
         self.lock = threading.Lock()
 
-    def __call__(self, block_id: int, content: BlockContent) -> bool:
+    def __call__(self, block_id: int, content: BlockContent, final: bool) -> bool:
         with self.lock:
             if self.fail_next:
                 self.fail_next -= 1
                 raise StorageError
             self.saved.append((block_id, content.text, time.monotonic()))
+            self.finals.append(final)
         return True
 
 
@@ -84,6 +86,14 @@ def test_flush_writes_everything_now(queue: AutosaveQueue, recorder: Recorder) -
     assert queue.flush()
     assert sorted((b, t) for b, t, _ in recorder.saved) == [(1, "a"), (2, "b")]
     assert queue.pending == 0
+    assert recorder.finals == [True, True]  # a flush is a final save (audit F-07)
+
+
+def test_timed_saves_are_not_final(queue: AutosaveQueue, recorder: Recorder) -> None:
+    queue.put(1, BlockContent(text="a"))
+
+    assert _wait(lambda: recorder.saved != [])
+    assert recorder.finals == [False]
 
 
 def test_close_saves_what_is_left(recorder: Recorder) -> None:

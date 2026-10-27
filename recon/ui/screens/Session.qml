@@ -294,7 +294,16 @@ FocusScope {
                 width: parent.width
                 hint: RoomSession.titleHint
                 accessibleName: qsTr("Task title")
-                onTextEdited: RoomSession.setTitle(text)
+                // Flags out as they're typed, with the notice (hard rule 2; audit F-14).
+                onTextEdited: {
+                    const shown = FlagGuard.cleanField(text, "panel")
+                    if (shown !== text) {
+                        const at = cursorPosition
+                        text = shown
+                        cursorPosition = Math.min(at, length)
+                    }
+                    RoomSession.setTitle(text)
+                }
             }
 
             Text {
