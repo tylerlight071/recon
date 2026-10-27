@@ -12,7 +12,7 @@ from recon.bridge.flags import FlagGuard
 from recon.bridge.session import RoomSessionBridge
 from recon.db.connection import Database
 from recon.db.migrate import migrate
-from recon.db.models import Block, BlockContent, BlockType, NewRoom, Room
+from recon.db.models import Block, BlockContent, BlockType, InsertBlock, NewRoom, Room
 from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, UndoRepository
 from recon.errors import ReconError, StorageError
 from tests.bridge.fakes import FakeAutosave
@@ -787,21 +787,67 @@ def test_a_deleted_block_can_come_back_after_a_restart(db: Database) -> None:
     assert [b.id for b in second.shown()] == [second.shown()[0].id, command.id]
 
 
-def test_a_restored_block_with_a_reused_id_keeps_its_history(world: World) -> None:
+def test_ids_are_never_reused_so_undo_hits_the_right_block(world: World) -> None:
+    # Audit F-04: delete the newest block A, add B, bring A back with the toast's Undo,
+    # then Ctrl+Z: each step must land on its own block.
     world.opened()
     world.session.addBlock("command")
+    a = world.shown()[1]
+    _typing(world, a.id, "nmap -sV target ")
+    world.autosave.flush()
+    world.session.deleteBlock(a.id)
+    world.session.addBlock("question")
+    b = world.shown()[1]
+    _typing(world, b.id, "why is UDP slower? ")
+    world.autosave.flush()
+    assert b.id != a.id
+
+    world.session.undoDelete(a.id)
+    shown = {blk.id: (blk.type, blk.content.text) for blk in world.shown()}
+    assert shown[a.id] == ("command", "nmap -sV target ")
+    world.session.undo()  # B's last word
+    world.session.undo()  # B's typing before it
+
+    assert world.autosave.pending[b.id].text == "why is "
+    assert a.id not in world.autosave.pending
+
+
+def test_the_toast_undo_after_finish_still_brings_the_block_back(world: World) -> None:
+    # Audit F-01: the toast outlives "Finish room".
+    room = world.opened(tasks=1)
+    world.session.addBlock("command")
     command = world.shown()[1]
-    _typing(world, command.id, "dig MX")
+    world.session.edit(command.id, "dig MX")
+    world.autosave.flush()
     world.session.deleteBlock(command.id)
-    world.blocks.add(world.shown()[0].task_id, "table")  # takes the freed ID behind the scenes
+    world.session.closeRoom()
 
-    world.session.undo()  # brings the command back, under a new ID
+    world.session.undoDelete(command.id)
 
-    (restored,) = [b for b in world.shown() if b.type == "command"]
-    assert restored.id != command.id
-    assert restored.content.text == "dig MX"
-    world.session.undo()  # its typing history followed it
-    assert world.autosave.pending[restored.id].text == "dig "
+    assert world.session.property("hasRoom") is False
+    restored = world.blocks.get(command.id)
+    assert restored is not None
+    assert (restored.type, restored.content.text) == ("command", "dig MX")
+    world.session.open(room.id)
+    assert [blk.id for blk in world.shown()] == [world.shown()[0].id, command.id]
+
+
+def test_a_failed_restore_keeps_its_undo_step(db: Database) -> None:
+    class BrokenRestore(BlockRepository):
+        def restore(self, _block: Block) -> Block:
+            raise StorageError
+
+    world = _world(db, blocks=BrokenRestore(db))
+    room = world.opened()
+    world.session.addBlock("command")
+    command = world.shown()[1]
+    world.session.deleteBlock(command.id)
+
+    world.session.undoDelete(command.id)
+
+    assert world.failures == [StorageError.user_message]
+    steps = UndoRepository(db).for_room(room.id)
+    assert any(isinstance(s.action, InsertBlock) for s in steps)
 
 
 def test_keep_can_be_undone(world: World) -> None:

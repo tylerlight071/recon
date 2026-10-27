@@ -13,6 +13,7 @@ from recon.db.models import (
     SetContent,
 )
 from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, UndoRepository
+from recon.errors import StorageError
 from tests.db.conftest import FakeClock
 
 
@@ -61,20 +62,26 @@ def test_restore_puts_a_block_back_with_its_id_and_place(
     assert restored.created_at == two.created_at
 
 
-def test_restore_gets_a_new_id_if_the_old_one_was_reused(
+def test_block_ids_are_never_reused(
     db: Database, clock: FakeClock, blocks: BlockRepository
 ) -> None:
     _room, task = _task(db, clock)
-    _one, _two, three = _three(blocks, task)
-    deleted = blocks.delete(three.id)
-    assert deleted is not None
-    reused = blocks.add(task, "table")  # SQLite hands out the highest free ID again
-    assert reused.id == three.id
+    newest = _three(blocks, task)[2]
+    blocks.delete(newest.id)
 
-    restored = blocks.restore(deleted)
+    added = blocks.add(task, "table")
 
-    assert restored.id != three.id
-    assert [b.content.text for b in blocks.for_task(task)] == ["one", "two", "three", ""]
+    assert added.id > newest.id  # AUTOINCREMENT (migration 0003)
+
+
+def test_restore_refuses_an_id_in_use(
+    db: Database, clock: FakeClock, blocks: BlockRepository
+) -> None:
+    _room, task = _task(db, clock)
+    block = blocks.add(task, "key_idea")
+
+    with pytest.raises(StorageError):
+        blocks.restore(block)
 
 
 def test_restore_clamps_the_position(
@@ -177,25 +184,24 @@ def test_only_the_newest_steps_are_kept(
     assert [e.action for e in undo.for_room(room)] == [RemoveBlock(block_id=i) for i in (3, 4, 5)]
 
 
-def test_remap_points_steps_at_a_restored_block(
-    db: Database, clock: FakeClock, blocks: BlockRepository, undo: UndoRepository
+def test_finishing_a_room_clears_its_steps(
+    db: Database, clock: FakeClock, undo: UndoRepository
 ) -> None:
+    room, task = _task(db, clock, "A")
+    other, other_task = _task(db, clock, "B")
+    undo.push(room, task, RemoveBlock(block_id=1))
+    undo.push(other, other_task, RemoveBlock(block_id=2))
+
+    undo.clear_room(room)
+
+    assert undo.for_room(room) == []
+    assert len(undo.for_room(other)) == 1
+
+
+def test_old_steps_expire(db: Database, clock: FakeClock, undo: UndoRepository) -> None:
     room, task = _task(db, clock)
-    block = blocks.add(task, "key_idea")
-    undo.push(room, task, SetContent(block_id=block.id, content=BlockContent(text="a")))
-    undo.push(room, task, InsertBlock(block=block))
-    undo.push(room, task, MoveBlock(block_id=999, position=0))
+    undo.push(room, task, RemoveBlock(block_id=1))
+    clock.advance(UndoRepository.KEEP_DAYS * 86400 + 1)
+    undo.push(room, task, RemoveBlock(block_id=2))
 
-    undo.remap(room, block.id, 77)
-
-    actions = [e.action for e in undo.for_room(room)]
-    assert actions[0] == SetContent(block_id=77, content=BlockContent(text="a"))
-    assert isinstance(actions[1], InsertBlock)
-    assert actions[1].block.id == 77
-    assert actions[2] == MoveBlock(block_id=999, position=0)
-    with db.read() as conn:
-        assert [r[0] for r in conn.execute("SELECT entity_id FROM undo_log ORDER BY id")] == [
-            77,
-            77,
-            999,
-        ]
+    assert [e.action for e in undo.for_room(room)] == [RemoveBlock(block_id=2)]

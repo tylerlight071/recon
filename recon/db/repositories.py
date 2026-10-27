@@ -11,7 +11,7 @@ blocks also bumps the room's `updated_at`, which "recent rooms" and
 import json
 import sqlite3
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 from recon.db.connection import Database
@@ -30,7 +30,6 @@ from recon.db.models import (
     UndoAction,
     UndoEntry,
     action_block_id,
-    remap_action,
 )
 from recon.engine.flags_filter import LONE_HEX, strip_flags
 from recon.errors import StorageError
@@ -108,6 +107,8 @@ _SELECT_UNDO: Final = """
     WHERE json_extract(before, '$.room_id') = ? ORDER BY id"""
 _UPDATE_UNDO: Final = "UPDATE undo_log SET entity_id = ?, before = ? WHERE id = ?"
 _DELETE_UNDO: Final = "DELETE FROM undo_log WHERE id = ?"
+_CLEAR_UNDO: Final = "DELETE FROM undo_log WHERE json_extract(before, '$.room_id') = ?"
+_EXPIRE_UNDO: Final = "DELETE FROM undo_log WHERE created_at < ?"
 _PRUNE_UNDO: Final = """
     DELETE FROM undo_log WHERE json_extract(before, '$.room_id') = ? AND id NOT IN (
         SELECT id FROM undo_log WHERE json_extract(before, '$.room_id') = ?
@@ -370,20 +371,26 @@ class BlockRepository:
         return self.update_content(block_id, block.content.model_copy(update={"kept": kept}))
 
     def restore(self, block: Block) -> Block:
-        """Put a deleted block back at its old place (Undo), keeping its ID if it's free.
+        """Put a deleted block back at its old place and with its own ID (Undo).
+
+        IDs are never reused (migration 0003), so the old ID is always free.
 
         Returns:
-            The block as stored; its ID differs only if the old one was reused meanwhile.
+            The block as stored.
+
+        Raises:
+            StorageError: The ID is taken (only a database edited by hand gets here).
         """
         now = self._clock().isoformat()
         body = clean_content(block.content).model_dump_json()
         with self._db.transaction() as conn:
-            free = conn.execute(_BLOCK_EXISTS, (block.id,)).fetchone() is None
+            if conn.execute(_BLOCK_EXISTS, (block.id,)).fetchone() is not None:
+                raise StorageError
             ids = [r[0] for r in conn.execute(_SELECT_BLOCK_IDS, (block.task_id,))]
             cursor = conn.execute(
                 _RESTORE_BLOCK,
                 (
-                    block.id if free else None,
+                    block.id,
                     block.task_id,
                     block.type,
                     len(ids),
@@ -464,6 +471,8 @@ class UndoRepository:
 
     KEEP_PER_ROOM: Final = 300
     """Older steps are dropped when a room opens."""
+    KEEP_DAYS: Final = 30
+    """Steps (and the old text they hold) go after this long, whichever room."""
 
     def __init__(self, db: Database, clock: Clock = utc_now) -> None:
         """Use `db`; `clock` stamps created_at."""
@@ -487,7 +496,9 @@ class UndoRepository:
 
     def for_room(self, room_id: int) -> list[UndoEntry]:
         """The room's steps back, oldest first, after dropping all but the newest few hundred."""
+        cutoff = (self._clock() - timedelta(days=self.KEEP_DAYS)).isoformat()
         with self._db.transaction() as conn:
+            conn.execute(_EXPIRE_UNDO, (cutoff,))
             conn.execute(_PRUNE_UNDO, (room_id, room_id, self.KEEP_PER_ROOM))
             rows = conn.execute(_SELECT_UNDO, (room_id,)).fetchall()
         return [UndoEntry.model_validate({"id": row[0], **json.loads(row[1])}) for row in rows]
@@ -497,14 +508,7 @@ class UndoRepository:
         with self._db.transaction() as conn:
             conn.execute(_DELETE_UNDO, (entry_id,))
 
-    def remap(self, room_id: int, old: int, new: int) -> None:
-        """A restored block got a new ID: point the room's steps at it."""
-        entries = self.for_room(room_id)
+    def clear_room(self, room_id: int) -> None:
+        """Forget a room's steps, and the deleted or overwritten text they hold (room finished)."""
         with self._db.transaction() as conn:
-            for entry in entries:
-                action = remap_action(entry.action, old, new)
-                if action is not entry.action:
-                    conn.execute(
-                        _UPDATE_UNDO,
-                        (new, _undo_body(entry.room_id, entry.task_id, action), entry.id),
-                    )
+            conn.execute(_CLEAR_UNDO, (room_id,))

@@ -150,8 +150,9 @@ Ctrl+Z / Ctrl+Shift+Z undo and redo within the task on screen.
 - **What's undoable:** typing, adds, deletes, moves and "Not a flag, keep it". Typing is grouped by `bridge/undo.py` (`UndoHistory`), so one step is about a word: a new step starts on another block or field, after a one-second pause, or once a word ends.
 - **How a step is stored:** each step is the action that goes back (`SetContent`, `RemoveBlock`, `InsertBlock`, `MoveBlock` in `db/models.py`). Applying one returns its opposite, which goes on the other stack.
 - **Persistence:**
-  - Undo steps are written to `undo_log` (`UndoRepository`, flag-filtered like every other store, the newest 300 per room kept), so a deleted block can come back after a restart. Redo lives in memory.
-  - `BlockRepository.restore` brings a block back at its old place, keeping its ID if it's still free. Otherwise the steps are remapped to the new ID.
+  - Undo steps are written to `undo_log` (`UndoRepository`, flag-filtered like every other store), so a deleted block can come back after a restart. A room keeps its newest 300 steps, steps older than 30 days go, and finishing a room clears its steps (and the old text they hold). Redo lives in memory.
+  - Block IDs are never reused (`AUTOINCREMENT`, migration 0003), so a step about a block always means that block. `BlockRepository.restore` brings a deleted block back at its old place with its own ID.
+  - A step leaves `undo_log` only after its change is saved. Bringing a block back and forgetting its step happen in one worker job, so a failed restore keeps the step. The delete toast's Undo works even after "Finish room".
 - **Deleting:** a block's × (Ctrl+Shift+Backspace) deletes it, never the last one. The panel shows "Block deleted." with Undo for 10 s, and that Undo brings back that block even if other things happened since.
 - **Keys:** the block editors catch Ctrl+Z themselves, so it undoes across the task rather than inside one editor. The task title field keeps its own text undo.
 

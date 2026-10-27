@@ -25,6 +25,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Component set on QtQuick.Templates: Button (primary, secondary, quiet), IconButton, Card, TextArea with a fading hint, Block, ProgressRing, Toast with Undo, Dialog, SidebarItem, TimerChip, Tooltip with shortcut, plus Recon's own line icons and keyboard focus rings. Every interactive component has an accessible role and name. `python -m recon --gallery` shows them all.
 - `Theme.qml` singleton with every design token (colours, accent choice, block edges, type, spacing, radii, panel widths, motion with Reduce motion) and the bundled Inter and JetBrains Mono fonts (OFL). Tests check the tokens against CLAUDE.md, text contrast of at least 4.5:1, and that QML outside the theme uses no literal colours or sizes.
 
+### Fixed
+
+- The delete toast's Undo, pressed after "Finish room", no longer loses the block: it comes back into its task, and its undo step is forgotten only once it's saved (audit F-01).
+- Undo can no longer land on the wrong block. Block IDs are never reused (migration 0003), so a restored block always gets its own ID back (audit F-04).
+- A finished room's undo history, which holds old and deleted text, is cleared, and steps older than 30 days are dropped (audit F-19).
+
 ## [0.0.0] - 2026-10-24
 
 Phase 0, foundations: repository, tooling, environment checks and smoke tests proving the stack runs on Tyler's machine. No app to run yet.

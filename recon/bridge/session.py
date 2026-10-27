@@ -413,8 +413,7 @@ class RoomSessionBridge(QObject):
             return
         step = self._history.pop_undo(task_id)
         if step is not None:
-            self._forget(step)
-            self._apply(step.action, lambda back: self._history.push_redo(task_id, back))
+            self._apply(step.action, lambda back: self._history.push_redo(task_id, back), step)
 
     @Slot()
     def redo(self) -> None:
@@ -430,11 +429,16 @@ class RoomSessionBridge(QObject):
 
     @Slot(int)
     def undoDelete(self, block_id: int) -> None:  # noqa: N802 - Qt naming, used from QML
-        """The delete toast's Undo: bring that block back, whatever happened since."""
+        """The delete toast's Undo: bring that block back, whatever happened since.
+
+        Works with no room open too (the toast outlives "Finish room"): the block
+        goes back into its task in storage, and shows when the task is opened.
+        """
+        if self._busy:
+            return
         step = self._history.take_insert(block_id)
-        if step is not None and not self._busy:
-            self._forget(step)
-            self._apply(step.action, lambda back: self._history.push_redo(step.task_id, back))
+        if step is not None:
+            self._apply(step.action, lambda back: self._history.push_redo(step.task_id, back), step)
 
     def _record(self, action: UndoAction) -> None:
         self.activity.emit()
@@ -442,8 +446,14 @@ class RoomSessionBridge(QObject):
         if task_id is not None:
             self._save_step(self._history.record(task_id, action))
 
-    def _apply(self, action: UndoAction, then: Callable[[UndoAction], None]) -> None:
-        # Do `action`, then hand its opposite to `then` (for the other stack).
+    def _apply(
+        self, action: UndoAction, then: Callable[[UndoAction], None], taken: Step | None = None
+    ) -> None:
+        # Do `action` and hand its opposite to `then` (for the other stack). `taken`, the
+        # undo step being used, leaves undo_log only after its change is saved.
+        if isinstance(action, InsertBlock):
+            self._insert_block(action.block, then, taken)
+            return
         if isinstance(action, SetContent):
             current = self._model.content(action.block_id)
             if current is not None:
@@ -454,29 +464,27 @@ class RoomSessionBridge(QObject):
             insert = self._remove_block(action.block_id)
             if insert is not None:
                 then(insert)
-        elif isinstance(action, MoveBlock):
+        else:
             move = self._move_block(action.block_id, action.position)
             if move is not None:
                 then(move)
-        else:
-            self._insert_block(action.block, then)
+        if taken is not None:
+            self._forget(taken)  # queued behind the change's own write (one serial worker)
 
-    def _insert_block(self, block: Block, then: Callable[[UndoAction], None]) -> None:
-        room = self._room
-        if room is None:
-            return
-
+    def _insert_block(
+        self, block: Block, then: Callable[[UndoAction], None], taken: Step | None
+    ) -> None:
+        # One job: the block comes back, and only then is its undo step forgotten, so a
+        # failed restore leaves the step in undo_log to try again.
         def work() -> Then:
             restored = self._blocks.restore(block)
-            if restored.id != block.id:
-                self._undo_repo.remap(room.id, block.id, restored.id)
-            return lambda: self._inserted(block.id, restored, then)
+            if taken is not None and taken.entry_id is not None:
+                self._undo_repo.delete(taken.entry_id)
+            return lambda: self._inserted(restored, then)
 
         self._background(work)
 
-    def _inserted(self, old_id: int, block: Block, then: Callable[[UndoAction], None]) -> None:
-        if block.id != old_id:
-            self._history.remap(old_id, block.id)
+    def _inserted(self, block: Block, then: Callable[[UndoAction], None]) -> None:
         if self._task_id() == block.task_id:
             self._model.insert(block)
             self.focusBlock.emit(block.id)

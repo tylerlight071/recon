@@ -14,7 +14,7 @@ from recon.config import Settings
 from recon.db.connection import Database
 from recon.db.migrate import migrate
 from recon.db.models import BlockContent, NewRoom, Task
-from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository
+from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, UndoRepository
 from recon.errors import ExportFolderMissingError, ReconError
 from tests.ui.qml_harness import SignalCounter, app
 
@@ -82,7 +82,7 @@ def setup(db: Database, tmp_path: Path) -> Setup:
     home = tmp_path / "home"
     (home / "Documents").mkdir(parents=True)
     finish = FinishBridge(
-        (rooms, tasks, blocks),
+        (rooms, tasks, blocks, UndoRepository(db)),
         settings,
         lambda folder: opened.append(folder) is None,
         submit=lambda job: job(),
@@ -189,7 +189,7 @@ class SurprisingRooms(RoomRepository):
 
 def test_an_unexpected_failure_never_leaves_finish_stuck(db: Database, setup: Setup) -> None:
     finish = FinishBridge(
-        (SurprisingRooms(db), setup.tasks, setup.blocks),
+        (SurprisingRooms(db), setup.tasks, setup.blocks, UndoRepository(db)),
         setup.settings,
         lambda _folder: True,
         submit=lambda job: job(),

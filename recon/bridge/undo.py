@@ -5,6 +5,9 @@ Each task has an undo stack and a redo stack of actions that put things back
 a deleted block can still come back after a restart; `Step.entry_id` is the
 row once it's been written. Redo lives in memory only.
 
+Block IDs are never reused (migration 0003), so a step about a block always
+means that block, even after it's deleted and brought back.
+
 Typing is grouped so one Ctrl+Z undoes about a word, not a keystroke: a new
 group starts on another block or field, after a pause, or once a word ends.
 No Qt and no storage here: the session applies actions and saves steps.
@@ -20,7 +23,6 @@ from recon.db.models import (
     SetContent,
     UndoAction,
     UndoEntry,
-    remap_action,
 )
 
 GROUP_PAUSE_S: Final = 1.0
@@ -138,14 +140,6 @@ class UndoHistory:
                 if isinstance(action, InsertBlock) and action.block.id == block_id:
                     return stack.pop(index)
         return None
-
-    def remap(self, old: int, new: int) -> None:
-        """A restored block came back with a new ID: point every step at it."""
-        for stack in self.undo.values():
-            for step in stack:
-                step.action = remap_action(step.action, old, new)
-        for task_id, actions in self.redo.items():
-            self.redo[task_id] = [remap_action(action, old, new) for action in actions]
 
     def _push(self, task_id: int, action: UndoAction) -> Step:
         self.redo.pop(task_id, None)
