@@ -119,13 +119,15 @@ exclude_also = [
 
 # --------------------------------------------------------------------------
 # mutmut (3.x): safety-critical modules only. Paths that don't exist yet are
-# picked up automatically as the modules land (flags filter: Phase 1;
-# stage and sanitise: Phase 2; factcheck: Phase 3).
+# picked up automatically as the modules land (flags filter, export escaping
+# and file names: Phase 1; stage and sanitise: Phase 2; factcheck: Phase 3).
 # --------------------------------------------------------------------------
 [tool.mutmut]
 source_paths = ["recon/"]
 only_mutate = [
     "recon/engine/flags_filter.py",
+    "recon/engine/names.py",
+    "recon/engine/render.py",
     "recon/engine/stage.py",
     "recon/engine/sanitise.py",
     "recon/engine/factcheck/*",
@@ -136,4 +138,7 @@ pytest_add_cli_args_test_selection = [
     "tests/engine/test_flags_filter.py",
     "tests/db/test_flags_never_stored.py",
     "tests/bridge/test_flag_guard.py",
+    "tests/engine/test_names.py",
+    "tests/engine/test_render.py",
+    "tests/engine/test_export.py",
 ]
