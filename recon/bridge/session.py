@@ -298,12 +298,15 @@ class RoomSessionBridge(QObject):
 
     @Slot(str)
     def setTitle(self, title: str) -> None:  # noqa: N802 - Qt naming, used from QML
-        """Tyler typed the task title; it saves half a second after he stops."""
+        """Tyler typed the task title; it saves within half a second, even while he types."""
         if self._task() is None:
             return
         self.activity.emit()
         self._pending_title = title
-        self._title_timer.start()
+        # Max-latency, like block autosave (hard rule 7): steady typing can't put
+        # the save off, so a title is stored within half a second of its first change.
+        if not self._title_timer.isActive():
+            self._title_timer.start()
 
     def _save_title(self) -> None:
         task, title = self._task(), self._take_title()

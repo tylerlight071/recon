@@ -23,7 +23,7 @@ from recon.bridge.pinning import PinningBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
-from recon.bridge.workers import serial_submit
+from recon.bridge.workers import SerialWorker, drain_global_pool
 from recon.config import Settings, load_settings, save_settings
 from recon.db import backup
 from recon.db.autosave import AutosaveQueue
@@ -159,7 +159,7 @@ def _room_bridges(
     rooms, tasks, blocks = RoomRepository(db), TaskRepository(db), BlockRepository(db)
     undo = UndoRepository(db)
     # One serial worker for the room's writes, so saves land before anything reads them back.
-    room_worker = serial_submit(app)
+    room_worker = SerialWorker(app)
     flag_guard = FlagGuard(blocks.keep_lookalike, parent=app)
     home = HomeBridge(rooms, blocks, utc_now, parent=app)
     start = StartRoomBridge(rooms, parent=app)
@@ -186,7 +186,9 @@ def _room_bridges(
     )
     connect_room_flow(navigation, home, start, session, focus)
     connect_finish(navigation, home, session, focus, finish)
-    # In order: the last title, the last seconds, then every queued keystroke (hard rule 7).
+    # In order: finish every queued job (Next, deletes, undo steps), then the last title,
+    # the last seconds and every queued keystroke, all before the database closes (F-06).
+    app.aboutToQuit.connect(lambda: _drain(room_worker))
     app.aboutToQuit.connect(session.close)
     app.aboutToQuit.connect(focus.close)
     app.aboutToQuit.connect(autosave.close)
@@ -198,6 +200,12 @@ def _room_bridges(
         "Focus": focus,
         "Finish": finish,
     }
+
+
+def _drain(room_worker: SerialWorker) -> None:
+    """At quit: let queued room jobs and global-pool jobs finish before anything closes."""
+    if not (room_worker.drain() and drain_global_pool()):
+        _log.warning("quit before every queued save finished")
 
 
 def _screen_area(app: QGuiApplication) -> tuple[int, int, int, int]:

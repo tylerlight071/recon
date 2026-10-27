@@ -29,6 +29,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - The delete toast's Undo, pressed after "Finish room", no longer loses the block: it comes back into its task, and its undo step is forgotten only once it's saved (audit F-01).
 - Undo can no longer land on the wrong block. Block IDs are never reused (migration 0003), so a restored block always gets its own ID back (audit F-04).
+- A task title typed without pausing is saved within half a second; before, the save waited for a pause and could be lost in a crash (audit F-02).
+- Quitting straight after "Next task", a delete or an undo no longer drops it: queued saves finish before the database closes (audit F-06).
 - A finished room's undo history, which holds old and deleted text, is cleared, and steps older than 30 days are dropped (audit F-19).
 
 ## [0.0.0] - 2026-10-24

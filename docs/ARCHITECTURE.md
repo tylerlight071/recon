@@ -86,7 +86,7 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 
 - **Keystrokes:** each one goes through `edit()`, which strips flags via `FlagGuard`, queues the content in the autosave queue and returns the text to show. The model is updated without notifying QML, so the cursor stays put.
 - **"Not a flag, keep it":** restores the string where it was, or at the end if Tyler has typed since.
-- **Task title:** saves half a second after the last keystroke, and immediately on Next, on switching rooms and at quit.
+- **Task title:** saves within half a second of the first unsaved keystroke, even while Tyler keeps typing (max-latency, like block autosave), and immediately on Next, on switching rooms and at quit.
 - **Other writes:** opening a room, adding a block, saving the title, Next and Skip run in order on one private worker thread (`workers.serial_submit`); results come back as signals.
 - **Next, Skip and Previous:** flush the autosave queue, mark the task done or skipped (Previous marks nothing), record the position, and open the target task with its starter block. Next plays a tick in the ring.
 - **Last task:** finishing it emits `finishRequested` for task 1.13.
@@ -128,7 +128,7 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 - **Open folder:** goes through `services/open_url.py`, the only module allowed `QDesktopServices`, and only for local folders.
 - **Back to the room:** sets the room back to `capturing` and reopens it at the last task. **Done** returns to Home.
 
-The room, its tasks' time and the export all go through one serial worker (`room_worker` in `__main__`), so a save always lands before the next read.
+The room, its tasks' time and the export all go through one serial worker (`room_worker`, a `workers.SerialWorker`), so a save always lands before the next read. At quit, `__main__` drains it, and Qt's global pool, before the last title, time and keystrokes are saved and before the database closes.
 
 ## Settings (first pass, task 1.14)
 
