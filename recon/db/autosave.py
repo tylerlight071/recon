@@ -22,7 +22,9 @@ from recon.logging_setup import Safe
 DELAY_S: Final = 0.5
 RETRY_S: Final = 1.0
 
-type Save = Callable[[int, BlockContent], object]
+type Save = Callable[[int, BlockContent, bool], object]
+"""(block, content, final): `final` is True for flushes (task switch, quit), False for
+timed saves while Tyler types."""
 type Clock = Callable[[], float]
 
 _log = logging.getLogger(__name__)
@@ -32,6 +34,7 @@ _log = logging.getLogger(__name__)
 class _Pending:
     content: BlockContent
     due: float
+    final: bool = False
 
 
 class AutosaveQueue:
@@ -87,6 +90,7 @@ class AutosaveQueue:
         with self._cond:
             for item in self._pending.values():
                 item.due = 0.0
+                item.final = True
             self._cond.notify()
             while (self._pending or self._writing) and self._clock() < deadline:
                 self._cond.wait(timeout=0.05)
@@ -115,13 +119,13 @@ class AutosaveQueue:
                     self._writing -= 1
                     self._cond.notify_all()
 
-    def _wait_for_due(self) -> dict[int, BlockContent] | None:
+    def _wait_for_due(self) -> dict[int, _Pending] | None:
         # Called with the lock held. None means: stop.
         while True:
             if self._stopping and not self._pending:
                 return None
             now = self._clock()
-            due = {k: v.content for k, v in self._pending.items() if v.due <= now}
+            due = {k: v for k, v in self._pending.items() if v.due <= now}
             if due:
                 for block_id in due:
                     del self._pending[block_id]
@@ -129,10 +133,11 @@ class AutosaveQueue:
             soonest = min((v.due for v in self._pending.values()), default=None)
             self._cond.wait(timeout=None if soonest is None else max(0.0, soonest - now))
 
-    def _write(self, batch: dict[int, BlockContent]) -> None:
-        for block_id, content in batch.items():
+    def _write(self, batch: dict[int, _Pending]) -> None:
+        for block_id, item in batch.items():
+            content = item.content
             try:
-                self._save(block_id, content)
+                self._save(block_id, content, item.final)
             # Thread boundary (CLAUDE.md, Errors): catch everything, log, retry, report.
             except Exception as exc:
                 _log.warning("autosave of block %s failed: %s", block_id, Safe(type(exc).__name__))

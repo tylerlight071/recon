@@ -27,6 +27,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Commands and notes that mention `flag{`, `THM{` or `HTB{` are no longer cut off at that word when saved. Only something that looks like a flag mid-typing is held back (audit F-03, ADR 0005 amended).
+- A hash typed key by key no longer reaches the database before its last character: timed saves hold back a 20–31 character hex run ending a line (audit F-07).
+- A flag typed into a task title, room name, path or module now disappears as you type, with the "Flag skipped" notice (audit F-14).
 - The delete toast's Undo, pressed after "Finish room", no longer loses the block: it comes back into its task, and its undo step is forgotten only once it's saved (audit F-01).
 - Undo can no longer land on the wrong block. Block IDs are never reused (migration 0003), so a restored block always gets its own ID back (audit F-04).
 - A task title typed without pausing is saved within half a second; before, the save waited for a pause and could be lost in a crash (audit F-02).

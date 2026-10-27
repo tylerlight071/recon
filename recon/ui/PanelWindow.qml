@@ -80,6 +80,14 @@ Window {
     }
 
     Connections {
+        target: FlagGuard
+        function onFieldFlagSkipped(window) {
+            if (window === "panel")
+                panel.notify(qsTr("Flag skipped. Recon never saves flags."))
+        }
+    }
+
+    Connections {
         target: Finish
         function onFailed(message) { panel.notify(message) }
     }

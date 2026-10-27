@@ -90,3 +90,17 @@ def test_flag_text_is_never_logged(guard: FlagGuard, caplog: pytest.LogCaptureFi
     assert "secret" not in messages
     assert MD5 not in messages
     assert "skipped 2 flag-shaped string(s) in block 5" in messages
+
+
+# Titles and room details (audit F-14) ----------------------------------------------------
+
+
+def test_fields_lose_flags_with_a_notice_for_their_window(guard: FlagGuard) -> None:
+    notices: list[str] = []
+    guard.fieldFlagSkipped.connect(notices.append)
+
+    assert guard.cleanField("Answer was THM{abc}", "panel") == "Answer was "
+    assert guard.cleanField(f"Hashing {MD5}", "main") == "Hashing "
+    assert guard.cleanField("Record types", "panel") == "Record types"
+
+    assert notices == ["panel", "main"]
