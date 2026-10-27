@@ -39,7 +39,14 @@ uv run python -m recon                   # quick dev run (no GPU libraries for v
 uv run python -m recon --gallery         # developer component gallery
 ```
 
-An app-menu entry arrives with task 1.15 (`scripts/install_desktop.py`).
+### App menu
+
+```fish
+uv run python -m scripts.install_desktop                # add Recon to the app menu (Education)
+uv run python -m scripts.install_desktop --uninstall    # remove it again
+```
+
+This writes `~/.local/share/applications/io.github.tylerlight071.Recon.desktop` and its icon, and asks KDE to refresh the menu. The entry runs this checkout's `packaging/recon-launch` with no terminal window. If you move the checkout, run the install again. The file name must match the app ID, which the F9 shortcut and the panel's KWin rule rely on.
 
 ## Check your machine
 
@@ -102,3 +109,4 @@ Any new source is added here before its first download.
 - **Whisper says `libcublas.so.12 is not found`:** start it through `packaging/recon-launch`, which puts the CUDA libraries on the loader path.
 - **The first voice clip after a driver update is slow (~13 s):** the driver is recompiling GPU kernels; later clips are fast.
 - **`uv lock --check` fails:** run `uv lock` and commit `uv.lock` with your change.
+- **Recon isn't in the app menu after installing:** run `kbuildsycoca6`, or log out and back in. If it's there but nothing opens, run `./packaging/recon-launch` from a terminal to see why (for example, `uv` isn't on the path).

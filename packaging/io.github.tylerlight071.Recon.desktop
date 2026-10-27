@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Recon
+GenericName=Study companion
+Comment=Write up TryHackMe rooms one task at a time, then revise them
+Exec=@RECON_LAUNCH@
+Icon=io.github.tylerlight071.Recon
+Terminal=false
+Categories=Education;ComputerScience;
+Keywords=TryHackMe;notes;study;revision;flashcards;
+StartupNotify=true
+StartupWMClass=io.github.tylerlight071.Recon
+X-Recon-Installed-By=scripts/install_desktop.py

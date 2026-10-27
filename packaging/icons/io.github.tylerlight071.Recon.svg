@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Recon: a calm "target" mark in the default violet accent on the near-black canvas. -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#111215" stroke="#23252a" stroke-width="2"/>
+  <circle cx="64" cy="64" r="34" fill="none" stroke="#7c74d9" stroke-width="8"/>
+  <circle cx="64" cy="64" r="12" fill="#7c74d9"/>
+  <path d="M64 18 V34 M64 94 V110 M18 64 H34 M94 64 H110" stroke="#ececef" stroke-width="6" stroke-linecap="round"/>
+</svg>
