@@ -218,3 +218,35 @@ def test_tylers_text_never_changes_the_notes_structure(
     # One title and one heading per task; no quotes, rules or comments of Tyler's own.
     assert headings == ["#"] + ["##"] * len(tasks)
     assert stray == []
+
+
+def _one(block: ExportBlock, title: str = "") -> str:
+    return render_export(_room(ExportTask(index=1, title=title, status="done", blocks=(block,))))
+
+
+def test_an_unknown_block_type_is_labelled_note() -> None:
+    assert "**Note**\nsomething" in _one(ExportBlock(type="mystery", text="something"))
+
+
+def test_room_question_answers() -> None:
+    no_answer = _one(ExportBlock(type="room_question", text="Which port?", answer=None))
+    kept = _one(ExportBlock(type="room_question", text="Hash?", answer=f"md5 {MD5}", kept=(MD5,)))
+    lines = _one(ExportBlock(type="room_question", text="Steps?", answer="first\nsecond"))
+
+    assert "[!question]" not in no_answer
+    assert f"> md5 {MD5}" in kept
+    assert "> [!question]- Answer\n> first\n> second" in lines
+
+
+def test_titles_and_cells_are_defused() -> None:
+    title = _one(ExportBlock(type="key_idea", text="x"), title="A %% hidden %% title")
+    cells = _one(ExportBlock(type="table", text="path, note\nC:\\Temp, a %% b"))
+
+    assert "## Task 1: A \\%\\% hidden \\%\\% title" in title
+    assert "| C:\\\\Temp | a \\%\\% b |" in cells
+
+
+def test_tylers_spacing_is_kept_but_blank_runs_collapse() -> None:
+    text = _one(ExportBlock(type="key_idea", text="    indented on purpose\n\n\n\nlater"))
+
+    assert "**Key idea**\n    indented on purpose\n\nlater" in text

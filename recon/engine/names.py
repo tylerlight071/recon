@@ -44,8 +44,9 @@ def file_name(name: str, fallback: str = FALLBACK) -> str:
 
 
 def _unsafe(char: str) -> bool:
-    # Control, format (e.g. bidi overrides), separator-line and unassigned characters.
-    return unicodedata.category(char) in {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
+    # Control, format (e.g. bidi overrides), lone surrogate, private-use and unassigned
+    # characters. Line and paragraph separators are whitespace, so _SPACES handles them.
+    return unicodedata.category(char) in {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
 def _cut(text: str) -> str:
