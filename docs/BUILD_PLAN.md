@@ -114,7 +114,7 @@ Later phases add: `runs`, `flags`, `cards`, `reviews`, `quiz_items`, `recaps`.
 - [x] **1.12 Focus timer.** Chip in the header: 15 / 25 / 45 minute presets; soft chime (off by default; toggle in Settings); after 90 minutes of continuous work, one gentle "Time for a short break?" toast. Time spent per task and room recorded.
 - [x] **1.13 Finish (temporary).** In this phase, "Finish room" marks the room done and offers "Export as Markdown" (one `.md` per room to a folder Tyler chooses). Replaced by the real pipeline in Phase 2.
 - [x] **1.14 Settings (first pass).** Vault path, accent colour (violet / cyan / green), reduce motion, panel width, chime on/off, KWin pinning on/off.
-- [ ] **1.15 Desktop entry.** `packaging/<app-id>.desktop` and icon installed to `~/.local/share/applications/` and `~/.local/share/icons/` by `scripts/install_desktop.py`, so Recon launches from the app menu. It runs `packaging/recon-launch`; no terminal window. The file name matches the app ID exactly, or the shortcuts portal and KWin rule won't recognise the app.
+- [x] **1.15 Desktop entry.** `packaging/<app-id>.desktop` and icon installed to `~/.local/share/applications/` and `~/.local/share/icons/` by `scripts/install_desktop.py`, so Recon launches from the app menu. It runs `packaging/recon-launch`; no terminal window. The file name matches the app ID exactly, or the shortcuts portal and KWin rule won't recognise the app.
 
 ### Acceptance
 
