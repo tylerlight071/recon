@@ -1,4 +1,4 @@
-"""UndoHistory: per-task stacks, typing grouped into words, lookups and remaps."""
+"""UndoHistory: per-task stacks, typing grouped into words, and lookups."""
 
 from datetime import UTC, datetime
 
@@ -7,9 +7,7 @@ from recon.db.models import (
     Block,
     BlockContent,
     InsertBlock,
-    MoveBlock,
     RemoveBlock,
-    SetContent,
     UndoEntry,
 )
 
@@ -129,23 +127,6 @@ def test_take_insert_finds_the_delete_wherever_it_is() -> None:
     assert step.action == InsertBlock(block=_block(1))
     assert [s.action for s in history.undo[10]] == [RemoveBlock(block_id=9)]
     assert history.take_insert(1) is None
-
-
-def test_remap_rewrites_undo_and_redo() -> None:
-    history, _clock = _history()
-    history.record(10, SetContent(block_id=1, content=BlockContent()))
-    history.record(10, InsertBlock(block=_block(1)))
-    history.record(10, MoveBlock(block_id=3, position=0))
-    history.push_redo(10, RemoveBlock(block_id=1))
-
-    history.remap(1, 7)
-
-    actions = [s.action for s in history.undo[10]]
-    assert actions[0] == SetContent(block_id=7, content=BlockContent())
-    assert isinstance(actions[1], InsertBlock)
-    assert actions[1].block.id == 7
-    assert actions[2] == MoveBlock(block_id=3, position=0)
-    assert history.redo[10] == [RemoveBlock(block_id=7)]
 
 
 def test_load_replaces_everything() -> None:

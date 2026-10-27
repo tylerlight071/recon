@@ -152,7 +152,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     connect_room_flow(navigation, home, start, session, focus)
     opened: list[Path] = []
     finish = FinishBridge(
-        (rooms, tasks, blocks),
+        (rooms, tasks, blocks, UndoRepository(db)),
         settings,
         lambda folder: opened.append(folder) is None,
         submit=lambda job: job(),

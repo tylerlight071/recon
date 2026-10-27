@@ -157,6 +157,7 @@ def _room_bridges(
 ) -> dict[str, QObject]:
     """Home, Start, the room session, its timer and Finish, sharing one worker."""
     rooms, tasks, blocks = RoomRepository(db), TaskRepository(db), BlockRepository(db)
+    undo = UndoRepository(db)
     # One serial worker for the room's writes, so saves land before anything reads them back.
     room_worker = serial_submit(app)
     flag_guard = FlagGuard(blocks.keep_lookalike, parent=app)
@@ -167,7 +168,7 @@ def _room_bridges(
         on_error=lambda _exc: session.failed.emit(StorageError.user_message),
     )
     session = RoomSessionBridge(
-        (rooms, tasks, blocks, UndoRepository(db)),
+        (rooms, tasks, blocks, undo),
         autosave,
         flag_guard,
         submit=room_worker,
@@ -181,7 +182,7 @@ def _room_bridges(
         parent=app,
     )
     finish = FinishBridge(
-        (rooms, tasks, blocks), settings, open_folder, submit=room_worker, parent=app
+        (rooms, tasks, blocks, undo), settings, open_folder, submit=room_worker, parent=app
     )
     connect_room_flow(navigation, home, start, session, focus)
     connect_finish(navigation, home, session, focus, finish)

@@ -11,7 +11,8 @@ from recon.db.connection import Database
 from recon.db.migrate import MIGRATIONS_DIR, available, current_version, migrate
 from recon.errors import StorageError
 
-TABLES = {"rooms", "tasks", "blocks", "sessions", "settings_kv", "undo_log"}
+TABLES = {"rooms", "tasks", "blocks", "sessions", "settings_kv", "undo_log", "sqlite_sequence"}
+"""sqlite_sequence is SQLite's own counter table, there since blocks became AUTOINCREMENT (0003)."""
 
 
 def _pragma(db: Database, name: str) -> object:
@@ -83,12 +84,12 @@ def test_fresh_database_migrates_to_the_latest_schema(db: Database) -> None:
     with db.read() as conn:
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
-    assert current_version(db) == len(available()) == 2
+    assert current_version(db) == len(available()) == 3
     assert tables == TABLES
 
 
 def test_migrating_twice_changes_nothing(db: Database) -> None:
-    assert migrate(db) == 2
+    assert migrate(db) == 3
 
 
 def test_database_from_a_newer_recon_is_refused(db: Database) -> None:
@@ -150,7 +151,7 @@ def test_0002_adds_task_time_to_a_version_1_database_with_rooms(
             [(1, "First"), (2, "Second")],
         )
 
-    assert migrate(db) == 2
+    assert migrate(db) == 3
 
     with db.read() as conn:
         rows = conn.execute("SELECT title, status, time_spent_s FROM tasks ORDER BY id").fetchall()
@@ -160,3 +161,59 @@ def test_0002_adds_task_time_to_a_version_1_database_with_rooms(
     with pytest.raises(StorageError), db.transaction() as conn:
         conn.execute("UPDATE tasks SET time_spent_s = -1")
     db.close()
+
+
+def test_0003_keeps_blocks_and_never_reuses_an_id_undo_remembers(
+    data_dir: Path, tmp_path: Path
+) -> None:
+    folder = tmp_path / "v2"
+    folder.mkdir()
+    for name in ("0001_initial.sql", "0002_task_time.sql"):
+        shutil.copy(MIGRATIONS_DIR / name, folder / name)
+    db = Database.open(data_dir / "app.db")
+    migrate(db, folder)
+    with db.transaction() as conn:
+        conn.execute(
+            "INSERT INTO rooms (platform, path, module, name, task_count, mode, created_at,"
+            " updated_at) VALUES ('TryHackMe', '', '', 'Old room', 1, 'new', 'x', 'x')"
+        )
+        conn.execute("INSERT INTO tasks (room_id, task_index) VALUES (1, 1)")
+        conn.executemany(
+            "INSERT INTO blocks (id, task_id, type, position, content, created_at, updated_at)"
+            " VALUES (?, 1, 'key_idea', ?, ?, 'x', 'x')",
+            [(1, 0, '{"text": "one"}'), (4, 1, '{"text": "four"}')],
+        )
+        # A deleted block 7 that Undo could still bring back.
+        conn.execute(
+            "INSERT INTO undo_log (entity, entity_id, before, created_at)"
+            " VALUES ('insert_block', 7, '{}', 'x')"
+        )
+
+    assert migrate(db) == 3
+
+    with db.transaction() as conn:
+        rows = conn.execute("SELECT id, json_extract(content, '$.text') FROM blocks").fetchall()
+        conn.execute(
+            "INSERT INTO blocks (task_id, type, position, content, created_at, updated_at)"
+            " VALUES (1, 'key_idea', 2, '{}', 'x', 'x')"
+        )
+        new_id = conn.execute("SELECT max(id) FROM blocks").fetchone()[0]
+        index = conn.execute("SELECT name FROM sqlite_master WHERE name = 'blocks_by_task'")
+        assert index.fetchone() is not None
+    assert rows == [(1, "one"), (4, "four")]
+    assert new_id == 8
+    db.close()
+
+
+def test_0003_on_an_empty_database_starts_ids_at_one(db: Database) -> None:
+    with db.transaction() as conn:
+        conn.execute(
+            "INSERT INTO rooms (platform, path, module, name, task_count, mode, created_at,"
+            " updated_at) VALUES ('TryHackMe', '', '', 'R', 1, 'new', 'x', 'x')"
+        )
+        conn.execute("INSERT INTO tasks (room_id, task_index) VALUES (1, 1)")
+        conn.execute(
+            "INSERT INTO blocks (task_id, type, position, content, created_at, updated_at)"
+            " VALUES (1, 'key_idea', 0, '{}', 'x', 'x')"
+        )
+        assert conn.execute("SELECT max(id) FROM blocks").fetchone()[0] == 1

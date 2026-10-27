@@ -129,15 +129,6 @@ def action_block_id(action: UndoAction) -> int:
     return action.block.id if isinstance(action, InsertBlock) else action.block_id
 
 
-def remap_action(action: UndoAction, old: int, new: int) -> UndoAction:
-    """The same action, about block `new` if it was about block `old`."""
-    if action_block_id(action) != old:
-        return action
-    if isinstance(action, InsertBlock):
-        return action.model_copy(update={"block": action.block.model_copy(update={"id": new})})
-    return action.model_copy(update={"block_id": new})
-
-
 class UndoEntry(_Row):
     """A row of `undo_log`: one step back for a task."""
 

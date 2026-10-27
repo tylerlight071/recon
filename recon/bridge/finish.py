@@ -17,7 +17,12 @@ from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.workers import Submit
 from recon.db.models import Room, Task
-from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository
+from recon.db.repositories import (
+    BlockRepository,
+    RoomRepository,
+    TaskRepository,
+    UndoRepository,
+)
 from recon.engine.export import export_room
 from recon.engine.render import ExportBlock, ExportRoom, ExportTask, duration
 from recon.errors import ReconError
@@ -54,7 +59,7 @@ class FinishBridge(QObject):
 
     def __init__(  # noqa: PLR0913 - every collaborator is injected (CLAUDE.md)
         self,
-        repos: tuple[RoomRepository, TaskRepository, BlockRepository],
+        repos: tuple[RoomRepository, TaskRepository, BlockRepository, UndoRepository],
         settings: SettingsBridge,
         open_folder: Callable[[Path], bool],
         *,
@@ -66,7 +71,7 @@ class FinishBridge(QObject):
         """Wire Finish to storage, settings and the file manager.
 
         Args:
-            repos: Rooms, tasks and blocks.
+            repos: Rooms, tasks, blocks and the undo log.
             settings: Remembers the export folder.
             open_folder: Shows a folder in the file manager.
             submit: Runs a job off the UI thread, in order with the session's.
@@ -75,7 +80,7 @@ class FinishBridge(QObject):
             parent: Qt parent.
         """
         super().__init__(parent)
-        self._rooms, self._tasks, self._blocks = repos
+        self._rooms, self._tasks, self._blocks, self._undo = repos
         self._settings = settings
         self._open_folder = open_folder
         self._submit = submit
@@ -131,6 +136,8 @@ class FinishBridge(QObject):
 
         def work() -> Then:
             self._rooms.update_progress(room_id, status="done")
+            # Finished: its undo steps (old and deleted text) aren't needed any more (F-19).
+            self._undo.clear_room(room_id)
             room = self._rooms.get(room_id)
             tasks = self._tasks.for_room(room_id)
             return lambda: self._show(room, tasks)
