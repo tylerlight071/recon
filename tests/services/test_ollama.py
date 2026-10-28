@@ -184,8 +184,9 @@ def test_a_good_reply_is_validated_and_returned() -> None:
     assert result == Summary(summary="DNS maps names to addresses.", points=["A records"])
     (call,) = client.calls
     assert call["format"] == Summary.model_json_schema()
-    assert call["options"] == {"temperature": 0}
+    assert call["options"] == {"temperature": 0, "num_ctx": 16_384}
     assert call["stream"] is False
+    assert call["think"] is False
     assert call["model"] == "qwen3.5:9b"
 
 

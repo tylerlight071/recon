@@ -89,6 +89,8 @@ class Settings(BaseModel):
     """Reading screenshots; the same model as text by default, so nothing swaps."""
     embedding_model: str = Field(default="qwen3-embedding:0.6b", pattern=MODEL_NAME)
     """Matching concepts to existing notes."""
+    model_thinking: bool = False
+    """Let the text model reason before answering: slower, often more thorough (bake-off, 2.9)."""
     ollama_host: str = "http://127.0.0.1:11434"
     """Ollama's address. Only this computer is ever used (`services.ollama.loopback`)."""
 

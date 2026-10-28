@@ -1,0 +1,46 @@
+{#- A concept note (SPEC.md, Note types). Later rooms add their own "From" section. -#}
+{% from "notes/_macros.md.j2" import section %}
+{{ properties }}
+# {{ title }}
+
+## Definition
+
+{% call section("definition") %}
+{% if own_words %}
+{{ own_words }}
+{% else %}
+> [!info] Generated definition
+> {{ definition }}
+{% endif %}
+{% endcall %}
+
+
+## Notes
+
+{% call section(from_section) %}
+### From {{ room_link }}, {{ day }}
+
+{% for point in points %}
+- {{ point }}
+{% endfor %}
+{% if gotchas %}
+
+**Easy to get wrong**
+
+{% for gotcha in gotchas %}
+- {{ gotcha }}
+{% endfor %}
+{% endif %}
+{% endcall %}
+
+{% if related %}
+
+## Related
+
+{% call section("related") %}
+{% for link in related %}
+- {{ link }}
+{% endfor %}
+{% endcall %}
+
+{% endif %}

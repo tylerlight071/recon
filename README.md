@@ -79,6 +79,8 @@ uv run pytest --cov --cov-branch         # with coverage
 uv run ruff check . ; uv run ruff format . ; uv run mypy
 uv run pre-commit run --all-files        # everything the commit hook runs
 uv run mutmut run                        # mutation tests on safety-critical modules
+uv run python -m scripts.record_responses # re-record model replies for the fixture rooms (needs Ollama)
+uv run python -m tests.engine.make_golden # rewrite golden notes, then read every diff
 ```
 
 Work goes through one issue, one branch and one pull request per task. See CLAUDE.md, Git and GitHub.

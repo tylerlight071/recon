@@ -44,7 +44,7 @@ def test_round_trip_is_private(tmp_path: Path) -> None:
         'panel_width = 470\nkwin_pinning = "ask"\nchime = false\nexport_folder = ""\n'
         'vault_path = ""\nobsidian_vault = ""\naccent = "violet"\nreduce_motion = false\n'
         'text_model = "qwen3.5:9b"\nvision_model = "qwen3.5:9b"\n'
-        'embedding_model = "qwen3-embedding:0.6b"\nollama_host = "http://127.0.0.1:11434"\n'
+        'embedding_model = "qwen3-embedding:0.6b"\nmodel_thinking = false\nollama_host = "http://127.0.0.1:11434"\n'
     )
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 

@@ -1,0 +1,44 @@
+{#- A tool note (SPEC.md, Note types): what it's for, its flags, and his example commands. -#}
+{% from "notes/_macros.md.j2" import section %}
+{{ properties }}
+# {{ title }}
+
+## What it's for
+
+{% call section("purpose") %}
+{% if own_words %}
+{{ own_words }}
+{% else %}
+> [!info] Generated description
+> {{ purpose }}
+{% endif %}
+{% endcall %}
+
+{% if flags %}
+
+## Flags and usage
+
+{% call section("usage") %}
+| Flag | What it does | Room |
+| --- | --- | --- |
+{% for row in flags %}
+| {{ row.flag }} | {{ row.meaning }} | {{ row.room }} |
+{% endfor %}
+
+*What each flag does is generated from your notes. Check anything that looks off.*
+{% endcall %}
+
+{% endif %}
+{% if examples %}
+
+## Examples
+
+{% call section("examples") %}
+| Command | What it does | Room |
+| --- | --- | --- |
+{% for row in examples %}
+| {{ row.command }} | {{ row.comment }} | {{ row.room }} |
+{% endfor %}
+{% endcall %}
+
+{% endif %}

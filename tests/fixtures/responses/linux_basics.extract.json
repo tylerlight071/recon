@@ -1,0 +1,369 @@
+{
+  "summary": [
+    "The room covers basic Linux shell operations using the bash terminal.",
+    "It teaches how to navigate directories, list files, and read file contents.",
+    "Key topics include hidden files, file permissions with chmod, and calculating file hashes with md5sum.",
+    "It also explains common command flags like -h for human-readable output in df."
+  ],
+  "tasks": [
+    {
+      "task": 1,
+      "points": [
+        {
+          "block": 3001,
+          "text": "The terminal runs a shell (bash) that reads input and executes programs."
+        }
+      ]
+    },
+    {
+      "task": 2,
+      "points": [
+        {
+          "block": 3002,
+          "text": "pwd prints the current folder path."
+        },
+        {
+          "block": 3003,
+          "text": "cd changes directory to a specified path."
+        },
+        {
+          "block": 3004,
+          "text": "ls -la lists all files including hidden ones in long format."
+        }
+      ]
+    },
+    {
+      "task": 3,
+      "points": [
+        {
+          "block": 3005,
+          "text": "cat prints the contents of a file to the screen."
+        },
+        {
+          "block": 3006,
+          "text": "cat -l prints file contents with line numbers."
+        },
+        {
+          "block": 3007,
+          "text": "grep -i error searches for lines containing 'error' ignoring case."
+        },
+        {
+          "block": 3008,
+          "text": "find looks for files matching a name pattern and suppresses permission errors with redirect."
+        },
+        {
+          "block": 3009,
+          "text": "Files starting with a dot are hidden from a plain ls command."
+        }
+      ]
+    },
+    {
+      "task": 4,
+      "points": [
+        {
+          "block": 3010,
+          "text": "chmod 600 sets permissions so only the owner can read and write the file."
+        },
+        {
+          "block": 3011,
+          "text": "chmod +x makes a script executable."
+        },
+        {
+          "block": 3012,
+          "text": "md5sum prints a 32 character hex hash for a file or string."
+        },
+        {
+          "block": 3014,
+          "text": "The -h flag in df shows sizes in human-readable units like G and M."
+        }
+      ]
+    }
+  ],
+  "concepts": [
+    {
+      "name": "Bash Shell",
+      "aliases": [
+        "bash",
+        "terminal shell"
+      ],
+      "topic": "Operating System Basics",
+      "own_words": "",
+      "definition": "The Bash shell is the interface that reads text typed into the terminal and executes corresponding programs or commands.",
+      "points": [
+        "It acts as a bridge between the user and the operating system."
+      ],
+      "gotchas": [],
+      "related": [],
+      "tasks": [
+        1
+      ]
+    },
+    {
+      "name": "File Permissions",
+      "aliases": [
+        "chmod",
+        "file access rights"
+      ],
+      "topic": "Linux Security",
+      "own_words": "",
+      "definition": "Permissions control who can read, write, or execute a file. The chmod command changes these permissions using numbers (like 600) or symbols (+x).",
+      "points": [
+        "chmod 600 restricts access to the owner only for reading and writing.",
+        "chmod +x adds execute permission to a file."
+      ],
+      "gotchas": [],
+      "related": [],
+      "tasks": [
+        4
+      ]
+    },
+    {
+      "name": "Hidden Files",
+      "aliases": [
+        "dotfiles",
+        "hidden files"
+      ],
+      "topic": "File System",
+      "own_words": "",
+      "definition": "Files starting with a dot (.) are hidden by default and do not appear in a standard ls listing unless the -a flag is used.",
+      "points": [
+        "They are useful for storing configuration files that shouldn't be seen by casual users."
+      ],
+      "gotchas": [],
+      "related": [],
+      "tasks": [
+        3
+      ]
+    },
+    {
+      "name": "File Hashing",
+      "aliases": [
+        "md5sum",
+        "checksum"
+      ],
+      "topic": "Data Integrity",
+      "own_words": "",
+      "definition": "A hash like MD5 produces a fixed-length string (32 hex characters) representing the content of a file. It is used to verify if a file has been altered.",
+      "points": [
+        "The output is a 32 character hexadecimal number."
+      ],
+      "gotchas": [],
+      "related": [],
+      "tasks": [
+        4
+      ]
+    },
+    {
+      "name": "Disk Usage",
+      "aliases": [
+        "df"
+      ],
+      "topic": "System Administration",
+      "own_words": "",
+      "definition": "The df command reports disk space usage. Using the -h flag displays sizes in human-readable units like Gigabytes (G) and Megabytes (M).",
+      "points": [
+        "-h makes the output easier to read for humans."
+      ],
+      "gotchas": [],
+      "related": [],
+      "tasks": [
+        4
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "pwd",
+      "aliases": [],
+      "category": "Navigation",
+      "own_words": "",
+      "purpose": "Prints the current working directory path.",
+      "flags": []
+    },
+    {
+      "name": "cd",
+      "aliases": [],
+      "category": "Navigation",
+      "own_words": "",
+      "purpose": "Changes the current directory to a specified path.",
+      "flags": []
+    },
+    {
+      "name": "ls",
+      "aliases": [],
+      "category": "File Listing",
+      "own_words": "",
+      "purpose": "Lists files and directories in the current location.",
+      "flags": [
+        {
+          "flag": "-la",
+          "meaning": "Shows a long list including hidden files."
+        }
+      ]
+    },
+    {
+      "name": "cat",
+      "aliases": [],
+      "category": "File Reading",
+      "own_words": "",
+      "purpose": "Displays the contents of a file to the terminal.",
+      "flags": [
+        {
+          "flag": "-l",
+          "meaning": "Shows line numbers alongside the file content."
+        }
+      ]
+    },
+    {
+      "name": "grep",
+      "aliases": [],
+      "category": "Search",
+      "own_words": "",
+      "purpose": "Searches for lines containing a specific pattern within files.",
+      "flags": [
+        {
+          "flag": "-i",
+          "meaning": "Makes the search case-insensitive."
+        }
+      ]
+    },
+    {
+      "name": "find",
+      "aliases": [],
+      "category": "File Search",
+      "own_words": "",
+      "purpose": "Searches for files matching specific criteria like name or type.",
+      "flags": []
+    },
+    {
+      "name": "chmod",
+      "aliases": [],
+      "category": "Permissions",
+      "own_words": "",
+      "purpose": "Changes file permissions (read, write, execute).",
+      "flags": [
+        {
+          "flag": "+x",
+          "meaning": "Adds execute permission to the file."
+        }
+      ]
+    },
+    {
+      "name": "md5sum",
+      "aliases": [],
+      "category": "Hashing",
+      "own_words": "",
+      "purpose": "Calculates and prints the MD5 hash of a file or string.",
+      "flags": []
+    }
+  ],
+  "claims": [
+    {
+      "block": 3001,
+      "claim": "The terminal runs a shell (bash here) that reads what I type and runs programs."
+    },
+    {
+      "block": 3002,
+      "claim": "pwd print the folder I'm in"
+    },
+    {
+      "block": 3003,
+      "claim": "cd /var/log go into the logs folder"
+    },
+    {
+      "block": 3004,
+      "claim": "ls -la long list, including hidden files"
+    },
+    {
+      "block": 3005,
+      "claim": "cat notes.txt print a file"
+    },
+    {
+      "block": 3006,
+      "claim": "cat -l notes.txt same but with line numbers"
+    },
+    {
+      "block": 3007,
+      "claim": "grep -i error app.log lines containing error, any case"
+    },
+    {
+      "block": 3008,
+      "claim": "find / -name '*.conf' 2>/dev/null look for config files, hide permission errors"
+    },
+    {
+      "block": 3009,
+      "claim": "Files whose names start with a dot are hidden from a plain ls."
+    },
+    {
+      "block": 3010,
+      "claim": "chmod 600 means only the owner can read and write the file."
+    },
+    {
+      "block": 3011,
+      "claim": "chmod +x backup.sh make the script runnable"
+    },
+    {
+      "block": 3012,
+      "claim": "md5sum prints a 32 character hex hash, e.g. for the word hello"
+    },
+    {
+      "block": 3014,
+      "claim": "Shows sizes in human-readable units like G and M"
+    }
+  ],
+  "answers": [
+    {
+      "block": 3014,
+      "answer": "The -h flag tells the df command to display disk usage in human-readable formats (like GB or MB) instead of raw blocks."
+    }
+  ],
+  "explanations": [],
+  "cards": [
+    {
+      "question": "What does the shell do in a Linux terminal?",
+      "answer": "It reads user input and executes programs.",
+      "concept": "Bash Shell"
+    },
+    {
+      "question": "Which command shows the current directory path?",
+      "answer": "pwd",
+      "concept": "File System"
+    },
+    {
+      "question": "How do you list hidden files in Linux?",
+      "answer": "Use 'ls -la' to include hidden files.",
+      "concept": "Hidden Files"
+    },
+    {
+      "question": "What does chmod 600 set for a file?",
+      "answer": "Only the owner can read and write the file.",
+      "concept": "File Permissions"
+    },
+    {
+      "question": "How do you make a script executable?",
+      "answer": "Use 'chmod +x filename.sh'.",
+      "concept": "File Permissions"
+    },
+    {
+      "question": "What does the -i flag do in grep?",
+      "answer": "It makes the search case-insensitive.",
+      "concept": "Search"
+    },
+    {
+      "question": "How do you suppress permission errors in a find command?",
+      "answer": "Redirect stderr with '2>/dev/null'.",
+      "concept": "File Search"
+    },
+    {
+      "question": "What does md5sum output?",
+      "answer": "A 32 character hexadecimal hash.",
+      "concept": "File Hashing"
+    },
+    {
+      "question": "What does the -h flag do in df?",
+      "answer": "It shows sizes in human-readable units like G and M.",
+      "concept": "Disk Usage"
+    }
+  ],
+  "processes": []
+}

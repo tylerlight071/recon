@@ -17,7 +17,8 @@ repos:
       - id: end-of-file-fixer
         exclude: ^recon/ui/theme/fonts/  # upstream licence texts stay verbatim
       - id: trailing-whitespace
-        exclude: ^recon/ui/theme/fonts/  # upstream licence texts stay verbatim
+        # Upstream licence texts stay verbatim; golden notes must match render output byte for byte.
+        exclude: ^(recon/ui/theme/fonts/|tests/golden/)
         args: [--markdown-linebreak-ext=md]
       - id: mixed-line-ending
         exclude: ^recon/ui/theme/fonts/  # upstream licence texts stay verbatim
