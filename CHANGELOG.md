@@ -27,6 +27,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- The UI thread no longer waits on storage. Reads use their own read-only connection that never waits for a write; "Not a flag, keep it" and settings saves run on workers (audit F-05).
+- Turning panel pinning on and quickly off (or the reverse) can no longer leave the wrong state in KDE: pin and unpin run in order and check the setting when they run (audit F-16).
 - Commands and notes that mention `flag{`, `THM{` or `HTB{` are no longer cut off at that word when saved. Only something that looks like a flag mid-typing is held back (audit F-03, ADR 0005 amended).
 - A hash typed key by key no longer reaches the database before its last character: timed saves hold back a 20–31 character hex run ending a line (audit F-07).
 - A flag typed into a task title, room name, path or module now disappears as you type, with the "Flag skipped" notice (audit F-14).

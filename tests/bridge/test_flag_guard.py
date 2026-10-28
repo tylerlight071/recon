@@ -1,11 +1,14 @@
 """FlagGuard: cleans editor text, signals the notice, keeps hex lookalikes on request."""
 
 import logging
+import threading
 
 import pytest
+from PySide6.QtCore import QObject
 
 from recon.bridge.flags import FlagGuard
-from tests.ui.qml_harness import app
+from recon.bridge.workers import SerialWorker
+from tests.ui.qml_harness import app, wait_until
 
 MD5 = "5d41402abc4b2a76b9719d911017c592"
 
@@ -31,7 +34,7 @@ def guard(kept_ok: list[tuple[int, str]]) -> FlagGuard:
         kept_ok.append((block_id, text))
         return text == MD5
 
-    return FlagGuard(keep)
+    return FlagGuard(keep, lambda job: job())
 
 
 def test_clean_text_passes_through_silently(guard: FlagGuard) -> None:
@@ -104,3 +107,40 @@ def test_fields_lose_flags_with_a_notice_for_their_window(guard: FlagGuard) -> N
     assert guard.cleanField("Record types", "panel") == "Record types"
 
     assert notices == ["panel", "main"]
+
+
+def test_keep_runs_off_the_ui_thread() -> None:
+    # Audit F-05: the keep is a database write, so it goes to a worker.
+    app()
+    owner = QObject()
+    worker = SerialWorker(owner)
+    threads: list[int] = []
+
+    def keep(_block_id: int, _text: str) -> bool:
+        threads.append(threading.get_ident())
+        return True
+
+    guard = FlagGuard(keep, worker)
+    restored: list[tuple[int, str]] = []
+    guard.keptRestored.connect(lambda b, t: restored.append((b, t)))
+
+    guard.keep(7, MD5)
+
+    assert wait_until(lambda: restored == [(7, MD5)])
+    assert threads != [threading.get_ident()]
+
+
+def test_a_failed_keep_restores_nothing(caplog: pytest.LogCaptureFixture) -> None:
+    app()
+
+    def keep(_block_id: int, _text: str) -> bool:
+        raise RuntimeError
+
+    guard = FlagGuard(keep, lambda job: job())
+    restored: list[tuple[int, str]] = []
+    guard.keptRestored.connect(lambda b, t: restored.append((b, t)))
+
+    guard.keep(7, MD5)
+
+    assert restored == []
+    assert MD5 not in caplog.text

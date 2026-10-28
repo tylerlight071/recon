@@ -126,7 +126,9 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         settings, pinner, lambda: (0, 0, 1280, 720), lambda job: job(), parent=owner
     )
     kept: list[tuple[int, str]] = []
-    flag_guard = FlagGuard(lambda block, text: kept.append((block, text)) is None, parent=owner)
+    flag_guard = FlagGuard(
+        lambda block, text: kept.append((block, text)) is None, lambda job: job(), parent=owner
+    )
     blocks = BlockRepository(db)
     home = HomeBridge(rooms, blocks, utc_now, parent=owner)
     start = StartRoomBridge(rooms, lambda job: job(), parent=owner)

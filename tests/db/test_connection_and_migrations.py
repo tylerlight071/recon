@@ -16,7 +16,7 @@ TABLES = {"rooms", "tasks", "blocks", "sessions", "settings_kv", "undo_log", "sq
 
 
 def _pragma(db: Database, name: str) -> object:
-    with db.read() as conn:
+    with db.writer() as conn:
         return conn.execute(f"PRAGMA {name}").fetchone()[0]
 
 
@@ -93,7 +93,7 @@ def test_migrating_twice_changes_nothing(db: Database) -> None:
 
 
 def test_database_from_a_newer_recon_is_refused(db: Database) -> None:
-    with db.read() as conn:
+    with db.writer() as conn:
         conn.execute("PRAGMA user_version = 99")
 
     with pytest.raises(StorageError):
@@ -217,3 +217,37 @@ def test_0003_on_an_empty_database_starts_ids_at_one(db: Database) -> None:
             " VALUES (1, 'key_idea', 0, '{}', 'x', 'x')"
         )
         assert conn.execute("SELECT max(id) FROM blocks").fetchone()[0] == 1
+
+
+def test_reads_use_a_read_only_connection_that_never_waits_for_a_writer(db: Database) -> None:
+    # Audit F-05: a read used to wait behind the writer's lock for a whole commit.
+    import threading  # noqa: PLC0415 - only this test needs it
+    import time  # noqa: PLC0415
+
+    with db.read() as conn:
+        assert conn.execute("PRAGMA query_only").fetchone()[0] == 1
+        with pytest.raises(sqlite3.OperationalError):
+            conn.execute("CREATE TABLE nope (x)")
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    def slow_write() -> None:
+        with db.transaction() as conn:
+            conn.execute("INSERT INTO settings_kv (key, value) VALUES ('k', 'v')")
+            entered.set()
+            release.wait(2)
+
+    writer = threading.Thread(target=slow_write)
+    writer.start()
+    assert entered.wait(2)
+    started = time.monotonic()
+    with db.read() as conn:
+        conn.execute("SELECT count(*) FROM rooms").fetchone()
+    waited = time.monotonic() - started
+    release.set()
+    writer.join()
+
+    assert waited < 0.1
+    with db.read() as conn:  # and once committed, the reader sees it
+        assert conn.execute("SELECT value FROM settings_kv").fetchone() == ("v",)

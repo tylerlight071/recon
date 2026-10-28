@@ -42,7 +42,7 @@ def flow(tmp_path: Path) -> Iterator[Flow]:
     session = RoomSessionBridge(
         (rooms, TaskRepository(db), blocks, UndoRepository(db)),
         FakeAutosave(blocks),
-        FlagGuard(blocks.keep_lookalike),
+        FlagGuard(blocks.keep_lookalike, lambda job: job()),
         submit=lambda job: job(),
     )
     focus = FocusBridge(TaskRepository(db), lambda: None, lambda: False, submit=lambda job: job())

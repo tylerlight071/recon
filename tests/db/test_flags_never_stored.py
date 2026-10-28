@@ -46,7 +46,7 @@ def test_flag_typed_into_a_block_never_reaches_the_file(
     assert stored is not None
     assert stored.content.text == "Got the answer for this task: "
     assert FLAG.encode() not in _raw_bytes(data_dir)
-    with db.read() as conn:
+    with db.writer() as conn:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     assert FLAG.encode() not in _raw_bytes(data_dir)
 
@@ -153,7 +153,7 @@ def test_a_flag_typed_key_by_key_never_reaches_the_database_even_half_typed(
         assert answer[:3] not in stored.content.text, typed
 
     assert stored.content.text == "Answer:  noted"
-    with db.read() as conn:
+    with db.writer() as conn:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     assert answer.encode() not in _raw_bytes(data_dir)
 
@@ -179,6 +179,6 @@ def test_a_hash_typed_key_by_key_never_reaches_the_file(
     assert stored is not None
     assert stored.content.answer == "The answer was "
     assert hash_flag[:20].encode() not in _raw_bytes(data_dir)  # app.db and its WAL
-    with db.read() as conn:
+    with db.writer() as conn:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     assert hash_flag[:20].encode() not in _raw_bytes(data_dir)

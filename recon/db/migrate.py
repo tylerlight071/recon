@@ -88,7 +88,7 @@ def _apply(db: Database, migration: Migration) -> None:
     script = (
         f"BEGIN IMMEDIATE;\n{migration.sql}\nPRAGMA user_version = {migration.version};\nCOMMIT;\n"
     )
-    with db.read() as conn:
+    with db.writer() as conn:
         try:
             conn.executescript(script)
         except sqlite3.Error as exc:

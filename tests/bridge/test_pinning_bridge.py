@@ -157,3 +157,43 @@ def test_real_thread_pool_delivers_the_result_back(owner: QObject) -> None:
 
     assert wait_until(lambda: failed.count == 1)
     assert len(pinner.pinned) == 1
+
+
+class _Held:
+    def __init__(self) -> None:
+        self.jobs: list[Callable[[], None]] = []
+
+    def __call__(self, job: Callable[[], None]) -> None:
+        self.jobs.append(job)
+
+    def run(self) -> None:
+        jobs, self.jobs = self.jobs, []
+        for job in jobs:
+            job()
+
+
+def test_pin_then_quick_unpin_leaves_no_rule(owner: QObject) -> None:
+    # Audit F-16: each job checks the setting when it runs, not when it was queued.
+    held = _Held()
+    bridge, settings, pinner = _bridge(owner, "off", submit=held)
+
+    bridge.pin()
+    bridge.unpin()
+    held.run()
+
+    assert settings.property("pinning") == "off"
+    assert pinner.pinned == []
+    assert pinner.unpinned == 1
+
+
+def test_unpin_then_quick_pin_keeps_the_rule(owner: QObject) -> None:
+    held = _Held()
+    bridge, settings, pinner = _bridge(owner, "on", submit=held)
+
+    bridge.unpin()
+    bridge.pin()
+    held.run()
+
+    assert settings.property("pinning") == "on"
+    assert pinner.unpinned == 0
+    assert len(pinner.pinned) == 1
