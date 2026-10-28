@@ -33,3 +33,5 @@ Launch Recon the way it will really be used: from the KDE app menu (`uv run pyth
 - [ ] Open a room's review from the notification, from Home and from the panel. Read it top to bottom: is anything confusing, too long or missing? Fold and unfold each section from the keyboard (Tab, Space).
 - [ ] Press Discard, then "Keep reviewing": nothing changes. Press Discard again and confirm: the room reopens in the panel exactly as you left it.
 - [ ] Apply: a toast says how many notes were written, and they're in the vault.
+- [ ] Apply a room: the done screen shows how many notes were written and the room's place in its path. Press "Open in Obsidian": the room note opens in Obsidian. If it doesn't, "Didn't open?" brings back the one-time vault step.
+- [ ] From Home, open a room that's already done: its done screen opens (without the count).

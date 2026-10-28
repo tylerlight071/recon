@@ -368,3 +368,12 @@ def test_properties_are_json_scalars() -> None:
     assert properties({"a": "x: y", "b": 3, "c": ["[[L]]"]}) == (
         '---\na: "x: y"\nb: 3\nc: ["[[L]]"]\n---'
     )
+
+
+def test_room_note_paths_match_what_render_writes() -> None:
+    from recon.engine.notes import room_note_path  # noqa: PLC0415
+
+    assert room_note_path("TryHackMe", "Foundations", "Number Systems") == (
+        _render(NUMBERS).of("room")[0].path
+    )
+    assert str(room_note_path("", "", "../x")) == "01 Rooms/Other/x.md"

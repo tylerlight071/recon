@@ -139,16 +139,21 @@ class _Names:
     def __init__(self, capture: Capture) -> None:
         self.stem = file_name(capture.name)
         self.raw_stem = f"{self.stem}{RAW_SUFFIX}"
-        folders = [ROOMS_FOLDER, file_name(capture.platform, "Other")]
-        if capture.path.strip():
-            folders.append(file_name(capture.path, "Other"))
-        self.room_path = PurePosixPath(*folders, f"{self.stem}.md")
+        self.room_path = room_note_path(capture.platform, capture.path, capture.name)
         self.raw_path = PurePosixPath(RAW_FOLDER, f"{self.raw_stem}.md")
         self.room_link = link(self.stem)
         self.raw_link = link(self.raw_stem)
         self.finished_on = capture.finished_on
         self.day = f"{capture.finished_on.day} {capture.finished_on:%B %Y}"
         self.section = f"from-{_SECTION.sub('-', self.stem.casefold()).strip('-') or 'room'}"
+
+
+def room_note_path(platform: str, path: str, name: str) -> PurePosixPath:
+    """Where a room's note lives in the vault: `01 Rooms/<platform>/<path>/<room>.md`."""
+    folders = [ROOMS_FOLDER, file_name(platform, "Other")]
+    if path.strip():
+        folders.append(file_name(path, "Other"))
+    return PurePosixPath(*folders, f"{file_name(name)}.md")
 
 
 def link(stem: str, shown: str = "") -> str:

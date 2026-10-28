@@ -159,6 +159,12 @@ class ProcessingBridge(QObject):
             self._queue.remove(room_id)
         self.changed.emit()
 
+    def forget(self, room_id: int) -> None:
+        """The room was applied: nothing more to say about it."""
+        self._ready.pop(room_id, None)
+        self._problems.pop(room_id, None)
+        self.changed.emit()
+
     def show(self, room_id: int) -> None:
         """Say which room the panel is showing (0 for none)."""
         self._shown = room_id

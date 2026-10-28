@@ -20,6 +20,7 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtTest import QTest
 
 from recon.app import QmlEngine, create_engine, load_windows, root_window
+from recon.bridge.done import DoneBridge
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
@@ -55,6 +56,7 @@ from recon.errors import ApplyConflict
 from recon.pipeline import Outcome, Step
 from recon.services.ollama import OllamaService
 from tests.bridge.fakes import FakeAutosave
+from tests.bridge.test_done import Opener
 from tests.bridge.test_pinning_bridge import FakePinner
 from tests.bridge.test_processing import MANIFEST as _MANIFEST
 from tests.bridge.test_processing import FakeRunner
@@ -112,6 +114,8 @@ class Running:
     notices: list[object]
     review: ReviewBridge
     reviews: "Fakes"
+    done: DoneBridge
+    opener: "Opener"
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -221,10 +225,18 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     connect_finish(navigation, home, session, focus, finish)
     processing, runner, notices, review, reviews = _processing(owner)
     connect_processing(navigation, home, finish, processing, review)
-    connect_review(navigation, home, session, processing, review)
     copied: list[str] = []
     vault = VaultBridge(settings, copied.append, submit=lambda job: job(), parent=owner)
     vault.setUp()
+    opener = Opener()
+    done = DoneBridge(
+        rooms,
+        lambda: Path(str(settings.property("vaultPath"))),
+        opener.open,
+        vault.forgetOpened,
+        submit=lambda job: job(),
+        parent=owner,
+    )
     ollama = FakeClient(models=["qwen3.5:9b"])
     models = ModelsBridge(
         settings,
@@ -233,6 +245,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         submit=lambda job: job(),
         parent=owner,
     )
+    connect_review(navigation, home, session, processing, review, done=done)
     qml = create_engine(
         {
             "AppSettings": settings,
@@ -248,6 +261,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "Models": models,
             "Processing": processing,
             "ReviewModel": review,
+            "DoneModel": done,
             "Editors": EditorsBridge(parent=owner),
         }
     )
@@ -288,6 +302,8 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         notices,
         review,
         reviews,
+        done,
+        opener,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -1210,7 +1226,8 @@ def test_finish_room_shows_a_calm_completion_screen(running: Running) -> None:
     assert find(running.panel, "sessionScreen").property("visible") is False
     assert find(running.panel, "noRoom").property("visible") is False
     assert find(running.panel, "exportedArea").property("visible") is False
-    assert _visible_primary_buttons(running.panel.contentItem()) == ["exportButton"]
+    assert _visible_primary_buttons(running.panel.contentItem()) == ["finishDone"]
+    assert find(running.panel, "finishHint").property("visible") is True
     assert running.rooms.recent(1)[0].status == "queued"
     assert running.runner.rooms == [running.rooms.recent(1)[0].id]
     assert find(running.panel, "processingLine").property("text") == "Waiting to be processed."
@@ -1355,14 +1372,45 @@ def test_the_review_screen_shows_each_section_with_one_primary(running: Running)
     assert running.warnings == []
 
 
-def test_apply_goes_home_with_a_calm_toast(running: Running) -> None:
-    _open_review(running)
+def test_apply_ends_on_the_done_screen(running: Running) -> None:
+    room_id = _open_review(running)
+    running.rooms.update_progress(room_id, status="done")  # as Apply leaves it
+    find = running.find
 
-    QMetaObject.invokeMethod(running.find(running.main, "applyReview"), "clicked")
+    QMetaObject.invokeMethod(find(running.main, "applyReview"), "clicked")
 
-    assert wait_until(lambda: running.navigation.property("currentScreen") == "home")
-    toast = running.find(running.main, "toast")
-    assert toast.property("message") == "Applied: 3 notes written to your vault."
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "done")
+    wait(50)
+    assert find(running.main, "doneTitle").property("text") == "DNS in Detail is in your vault."
+    assert find(running.main, "doneWritten").property("text") == "3 notes written."
+    assert find(running.main, "doneProgress").property("text") == "1 room done so far."
+    # The vault isn't open in Obsidian yet: its one-time step, not a link that would fail.
+    assert find(running.main, "openInObsidian").property("visible") is False
+    assert find(running.main, "doneOpenVault").property("visible") is True
+    assert _visible_primary_buttons(running.main.contentItem()) == ["doneConfirmOpened"]
+
+    QMetaObject.invokeMethod(find(running.main, "doneConfirmOpened"), "clicked")
+    assert find(running.main, "openInObsidian").property("visible") is True
+    QMetaObject.invokeMethod(find(running.main, "openInObsidian"), "clicked")
+    assert running.opener.opened[-1].name == "DNS in Detail.md"
+    assert find(running.main, "notOpened").property("visible") is True
+    QMetaObject.invokeMethod(find(running.main, "notOpened"), "clicked")
+    assert find(running.main, "doneOpenVault").property("visible") is True
+    assert running.warnings == []
+
+
+def test_a_room_already_in_the_vault_opens_its_done_screen(running: Running) -> None:
+    _finish_room(running)
+    room_id = running.rooms.recent(1)[0].id
+    running.rooms.update_progress(room_id, status="done")
+    running.qml.engine.rootContext().contextProperty("HomeModel").refresh()
+    QMetaObject.invokeMethod(running.find(running.panel, "finishDone"), "clicked")
+    wait(50)
+
+    QMetaObject.invokeMethod(running.find(running.main, f"recent-{room_id}"), "clicked")
+
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "done")
+    assert running.find(running.main, "doneWritten").property("visible") is False
 
 
 def test_a_conflict_offers_recheck_and_disables_apply(running: Running) -> None:
@@ -1404,6 +1452,8 @@ def test_the_panel_offers_the_review_once_ready(running: Running) -> None:
     running.reviews.loaded = (REVIEW.model_copy(update={"room_id": room_id}), "DNS in Detail")
     button = running.find(running.panel, "openReview")
     assert button.property("visible") is True
+    assert _visible_primary_buttons(running.panel.contentItem()) == ["openReview"]
+    assert running.find(running.panel, "finishHint").property("visible") is False
 
     QMetaObject.invokeMethod(button, "clicked")
 

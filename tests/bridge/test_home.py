@@ -149,14 +149,17 @@ def test_finished_rooms_are_listed_not_resumed(
     ]
     finished: list[int] = []
     reviewing: list[int] = []
+    done_rooms: list[int] = []
     home.finishedRequested.connect(finished.append)
     home.reviewRequested.connect(reviewing.append)
+    home.doneRequested.connect(done_rooms.append)
     home.resume(done.id)
     home.resume(waiting.id)
     home.resume(9999)
     assert resumed.count == 0
-    assert finished == [done.id]  # a finished room opens its Finish screen (audit F-11)
+    assert done_rooms == [done.id]  # a room in the vault opens its done screen
     assert reviewing == [waiting.id]  # one ready to review opens the review
+    assert finished == []
     assert [r["canOpen"] for r in home.property("recentRooms")] == [True, True]
 
 
@@ -216,3 +219,18 @@ def test_refresh_picks_up_new_rooms(
 
     assert changed.count == 1
     assert home.property("currentName") == "New"
+
+
+def test_a_room_still_processing_opens_its_finish_screen(
+    repos: tuple[RoomRepository, TaskRepository, BlockRepository],
+) -> None:
+    rooms, _tasks, _blocks = repos
+    queued = rooms.create(NewRoom(name="DNS in Detail", task_count=1))
+    rooms.update_progress(queued.id, status="queued")
+    home = _home(repos)
+    finished: list[int] = []
+    home.finishedRequested.connect(finished.append)
+
+    home.resume(queued.id)
+
+    assert finished == [queued.id]  # audit F-11: its Finish screen, to export or reopen
