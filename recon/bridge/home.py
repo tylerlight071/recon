@@ -75,6 +75,7 @@ class HomeBridge(QObject):
     startRequested = Signal()  # noqa: N815 - Qt naming, used from QML
     resumeRequested = Signal(int)  # noqa: N815 - Qt naming, used from QML
     finishedRequested = Signal(int)  # noqa: N815 - Qt naming; a done room's Finish screen
+    reviewRequested = Signal(int)  # noqa: N815 - Qt naming; a room ready to review
 
     def __init__(
         self,
@@ -165,11 +166,13 @@ class HomeBridge(QObject):
 
     @Slot(int)
     def resume(self, room_id: int) -> None:
-        """Open a recent room: carry on capturing it, or, once finished, its Finish screen."""
+        """Open a recent room: carry on capturing it, review it, or show its Finish screen."""
         room = self._rooms.get(room_id)
         if room is None:
             return
         if room.status == "capturing":
             self.resumeRequested.emit(room_id)
+        elif room.status == "in_review":
+            self.reviewRequested.emit(room_id)
         else:
             self.finishedRequested.emit(room_id)

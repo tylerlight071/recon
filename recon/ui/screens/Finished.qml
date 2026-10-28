@@ -127,6 +127,15 @@ FocusScope {
             }
 
             Button {
+                objectName: "openReview"
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: Processing.ready || (Finish.inReview && Processing.line === "")
+                variant: "secondary"
+                text: qsTr("Review notes")
+                onClicked: ReviewModel.open(Finish.roomId)
+            }
+
+            Button {
                 objectName: "retryProcessing"
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: Processing.failed

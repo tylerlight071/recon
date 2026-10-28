@@ -118,6 +118,9 @@ class ProcessingBridge(QObject):
     def _steps_total(self) -> int:
         return STEPS
 
+    def _is_ready(self) -> bool:
+        return self._shown in self._ready
+
     def _queued_count(self) -> int:
         return len(self._queue)
 
@@ -129,6 +132,8 @@ class ProcessingBridge(QObject):
     """The shown room is processing right now."""
     failed = Property(bool, _failed, notify=changed)
     """The shown room couldn't be processed: show Retry."""
+    ready = Property(bool, _is_ready, notify=changed)
+    """The shown room was just processed and is ready to review."""
     queued = Property(int, _queued_count, notify=changed)
     """Rooms waiting or processing."""
 

@@ -15,6 +15,7 @@ def test_renders_every_screen(tmp_path: Path) -> None:
         "home.png",
         "panel-finish.png",
         "panel-session.png",
+        "review.png",
         "settings-cyan.png",
         "settings.png",
         "start.png",

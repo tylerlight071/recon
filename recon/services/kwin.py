@@ -2,7 +2,7 @@
 
 Opt-in only: nothing here runs until the user says yes. The rule matches Recon's
 app ID *and* the panel's title, so the main window (same app ID) stays free,
-and it forces the panel to the right edge at the width from Settings (The user
+and it forces the panel to the right edge at the width from Settings (the user
 chose "width from Settings only" while pinned). The height isn't a number:
 the rule forces vertical maximise, so KWin fills exactly the area above the
 taskbar. On Wayland, Qt reports the whole screen as "available", so a numeric

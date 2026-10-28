@@ -4,10 +4,11 @@ from typing import Final
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
-MAIN_SCREENS: Final = ("home", "start", "settings")
-"""Main-window screens that exist so far. Later tasks add review, cards, revise, ask, library.
+MAIN_SCREENS: Final = ("home", "start", "review", "settings")
+"""Main-window screens that exist so far. Later tasks add cards, revise, ask, library.
 
-"start" (Start a room) has no sidebar entry of its own: it's reached from Home.
+"start" (Start a room) and "review" have no sidebar entries of their own: they're
+reached from Home, the panel or a notification.
 """
 
 

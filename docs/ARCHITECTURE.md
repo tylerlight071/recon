@@ -2,7 +2,7 @@
 
 How Recon is put together. Behaviour is defined in [`SPEC.md`](SPEC.md); conventions in [`../CLAUDE.md`](../CLAUDE.md). This file is kept current in the same pull request as any change it describes.
 
-**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, pipeline steps 1, 3 and 6 (parse, extract and render), staging, Apply, Discard and backups, and background processing with notifications. `revision/` and the processing pipeline are still empty.
+**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, pipeline steps 1, 3 and 6 (parse, extract and render), staging, Apply, Discard and backups, background processing with notifications, and the review screen. `revision/` and the processing pipeline are still empty.
 
 ## Layers
 
@@ -221,6 +221,16 @@ Finishing a room queues it (`Finish.processRequested` sets the room to `queued`)
 - **At launch**, `Processing.resume` queues every room left `queued` or `processing`, oldest first. At quit, `Processing.close` stops the run at its next check.
 - **`services/notifications.py`** sends "<room> is ready to review" or "<room> couldn't be processed". One private thread owns one jeepney connection, which sends `Notify` and listens for `ActionInvoked`. A click opens that room's Finish screen (`connect_processing`), and the review screen replaces this in task 2.7.
 - **"Back to the room"** discards the room's staged runs (`Processing.discard_room`) and withdraws it from the queue.
+
+## Review screen (task 2.6)
+
+`screens/Review.qml` in the main window, bound to `ReviewModel` (`bridge/review.py`). [ADR 0010](adr/0010-review-screen.md) records why it works this way.
+
+- **What's shown:** `Processing.review(room_id)` reads the room's newest staged run, and `engine/review.build_review` splits it into the room note, new notes, additions (only the changed sections, `added_parts`) and notes left alone. `for_display` turns Obsidian Markdown into Markdown Qt can render: no frontmatter or markers, wikilink text, callouts as quotes, smaller headings, and no images or HTML outside code.
+- **Layout:** each section is a `Disclosure` (a new collapsible component) with a count, and empty sections are hidden. A sticky footer holds Discard and Apply, the one accent button.
+- **Apply** runs `Processing.apply_run` on the room worker. On `ApplyConflict` nothing is written and the screen offers Re-check (`Processing.requeue`), which processes the room again with its progress in the panel.
+- **Discard** asks once (`Dialog`), then discards the run and reopens the room in the panel.
+- **Opened from:** Home (a room in review), the panel's "Review notes" button, and the ready notification (`connect_review`). With nothing staged, the room's Finish screen opens instead.
 
 ## Undo
 

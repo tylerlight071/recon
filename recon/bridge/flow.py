@@ -11,6 +11,7 @@ from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.processing import ProcessingBridge
+from recon.bridge.review import ReviewBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.start import StartRoomBridge
 
@@ -74,11 +75,14 @@ def connect_processing(
     home: HomeBridge,
     finish: FinishBridge,
     processing: ProcessingBridge,
+    review: ReviewBridge,
 ) -> None:
     """A finished room is processed; the panel follows the room it shows.
 
-    A notification's click opens that room's Finish screen (the review screen
-    takes over in task 2.7). "Back to the room" takes it out of processing.
+    "Back to the room" takes a room out of processing. A room with nothing to
+    review (a notification about a problem) opens its Finish screen, and
+    Re-check after an Apply conflict prepares the room again, with its progress
+    in the panel.
     """
 
     def process(room_id: int) -> None:
@@ -89,14 +93,48 @@ def connect_processing(
         processing.withdraw(room_id)
         processing.show(0)
 
-    def open_room(room_id: int) -> None:
+    def open_finish(room_id: int) -> None:
         processing.show(room_id)
         finish.revisit(room_id)
         navigation.showPanel()
+
+    def recheck(room_id: int) -> None:
+        navigation.open("home")
+        open_finish(room_id)
+        processing.enqueue(room_id)
 
     finish.processRequested.connect(process)
     finish.reopenRequested.connect(reopen)
     finish.closed.connect(lambda: processing.show(0))
     home.finishedRequested.connect(processing.show)
     processing.readyForReview.connect(lambda _room: home.refresh())
-    processing.reviewRequested.connect(open_room)
+    review.nothingToReview.connect(open_finish)
+    review.recheckRequested.connect(recheck)
+    review.discarded.connect(lambda _room: finish.hide())
+
+
+def connect_review(
+    navigation: NavigationBridge,
+    home: HomeBridge,
+    session: RoomSessionBridge,
+    processing: ProcessingBridge,
+    review: ReviewBridge,
+) -> None:
+    """The review screen: opened from Home, the panel or a notification; Apply and Discard.
+
+    Apply goes Home (the done screen arrives in task 2.7). Discard reopens the
+    room in the panel, exactly as it was.
+    """
+
+    def reopen(room_id: int) -> None:
+        home.refresh()
+        navigation.switch_to("home")
+        session.open(room_id)
+        navigation.showPanel()
+
+    home.reviewRequested.connect(review.open)
+    processing.reviewRequested.connect(review.open)
+    review.opened.connect(lambda: navigation.open("review"))
+    review.applied.connect(lambda _room, _written: home.refresh())
+    review.applied.connect(lambda _room, _written: navigation.open("home"))
+    review.discarded.connect(reopen)
