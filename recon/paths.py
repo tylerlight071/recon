@@ -88,6 +88,7 @@ def ensure_private_dir(folder: Path) -> None:
 
     Raises:
         InsecurePermissionsError: The folder is too open and couldn't be locked down.
+        NotADirectoryError: Something other than a folder is in the way.
     """
     # mkdir(parents=True) applies `mode` to the last folder only; the ones above it
     # would get the umask's 0755 (audit F-09). Create each missing level ourselves.
@@ -95,6 +96,8 @@ def ensure_private_dir(folder: Path) -> None:
     for level in reversed(missing):
         level.mkdir(mode=PRIVATE_DIR_MODE, exist_ok=True)
         _ensure_mode(level, PRIVATE_DIR_MODE)
+    if not folder.is_dir():  # a file (or link to one) where the folder should be
+        raise NotADirectoryError(folder)
     _ensure_mode(folder, PRIVATE_DIR_MODE)
 
 

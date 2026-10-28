@@ -142,3 +142,10 @@ def test_secure_tree_fixes_what_is_too_open_and_skips_symlinks(tmp_path: Path) -
     assert stat.S_IMODE(loose.stat().st_mode) == 0o600
     assert stat.S_IMODE(outside.stat().st_mode) == 0o644  # never followed
     assert secure_tree(tmp_path) == 0
+
+
+def test_a_file_where_the_folder_should_be_is_refused(tmp_path: Path) -> None:
+    (tmp_path / "recon").write_text("not a folder")
+
+    with pytest.raises(NotADirectoryError):
+        ensure_private_dir(tmp_path / "recon")

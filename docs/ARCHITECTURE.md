@@ -49,6 +49,10 @@ Every interactive component sets `Accessible.role` and `Accessible.name`, works 
 
 `recon/__main__.py` sets up the private data folders and logging, then `recon/app.py` creates the `QGuiApplication` with the app ID (set before the app object, as the portal and KWin rule need) and loads QML into a `QQmlApplicationEngine`. QML warnings are logged as a count and line number only, since their text can quote bound values. `root_window()` casts PySide's plain `QWindow` root back to `QQuickWindow`.
 
+Start-up problems are never silent (audit F-12). If the folders can't be set up, the database can't be opened, or a newer Recon wrote it, `show_startup_problem` prints the error's plain copy and shows it in a small window (`ui/StartupProblem.qml`, one "Close" button). Each cause has its own error and copy: `DataFolderUnusableError`, `InsecurePermissionsError`, `DatabaseUnreadableError` and `DatabaseTooNewError`.
+
+One copy runs at a time (audit F-10). `main` takes a `QLockFile` (`recon.lock` in the data folder) before opening the database. A second launch finds it held, says "Recon is already open. Look for its window in the taskbar." and exits, never touching the database. Qt notices a stale lock left by a crash (its process is gone) and takes it over.
+
 ## Two windows
 
 One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `PanelWindow.qml`, and both bind to the same bridge objects, which are attached as context properties per engine so tests stay independent. Wayland windows can't position themselves, and a pinned window can't resize freely, hence two windows.

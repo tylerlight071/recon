@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Final
 
 from recon.db.connection import Database
-from recon.errors import StorageError
+from recon.errors import DatabaseTooNewError, StorageError
 from recon.logging_setup import Safe
 
 MIGRATIONS_DIR: Final = Path(__file__).resolve().parent / "migrations"
@@ -69,14 +69,14 @@ def migrate(db: Database, folder: Path = MIGRATIONS_DIR) -> int:
 
     Raises:
         StorageError: A migration failed (that step is rolled back), or the
-            database is newer than this version of Recon knows.
+            database is newer than this version of Recon knows (DatabaseTooNewError).
     """
     migrations = available(folder)
     version = current_version(db)
     latest = migrations[-1].version if migrations else 0
     if version > latest:
         _log.error("database schema %s is newer than this recon (%s)", version, latest)
-        raise StorageError
+        raise DatabaseTooNewError
     for migration in migrations[version:]:
         _apply(db, migration)
     return current_version(db)
