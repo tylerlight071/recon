@@ -901,7 +901,7 @@ def test_close_room_puts_the_room_away_and_saves(world: World) -> None:
 
 
 def test_a_title_typed_steadily_is_saved_within_a_second(world: World) -> None:
-    # Audit F-02: a trailing debounce never fired while Tyler kept typing.
+    # Audit F-02: a trailing debounce never fired while the user kept typing.
     room = world.opened()
     typed = ""
     started = time.monotonic()

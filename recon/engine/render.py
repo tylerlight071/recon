@@ -2,12 +2,12 @@
 
 Pydantic in, Markdown out, through a Jinja2 template (`templates/export.md.j2`):
 Python decides what each block looks like; the template lays out the note.
-Tyler's text is escaped only where it could break the note's structure: a
+The user's text is escaped only where it could break the note's structure: a
 line that would become a heading, quote, code fence, rule, HTML block or
 Obsidian comment.
 Commands go in a fence longer than any backtick run inside them; tables
 become Markdown tables. Flags are stripped once more on the way out (hard
-rule 2), keeping only the hex strings Tyler marked "Not a flag, keep it".
+rule 2), keeping only the hex strings the user marked "Not a flag, keep it".
 """
 
 import re

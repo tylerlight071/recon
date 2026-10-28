@@ -77,13 +77,13 @@ class PinningBridge(QObject):
 
     @Slot()
     def pin(self) -> None:
-        """Tyler said yes: remember it and pin now."""
+        """The user said yes: remember it and pin now."""
         self._settings.setProperty("pinning", "on")
         self.applyIfOn()
 
     @Slot()
     def decline(self) -> None:
-        """Tyler said not now: don't ask again (Settings can turn it on)."""
+        """The user said not now: don't ask again (Settings can turn it on)."""
         self._settings.setProperty("pinning", "off")
 
     @Slot()

@@ -122,7 +122,7 @@ def test_start_up_finishes_an_interrupted_apply_and_keeps_waiting_runs(
     assert (old.vault / "02 Concepts" / "Binary.md").exists()
     assert not expired.folder.exists()
     assert not crashed.folder.exists()  # applied and over 30 days old
-    assert waiting.folder.exists()  # still waiting for Tyler
+    assert waiting.folder.exists()  # still waiting for the user
 
 
 def test_start_up_logs_and_carries_on_when_tidying_fails(

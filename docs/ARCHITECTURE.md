@@ -89,8 +89,8 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 `bridge/session.py` (`RoomSession`) holds the open room, its tasks and a `BlockListModel` (`bridge/blocks_model.py`, which also holds SPEC.md's block table: labels, hints, shortcuts, icons).
 
 - **Keystrokes:** each one goes through `edit()`, which strips flags via `FlagGuard`, queues the content in the autosave queue and returns the text to show. The model is updated without notifying QML, so the cursor stays put.
-- **"Not a flag, keep it":** restores the string where it was, or at the end if Tyler has typed since.
-- **Task title:** saves within half a second of the first unsaved keystroke, even while Tyler keeps typing (max-latency, like block autosave), and immediately on Next, on switching rooms and at quit.
+- **"Not a flag, keep it":** restores the string where it was, or at the end if the user has typed since.
+- **Task title:** saves within half a second of the first unsaved keystroke, even while the user keeps typing (max-latency, like block autosave), and immediately on Next, on switching rooms and at quit.
 - **Other writes:** opening a room, adding a block, saving the title, Next and Skip run in order on one private worker thread (`workers.serial_submit`); results come back as signals.
 - **Next, Skip and Previous:** flush the autosave queue, mark the task done or skipped (Previous marks nothing), record the position, and open the target task with its starter block. Next plays a tick in the ring.
 - **Last task:** finishing it emits `finishRequested` for task 1.13.
@@ -112,7 +112,7 @@ One `QQmlApplicationEngine` (`app.create_engine`) loads `MainWindow.qml` and `Pa
 `bridge/focus.py` (`Focus`) drives the header's chip.
 
 - **Time on task:**
-  - It counts while Tyler is working. Every edit in the session (`RoomSession.activity`) keeps it going, and it carries on for up to 15 minutes without one (reading the room in the browser). After that he's away and it stops.
+  - It counts while the user is working. Every edit in the session (`RoomSession.activity`) keeps it going, and it carries on for up to 15 minutes without one (reading the room in the browser). After that the user is away and it stops.
   - A suspend counts as at most 2 s.
   - Time is written per task (`tasks.time_spent_s`, migration 0002) and to the room every 30 s, on every task switch, and at quit. It doesn't touch the room's `updated_at`, so "Where was I?" still means the last note.
 - **Focus blocks:** 15, 25 or 45 minutes from the chip's menu (`PopupMenu`). The chip shows a thin accent line filling up, never a countdown. At the end the panel says "That's 25 minutes of focus. Keep going, or take a short break.", and plays the soft chime if Settings has it on (`chime`, off by default).
@@ -156,7 +156,7 @@ New components: `Toggle` (a switch with its label) and `Slider`. `Choice` gains 
 - three `.base` files in `Bases/`;
 - Obsidian's `.obsidian/app.json` (wikilinks, automatically update links, attachments in `Attachments/`).
 
-It never replaces a file, and `app.json` only gains missing keys. `bridge/vault.py` (`Vault`) runs it on the room worker at launch and whenever the vault setting changes. Until Tyler confirms he's opened the folder in Obsidian once (stored as `obsidian_vault`), Home shows a one-time card with Copy path and "I've done that", and `canOpenInObsidian` stays false. This is scaffolding, not room output, so hard rule 3 still holds: [ADR 0006](adr/0006-vault-bootstrap.md).
+It never replaces a file, and `app.json` only gains missing keys. `bridge/vault.py` (`Vault`) runs it on the room worker at launch and whenever the vault setting changes. Until the user confirms they've opened the folder in Obsidian once (stored as `obsidian_vault`), Home shows a one-time card with Copy path and "I've done that", and `canOpenInObsidian` stays false. This is scaffolding, not room output, so hard rule 3 still holds: [ADR 0006](adr/0006-vault-bootstrap.md).
 
 ## Ollama service (task 2.2)
 
@@ -175,8 +175,8 @@ Model names are settings (`text_model`, `vision_model`, `embedding_model`; defau
 Pure Python in `engine/`. The bridge will run it on a worker in task 2.5. [ADR 0007](adr/0007-note-rendering.md) records why it works this way.
 
 1. **Parse** (`engine/capture.py`): `capture_room(room, tasks, finished_on)` builds a `Capture` from the database rows. Each block keeps its type, empty blocks are left out, screenshots wait for Phase 5, and flags are stripped again, keeping only "Not a flag, keep it" hashes.
-2. **Extract** (`engine/extract.py`, prompt `engine/prompts/extract.RoomExtract.md`, schema `engine/schemas.RoomExtract`): the room goes to the text model as numbered, typed blocks between `<room>` delimiters, described as data. `check` then applies every rule code can check: points cite their own block, concepts and tools must appear in his notes, `own_words` must be his, flags come from his commands, and tool names stay with tool notes.
-3. **Render** (`engine/notes.py`, templates in `engine/templates/notes/`): `render_room` returns a `Rendered` set of notes, each with a path relative to the vault, a kind (room, raw, concept or tool) and its text. Model text goes through `engine/sanitise.inline` and gets its links from the engine. Tyler's own text is escaped only where it could break structure. Generated parts are labelled, and generated sections sit between markers. Nothing is written yet: staging is task 2.4.
+2. **Extract** (`engine/extract.py`, prompt `engine/prompts/extract.RoomExtract.md`, schema `engine/schemas.RoomExtract`): the room goes to the text model as numbered, typed blocks between `<room>` delimiters, described as data. `check` then applies every rule code can check: points cite their own block, concepts and tools must appear in the notes, `own_words` must be the user's, flags come from the user's commands, and tool names stay with tool notes.
+3. **Render** (`engine/notes.py`, templates in `engine/templates/notes/`): `render_room` returns a `Rendered` set of notes, each with a path relative to the vault, a kind (room, raw, concept or tool) and its text. Model text goes through `engine/sanitise.inline` and gets its links from the engine. The user's own text is escaped only where it could break structure. Generated parts are labelled, and generated sections sit between markers. Nothing is written yet: staging is task 2.4.
 
 `engine/commands.py` reads Command blocks in code: each command and its `# comment`, and the programs and flags it runs (`sudo -u root nmap -sV` runs `nmap` with `-sV`).
 

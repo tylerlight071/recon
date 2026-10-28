@@ -44,8 +44,8 @@ No hard rule is broken by the code as it stands: there's no app code yet that to
 - **Severity:** High
 - **Area:** Docs
 - **Location:** `docs/BUILD_PLAN.md:77`
-- **Finding:** Gate 0's manual test step 4 asks Tyler to look over "the Phase 1 issues" on GitHub. The Phase 1 milestone has 0 open and 0 closed issues (`gh api repos/tylerlight071/recon/milestones`). So that gate step can't be done as written. The plan also contradicts itself: line 8 says issues are created "at the start of each phase", while Gate 0 expects them before Phase 1 starts.
-- **Fix:** Before the Gate 0 handover, create the Phase 1 issues (tasks 1.1–1.15, `task` template, labels, `Phase 1` milestone). Or, if they should only be created once Tyler approves the gate, change step 4 to drop "the Phase 1 issues". Either way, make lines 8 and 77 agree.
+- **Finding:** Gate 0's manual test step 4 asks for a review of "the Phase 1 issues" on GitHub. The Phase 1 milestone has 0 open and 0 closed issues (`gh api repos/tylerlight071/recon/milestones`). So that gate step can't be done as written. The plan also contradicts itself: line 8 says issues are created "at the start of each phase", while Gate 0 expects them before Phase 1 starts.
+- **Fix:** Before the Gate 0 handover, create the Phase 1 issues (tasks 1.1–1.15, `task` template, labels, `Phase 1` milestone). Or, if they should only be created once the gate is approved, change step 4 to drop "the Phase 1 issues". Either way, make lines 8 and 77 agree.
 
 ## F-02 — The pre-push hook (main's only protection) misses deletes and multi-ref pushes
 
@@ -121,7 +121,7 @@ No hard rule is broken by the code as it stands: there's no app code yet that to
 - **Severity:** Low
 - **Area:** Tests and coverage
 - **Location:** `pyproject.toml:100-102`
-- **Finding:** CI's "Total coverage: 100.00%" covers 122 statements in `recon/`. The 858 statements in `scripts/` (85% when measured) aren't counted, including `coverage_gates.py` (which enforces the gates) and `kwin_rule.py` at 38% (it writes Tyler's KDE config). For one-off smoke scripts that's acceptable. For `check_env.py` and `coverage_gates.py`, which stay in use, it isn't.
+- **Finding:** CI's "Total coverage: 100.00%" covers 122 statements in `recon/`. The 858 statements in `scripts/` (85% when measured) aren't counted, including `coverage_gates.py` (which enforces the gates) and `kwin_rule.py` at 38% (it writes the user's KDE config). For one-off smoke scripts that's acceptable. For `check_env.py` and `coverage_gates.py`, which stay in use, it isn't.
 - **Fix:** Measure `scripts/check_env.py` and `scripts/coverage_gates.py` (add them to `source` or a separate report). Leave `scripts/smoke/` out, saying why in `pyproject.toml`.
 
 ## F-09 — The documented "fast tests" command runs the real GPU Whisper test
@@ -215,7 +215,7 @@ No hard rule is broken by the code as it stands: there's no app code yet that to
 - **pre-commit:** covers everything CLAUDE.md lists (ruff check, ruff format check, mypy strict, fast tests, gitleaks on staged changes, Conventional Commits with the allowed types). If gitleaks isn't installed, the hook fails rather than being skipped. `default_install_hook_types` installs all three hooks.
 - **Logging basics:** string, bytes, mapping and non-allowlisted arguments are redacted (property test included). Exception messages are dropped along the whole cause/context chain, including cycles. `add_note` notes, `stack_info` and `extra=` don't reach the file (probed). Log files are created 0600, rotated ones too. Rotation is 5 MB × 5.
 - **Paths:** XDG resolution ignores empty and relative values as the spec requires. Folders are created 0700 with an atomic `mkdir(mode=…)`, and too-open folders are tightened (tested).
-- **Errors:** every class derives from `ReconError`, each has its own plain British-English `user_message` with a next step, and none of the copy blames Tyler. Each `noqa: N818` has a reason.
+- **Errors:** every class derives from `ReconError`, each has its own plain British-English `user_message` with a next step, and none of the copy blames the user. Each `noqa: N818` has a reason.
 - **Engineering standards:** mypy strict and ruff are clean. The ruff selection includes every family CLAUDE.md requires, plus `G`, `LOG` and `T20`. Per-file ignores have reasons. No function is over 50 lines (the longest is 46). No TODOs, no dead code apart from `busctl` (F-16). mutmut 3.8 config keys (`source_paths`, `only_mutate`) are valid.
 - **Fixture rooms (0.8):** original text with no URLs. The two conversion mistakes, one port mistake and one flag mistake are proven wrong in code. `THM{this_is_a_test}` and the MD5 lookalike are declared and are the only flag-shaped strings. A strict pydantic loader rejects unknown fields.
 - **Smoke scripts (0.7a–c):** Ollama is pinned to `127.0.0.1`. The shortcut log is written 0600 in a 0700 folder. The KWin rule matches the app ID and title exactly, and removal also cleans `Order`. The temporary KWin script is deleted in `finally`.

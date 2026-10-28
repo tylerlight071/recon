@@ -1,5 +1,5 @@
 {#- Shared by every vault note. A generated section sits between Recon's markers, so
-    later runs can update it without touching anything Tyler writes outside them. -#}
+    later runs can update it without touching anything the user writes outside them. -#}
 {% macro section(name) -%}
 %% recon:start {{ name }} %%
 {{ caller() | trim }}

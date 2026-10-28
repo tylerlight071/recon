@@ -162,7 +162,7 @@ def _stage_note(note: RenderedNote, vault: Path, staged: Path) -> StagedFile:
 def _merge_bytes(existing: bytes, new: str) -> str | None:
     """`merge` for a file on disk; None (leave it alone) if it isn't valid UTF-8.
 
-    Decoding with replacement characters and writing back would change Tyler's
+    Decoding with replacement characters and writing back would change the user's
     text outside the markers, so such a note is skipped instead.
     """
     try:

@@ -6,7 +6,7 @@
 
 ## Context
 
-Recon needs hold-to-talk on F9 while the browser has focus, and a side panel pinned to the right edge on Wayland. CLAUDE.md planned to call the XDG GlobalShortcuts portal directly through QtDBus, and to pin the panel with a KWin rule matched on the app ID and the window title. Phase 0 tested both on Tyler's machine (Plasma 6.8.1, xdg-desktop-portal 1.22.1, GlobalShortcuts portal version 2).
+Recon needs hold-to-talk on F9 while the browser has focus, and a side panel pinned to the right edge on Wayland. CLAUDE.md planned to call the XDG GlobalShortcuts portal directly through QtDBus, and to pin the panel with a KWin rule matched on the app ID and the window title. Phase 0 tested both on the user's machine (Plasma 6.8.1, xdg-desktop-portal 1.22.1, GlobalShortcuts portal version 2).
 
 ## Findings
 
@@ -20,7 +20,7 @@ Recon needs hold-to-talk on F9 while the browser has focus, and a side panel pin
 
 **The KWin rule works as designed.** With `wmclass` (exact) = the app ID and `title` (exact) = the panel title, only the panel was forced to the right edge at full height; a second window with the same app ID stayed free. KWin appends applied rules to `General/Order` by itself, so removing a rule must clean `Order` as well as `rules` and `count`.
 
-**Display scale.** The screen is 2560×1440 at 200% scale, so the logical desktop is 1280×720. A 420 px panel is 840 physical px, a third of the width; the spec's "about 2,100 px left for the room" assumed 100% scale. Tyler saw the 420 px test panel and kept 420 px.
+**Display scale.** The screen is 2560×1440 at 200% scale, so the logical desktop is 1280×720. A 420 px panel is 840 physical px, a third of the width; the spec's "about 2,100 px left for the room" assumed 100% scale. After trying the 420 px test panel, 420 px was kept.
 
 ## Decision
 
@@ -28,7 +28,7 @@ Recon needs hold-to-talk on F9 while the browser has focus, and a side panel pin
 2. **Register first, on the portal connection,** after making sure the `.desktop` file is installed (task 1.15 installs it; Phase 5 checks it).
 3. **Detect an unbound shortcut.** When `BindShortcuts` returns an empty trigger, Recon says so plainly and offers to fix it: the portal's `ConfigureShortcuts` (version 2) opens KDE's shortcut settings. The panel's mic button keeps voice usable meanwhile.
 4. **KWin rule as tested,** with `Order` cleanup on removal (task 1.4).
-5. **Panel width stays 420 px** (Tyler's call, 2026-10-24), resizable from 360 to 520 as the spec says.
+5. **Panel width stays 420 px** (decided 2026-10-24, after trying it), resizable from 360 to 520 as the spec says.
 
 ## Consequences
 

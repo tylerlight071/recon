@@ -19,6 +19,11 @@ build/
 # Test output
 tests/screenshots/
 
+# Local environment and logs (Recon's own log lives in ~/.local/share/recon)
+.env
+.env.*
+*.log
+
 # Never commit real data: databases, vaults, recordings
 *.db
 *.db-wal

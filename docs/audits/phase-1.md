@@ -7,7 +7,7 @@
 
 ## How the audit was done
 
-Read every Python and QML file in scope, plus CLAUDE.md, BUILD_PLAN (Phase 1), SPEC (room session, ADHD rules, look and feel), ARCHITECTURE, THREAT_MODEL, ADRs 0004–0005 and the Phase 0 audit. Each finding below was reproduced with a script or a scratch pytest file in the session scratch folder (`/tmp/claude-1000/-data-projects-Recon/audit-phase1/`), driving the real repositories, bridges and QML windows headless (`QT_QPA_PLATFORM=offscreen`, `QT_QUICK_BACKEND=software`). Scratch tests reuse the project's own fixtures (`tests/bridge/test_session.py::_world`, `tests/ui/test_windows.py::running`). Nothing touched Tyler's real data, config, vault or KDE settings; every app launch used throwaway `XDG_*` folders. No repository file was changed apart from this report.
+Read every Python and QML file in scope, plus CLAUDE.md, BUILD_PLAN (Phase 1), SPEC (room session, ADHD rules, look and feel), ARCHITECTURE, THREAT_MODEL, ADRs 0004–0005 and the Phase 0 audit. Each finding below was reproduced with a script or a scratch pytest file in the session scratch folder (`/tmp/claude-1000/-data-projects-Recon/audit-phase1/`), driving the real repositories, bridges and QML windows headless (`QT_QPA_PLATFORM=offscreen`, `QT_QUICK_BACKEND=software`). Scratch tests reuse the project's own fixtures (`tests/bridge/test_session.py::_world`, `tests/ui/test_windows.py::running`). Nothing touched the user's real data, config, vault or KDE settings; every app launch used throwaway `XDG_*` folders. No repository file was changed apart from this report.
 
 | Command | Result |
 | --- | --- |
@@ -37,7 +37,7 @@ Read every Python and QML file in scope, plus CLAUDE.md, BUILD_PLAN (Phase 1), S
 | Medium | 8 |
 | Low | 13 |
 
-The tooling gates are all green and the code is careful in most places. But two paths lose Tyler's text outright: the delete toast's Undo after Finish, and a task title typed without pausing. Two more lose or misplace it in common situations: the unfinished-flag rule eats the rest of a line, and Undo goes to the wrong block once a block ID has been reused. The Mediums are mostly guarantees the docs make that the code doesn't fully keep: the UI thread never blocks, nothing is lost at quit, files are 0600, and every error has plain copy.
+The tooling gates are all green and the code is careful in most places. But two paths lose the user's text outright: the delete toast's Undo after Finish, and a task title typed without pausing. Two more lose or misplace it in common situations: the unfinished-flag rule eats the rest of a line, and Undo goes to the wrong block once a block ID has been reused. The Mediums are mostly guarantees the docs make that the code doesn't fully keep: the UI thread never blocks, nothing is lost at quit, files are 0600, and every error has plain copy.
 
 ---
 
@@ -67,20 +67,20 @@ The tooling gates are all green and the code is careful in most places. But two 
   ```
 - **Fix:** Start the timer only when it isn't already active (max-latency, the same as `AutosaveQueue`), or put titles through the autosave queue. Add a test that steady typing is saved within 1 s, and extend `tests/db/test_crash.py` (or a bridge-level crash test) to cover the title.
 
-## F-03 — The unfinished-flag rule silently deletes the rest of Tyler's line from storage
+## F-03 — The unfinished-flag rule silently deletes the rest of the user's line from storage
 
 - **Severity:** High
 - **Area:** Hard rules (2 and 4), Correctness
 - **Location:** `recon/engine/flags_filter.py:31` (`UNFINISHED`), `:111-118` (repeat rounds); `recon/db/repositories.py:122-134`; `docs/adr/0005-flag-filter-rules.md` decision 2
-- **Finding:** On save, everything from an unclosed `THM{`/`flag{`/`HTB{` to the end of its line is removed. ADR 0005 accepted this as "rare". In CTF notes it isn't rare: `grep -r "flag{" .` and `strings x | grep THM{` are standard commands, and prose about flag formats is common. The editor doesn't apply this rule, so Tyler sees his full line and gets no "Flag skipped" notice. The truncated text appears on the next task switch, "Previous task" or restart. Because stripping repeats, one removal can expose another unclosed prefix, and the whole line goes. The undo log stores the truncated text too, so Undo can't bring it back.
+- **Finding:** On save, everything from an unclosed `THM{`/`flag{`/`HTB{` to the end of its line is removed. ADR 0005 accepted this as "rare". In CTF notes it isn't rare: `grep -r "flag{" .` and `strings x | grep THM{` are standard commands, and prose about flag formats is common. The editor doesn't apply this rule, so the user sees their full line and gets no "Flag skipped" notice. The truncated text appears on the next task switch, "Previous task" or restart. Because stripping repeats, one removal can expose another unclosed prefix, and the whole line goes. The undo log stores the truncated text too, so Undo can't bring it back.
 - **Reproduced:** `repro_flags.py` (real `BlockRepository.update_content`):
   ```
   'grep -ri "flag{" /home  # find flags' -> 'grep -ri "'
   'strings dump.bin | grep THM{ | head' -> 'strings dump.bin | grep '
   'HTB{ is the HackTheBox prefix, THM{ is TryHackMe' -> ''
-     editor-side strip (what Tyler sees): unchanged in all three
+     editor-side strip (what the user sees): unchanged in all three
   ```
-  High rather than Critical because the trade-off was recorded in an ADR. Tyler should decide whether, given these examples, it counts as data loss.
+  High rather than Critical because the trade-off was recorded in an ADR. The user should decide whether, given these examples, it counts as data loss.
 - **Fix:** Narrow the rule to what a flag being typed looks like. The body can't contain whitespace, quotes or pipes (`(?:thm|htb|flag)\{[^{}\s"'`|]{0,200}$`), and it has to be at the end of the text or the line. Better still, strip only at the cursor (pass the cursor position from the editor). Show the notice whenever storage strips something the editor didn't. Add the three examples above as regression tests, and update ADR 0005.
 
 ## F-04 — After a block ID is reused, Undo acts on the wrong block
@@ -88,7 +88,7 @@ The tooling gates are all green and the code is careful in most places. But two 
 - **Severity:** High
 - **Area:** Correctness (undo)
 - **Location:** `recon/db/migrations/0001_initial.sql:33` (`id INTEGER PRIMARY KEY`, no `AUTOINCREMENT`); `recon/db/repositories.py:372-403` (`restore`), `:500-510` (`UndoRepository.remap`); `recon/bridge/undo.py:142-148` (`UndoHistory.remap`)
-- **Finding:** SQLite reuses the highest deleted rowid. Delete block A (the newest), then add block B, and B gets A's ID. When A is then restored (toast Undo, or Ctrl+Z), its ID is taken, so it comes back with a new ID. `remap(old, new)` then rewrites *every* step about the old ID, including B's add and B's typing, to point at A. The next Ctrl+Z puts B's earlier content into A, and the one after deletes A. B's own typing is never undone. If Tyler types again after that, redo is cleared and A's text is gone. The same thing happens across tasks: a task's new starter block can reuse a deleted block's ID, and remap then moves steps between tasks, where they're silently dropped.
+- **Finding:** SQLite reuses the highest deleted rowid. Delete block A (the newest), then add block B, and B gets A's ID. When A is then restored (toast Undo, or Ctrl+Z), its ID is taken, so it comes back with a new ID. `remap(old, new)` then rewrites *every* step about the old ID, including B's add and B's typing, to point at A. The next Ctrl+Z puts B's earlier content into A, and the one after deletes A. B's own typing is never undone. If the user types again after that, redo is cleared and A's text is gone. The same thing happens across tasks: a task's new starter block can reuse a deleted block's ID, and remap then moves steps between tasks, where they're silently dropped.
 - **Reproduced:** `tests_audit/test_undo_reuse.py`:
   ```
   A id 2 B id 2
@@ -112,7 +112,7 @@ The tooling gates are all green and the code is careful in most places. But two 
   FlagGuard.keep on UI thread: ['read', 'WRITE']
   HomeModel.refresh waited 200 ms behind a 200 ms write
   ```
-  (The 200 ms commit stands in for an fsync on a busy disk. Real fsync times on Tyler's btrfs NVMe couldn't be measured inside the allowed folders, because `/tmp` is tmpfs.)
+  (The 200 ms commit stands in for an fsync on a busy disk. Real fsync times on the user's btrfs NVMe couldn't be measured inside the allowed folders, because `/tmp` is tmpfs.)
 - **Fix:** Run `keep_lookalike` and `save_settings` on a worker (the room worker for the first, a small serial worker for settings). Move Home and Start refreshes to a worker and deliver the results by signal. Give reads their own connection (WAL lets readers run alongside the writer), so a reader never waits on the writer's lock. Add a test that fails if any bridge slot touches `Database` on the UI thread (the instrumentation above works as a fixture).
 
 ## F-06 — Room-worker jobs still queued at quit run after the database is closed
@@ -120,7 +120,7 @@ The tooling gates are all green and the code is careful in most places. But two 
 - **Severity:** Medium
 - **Area:** Correctness (data safety at quit)
 - **Location:** `recon/__main__.py:76-81` (`db.close()` in `main`'s `finally`), `:161` (`serial_submit(app)`), `:189-191` (the `aboutToQuit` savers don't wait for the worker); `recon/bridge/workers.py:16-28`
-- **Finding:** `aboutToQuit` saves the title, the time and the autosave queue, but never waits for the serial room worker. `main()` then closes the database while jobs may still be queued: "Next task" (its title and status), a block delete or move, undo-log pushes. They fail with `ProgrammingError`, which is logged and dropped. For example, if Tyler types a title, presses Ctrl+Return and quits straight away, the title is lost, because `_move` has already taken it from `_pending_title`, so `session.close` has nothing to save.
+- **Finding:** `aboutToQuit` saves the title, the time and the autosave queue, but never waits for the serial room worker. `main()` then closes the database while jobs may still be queued: "Next task" (its title and status), a block delete or move, undo-log pushes. They fail with `ProgrammingError`, which is logged and dropped. For example, if the user types a title, presses Ctrl+Return and quits straight away, the title is lost, because `_move` has already taken it from `_pending_title`, so `session.close` has nothing to save.
 - **Reproduced:** `quit_drain.py` mirrors `main()`'s order (queue a slow job and a delete, `app.quit()`, then `db.close()`):
   ```
   db closed (main's finally)
@@ -142,12 +142,12 @@ The tooling gates are all green and the code is careful in most places. But two 
   ```
 - **Fix:** On save, also strip a hex run of, say, 20–31 characters that ends the text or a line (a hash still being typed), with the same "hold, don't store" rule as braced prefixes. Add the key-by-key test for hex that `test_flags_never_stored.py` already has for `THM{`.
 
-## F-08 — In the Markdown export, a line of Tyler's text can hide the rest of the note
+## F-08 — In the Markdown export, a line of the user's text can hide the rest of the note
 
 - **Severity:** Medium
-- **Area:** Security and privacy (sanitising Tyler's text), Correctness
+- **Area:** Security and privacy (sanitising the user's text), Correctness
 - **Location:** `recon/engine/render.py:35` (`_STRUCTURE`), `:117-120` (`escape_lines`)
-- **Finding:** CLAUDE.md asks that Tyler's own text is "escaped where needed so it can't break the note's structure". `escape_lines` covers headings, quotes, fences, rules and `%%`, but not raw HTML. A line starting with `<script`, `<style`, `<pre`, `<textarea` or `<!--` opens a CommonMark HTML block, and these can interrupt a paragraph. Unclosed, the block runs to the end of the document. Notes for web rooms (XSS, HTML comments) contain exactly these lines, so whole later tasks vanish from the rendered note. Obsidian also drops `<script>` content.
+- **Finding:** CLAUDE.md asks that the user's own text is "escaped where needed so it can't break the note's structure". `escape_lines` covers headings, quotes, fences, rules and `%%`, but not raw HTML. A line starting with `<script`, `<style`, `<pre`, `<textarea` or `<!--` opens a CommonMark HTML block, and these can interrupt a paragraph. Unclosed, the block runs to the end of the document. Notes for web rooms (XSS, HTML comments) contain exactly these lines, so whole later tasks vanish from the rendered note. Obsidian also drops `<script>` content.
 - **Reproduced:** `repro_export_html.py` renders a four-task room through `render_export` and parses it with markdown-it (CommonMark):
   ```
   --- headings CommonMark sees: ['XSS Basics', 'Task 1: Reflected XSS']
@@ -188,14 +188,14 @@ The tooling gates are all green and the code is careful in most places. But two 
 - **Severity:** Medium
 - **Area:** Correctness (task 1.13; Gate 1 step 5); ADHD rule 4
 - **Location:** `recon/bridge/finish.py:129-138` (`open` marks the room `done` straight away), `:216-219`; `recon/bridge/home.py:118` (`canResume` only while capturing)
-- **Finding:** "Finish room" marks the room `done` before Tyler exports. Export and "Back to the room" exist only on the Finish screen. Press "Done" without exporting, or quit or crash there, and the room shows on Home as an inert "Done" row: no export and no reopen until Phase 2's Library. The notes are safe in `app.db`, but Tyler can't reach them.
+- **Finding:** "Finish room" marks the room `done` before the user exports. Export and "Back to the room" exist only on the Finish screen. Press "Done" without exporting, or quit or crash there, and the room shows on Home as an inert "Done" row: no export and no reopen until Phase 2's Library. The notes are safe in `app.db`, but the user can't reach them.
 - **Reproduced:** `tests_audit/test_finish_done.py` (real QML windows):
   ```
   recent rooms: [{'canResume': False, 'detail': 'Done', 'id': 1, 'name': 'DNS in Detail', 'when': 'just now'}]
   hasCurrent: False | room status: done
   panel shows Finish: False | session has room: False
   ```
-- **Fix:** Make a done room's row on Home open the Finish screen again (export, back to the room). Or keep the room `capturing` until Tyler presses "Done", and on launch reopen Finish for a room left there.
+- **Fix:** Make a done room's row on Home open the Finish screen again (export, back to the room). Or keep the room `capturing` until the user presses "Done", and on launch reopen Finish for a room left there.
 
 ## F-12 — Start-up failures are invisible from the app menu, and the copy is wrong
 
@@ -236,7 +236,7 @@ The tooling gates are all green and the code is careful in most places. But two 
 - **Severity:** Low
 - **Area:** Hard rules (2)
 - **Location:** `recon/engine/flags_filter.py:30-31`
-- **Finding:** These survive storage: `THM{a{b}c}` (a brace inside), a body of more than 200 characters, `TH​M{secret}` (zero-width space), `THM｛secret｝` (full-width braces) and `THM {secret}`. `THM{multi\nline}` leaves `\nline}` behind. Most are unlikely in real rooms. They're listed so Tyler can decide which to cover.
+- **Finding:** These survive storage: `THM{a{b}c}` (a brace inside), a body of more than 200 characters, `TH​M{secret}` (zero-width space), `THM｛secret｝` (full-width braces) and `THM {secret}`. `THM{multi\nline}` leaves `\nline}` behind. Most are unlikely in real rooms. They're listed so the user can decide which to cover.
 - **Reproduced:** `repro_flags.py` ("flag-shaped strings that survive" section).
 - **Fix:** NFKC-normalise and drop zero-width characters before matching (only for detection, mapping positions back). Allow optional whitespace before `{`. Document the 200-character and nested-brace limits in ADR 0005, or lift them.
 
@@ -263,7 +263,7 @@ The tooling gates are all green and the code is careful in most places. But two 
 - **Severity:** Low
 - **Area:** Hard rules (2, "Not a flag, keep it")
 - **Location:** `recon/bridge/flags.py:48`; `recon/ui/PanelWindow.qml:54-60`
-- **Finding:** Keeping is offered only when exactly one string was removed. A pasted hash table (common in hashing rooms) loses every hash, with the notice "Flag skipped. Recon never saves flags." Tyler has to paste them one at a time.
+- **Finding:** Keeping is offered only when exactly one string was removed. A pasted hash table (common in hashing rooms) loses every hash, with the notice "Flag skipped. Recon never saves flags." The user has to paste them one at a time.
 - **Reproduced:** `FlagGuard.clean` with two 32-hex strings emits `keepable == ""` (also covered by the project's own `test_several_findings_offer_no_keep`).
 - **Fix:** Offer "Not a flag, keep them" when every removal is hex (still never for braced flags), and say "Skipped 3 things that look like flags."
 
@@ -351,7 +351,7 @@ Run on the gate branch once the audit was written, with `engine/render.py` and `
 | `recon/engine/names.py` | 64 / 68 |
 | **Total** | **395 / 409 (96.6%)** |
 
-The first run had 46 survivors. New tests killed every one that showed a real gap: strip and cut edges, a multibyte cut, lone surrogates, the unknown-type label, answer callouts, `%%` in titles and cells, backslashes in cells, and keeping Tyler's own spacing. The 14 left are equivalent mutants:
+The first run had 46 survivors. New tests killed every one that showed a real gap: strip and cut edges, a multibyte cut, lone surrogates, the unknown-type label, answer callouts, `%%` in titles and cells, backslashes in cells, and keeping the user's own spacing. The 14 left are equivalent mutants:
 
 - **`render_export` (9):** the Jinja `Environment` options (`autoescape=False` versus `None` or removed, `StrictUndefined` removed, `keep_trailing_newline`, `lstrip_blocks`) and the `\n{3,}` collapse. The template has no indented tags or undefined names, and the final `rstrip() + "\n"` makes trailing-newline handling irrelevant.
 - **`names._cut` (4):** `"utf-8"` versus `"UTF-8"` or Python's default (the same codec), and `<=` versus `<` at exactly the limit (the slice is the whole string either way).
@@ -398,8 +398,8 @@ After the fixes, on `main` at `2de1db6`:
 
 ## Couldn't check
 
-- **On Tyler's desktop:** launch time through the app menu on Wayland with the GPU renderer, 60 fps panel animations, idle memory with the real RHI backend, the KWin rule's behaviour, and the chime through PipeWire. Headless numbers are in the table above.
-- **Real fsync latency** on Tyler's btrfs disks (scratch is tmpfs), so F-05's wait was shown with a stand-in commit.
+- **On the user's desktop:** launch time through the app menu on Wayland with the GPU renderer, 60 fps panel animations, idle memory with the real RHI backend, the KWin rule's behaviour, and the chime through PipeWire. Headless numbers are in the table above.
+- **Real fsync latency** on the user's btrfs disks (scratch is tmpfs), so F-05's wait was shown with a stand-in commit.
 - **Obsidian's rendering** of the export (F-08 used a CommonMark parser).
 - **Mutation scores** (a separate run was in progress; see F-25).
 - **Screen-reader output:** the accessible names and roles were checked in the tree, not with Orca.

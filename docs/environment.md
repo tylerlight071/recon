@@ -1,4 +1,4 @@
-# Tyler's environment
+# Development environment
 
 The machine Recon is built and tested on, as reported by `scripts/check_env.py`, with the fixes agreed in task 0.5. Re-run the script after any system change and update this file when the results change.
 
@@ -13,7 +13,7 @@ The machine Recon is built and tested on, as reported by `scripts/check_env.py`,
 | Audio | PortAudio installed. **Default input not set yet** (see below) |
 | Models pulled | See below (15 GB in `/data/models/ollama`) |
 | Obsidian | 1.14.4 from pacman (Arch `extra`); `obsidian://` handler registered |
-| Display | Samsung 85" over HDMI, 2560×1440 at 59.95 Hz, **200% scale**, so the logical desktop is 1280×720. The 420 px panel is a third of the width; Tyler kept 420 px (ADR 0003) |
+| Display | Samsung 85" over HDMI, 2560×1440 at 59.95 Hz, **200% scale**, so the logical desktop is 1280×720. The 420 px panel is a third of the width; 420 px was kept (ADR 0003) |
 | Disk | About 1 TB free in home |
 
 ## Models (task 0.6, pulled 2026-10-24)
@@ -59,13 +59,13 @@ Without the launcher it fails with "libcublas.so.12 is not found", as expected. 
 | QML window (PySide6 6.11.2, Wayland) | Pass: label in the bundled Inter (400/500/600 map to the real files); 200 ms animation took 209 ms over 12 frames (60 fps). The same test passes headless in CI |
 | Global shortcut, from a terminal | Pass, after clearing a stale binding: KDE bound F9; 2 press/release pairs (667 ms, 773 ms) |
 | Global shortcut, from a `.desktop` launch | Pass: 2 pairs (1036 ms, 867 ms); log written 0600 |
-| KWin rule | Pass: "Recon Panel test" forced to x=860, 420×720; "Recon test" (same app ID) stayed free, as Tyler confirmed by moving and resizing it |
+| KWin rule | Pass: "Recon Panel test" forced to x=860, 420×720; "Recon test" (same app ID) stayed free, confirmed by moving and resizing it |
 
 Cleaned up afterwards: `kwinrulesrc` restored byte for byte from a backup; the test `.desktop` entry and the test shortcut removed. Details: [ADR 0003](adr/0003-desktop-integration.md).
 
 ## Fixes made in task 0.5
 
-| Problem | Cause | Fix (run by Tyler) |
+| Problem | Cause | Fix (run by hand) |
 | --- | --- | --- |
 | Ollama service failed at boot | The override points `OLLAMA_MODELS` at `/data/models/ollama`, which didn't exist; `/data/models` is owned by `tyler` (755), so the `ollama` user couldn't create it | `sudo install -d -o ollama -g ollama -m 755 /data/models/ollama`, then `sudo systemctl restart ollama`. No models existed before, so nothing needed moving |
 | Obsidian missing | Not installed | `sudo pacman -S obsidian`, then opened once to register `obsidian://` |

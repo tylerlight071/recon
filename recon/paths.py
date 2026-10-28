@@ -38,7 +38,7 @@ class AppPaths:
 
     @property
     def settings_file(self) -> Path:
-        """Path of Tyler's settings (`settings.toml`)."""
+        """Path of the user's settings (`settings.toml`)."""
         return self.config / "settings.toml"
 
     @classmethod

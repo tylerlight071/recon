@@ -1,10 +1,10 @@
 """Whether Ollama and Recon's models are ready, exposed to QML as `Models` (task 2.2).
 
-Checked once at launch and whenever Settings opens or Tyler presses "Check
+Checked once at launch and whenever Settings opens or the user presses "Check
 again", on a worker (a check waits a few seconds at most). Settings shows one
 plain line about it and, for a model that isn't installed yet, the exact
 `ollama pull` command to run. Recon never pulls models itself: each new
-download is Tyler's to start (CLAUDE.md, hard rule 1).
+download is the user's to start (CLAUDE.md, hard rule 1).
 """
 
 import logging

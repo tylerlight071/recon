@@ -1,6 +1,6 @@
 # Security policy
 
-Recon is a private, single-user, local-only app. It holds Tyler's study notes, which are treated as private data.
+Recon is a private, single-user, local-only app. It holds the user's study notes, which are treated as private data.
 
 ## Supported versions
 
@@ -18,6 +18,6 @@ The threat model, assets, entry points and mitigations are in [`docs/THREAT_MODE
 
 - At runtime Recon talks only to Ollama on loopback. A test fails if any module other than `services/ollama.py` imports networking code.
 - Anything shaped like a CTF flag is stripped before it's stored.
-- Model output is untrusted data: schema-validated, sanitised before rendering, and reviewed by Tyler before Apply.
+- Model output is untrusted data: schema-validated, sanitised before rendering, and reviewed by the user before Apply.
 - Logs never contain note content; data folders are `0700`, files `0600`.
 - Secrets are scanned by gitleaks on every commit and in CI.

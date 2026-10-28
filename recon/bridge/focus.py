@@ -1,9 +1,9 @@
 """The header's timer, exposed to QML as `Focus` (task 1.12).
 
 - **Time on task**, shown quietly in the chip and recorded per task and room.
-  It counts while Tyler is working: any edit in Recon keeps it going, and it
-  carries on for up to 15 minutes without one (he's reading the room in the
-  browser). After that he's away, and it stops until he's back.
+  It counts while the user is working: any edit in Recon keeps it going, and it
+  carries on for up to 15 minutes without one (the user is reading the room
+  in the browser). After that they're away, and it stops until they're back.
 - **Focus blocks** of 15, 25 or 45 minutes, chosen from the chip. The chip
   shows a thin line filling up, never a countdown (ADHD rule 10). At the end:
   a gentle notice, and the soft chime if it's on in Settings (off by default).
@@ -25,7 +25,7 @@ from recon.errors import ReconError
 from recon.logging_setup import Safe
 
 AWAY_AFTER_S: Final = 15 * 60
-"""No edit in Recon for this long: Tyler is away, so time stops counting."""
+"""No edit in Recon for this long: The user is away, so time stops counting."""
 BREAK_AFTER_S: Final = 90 * 60
 SAVE_EVERY_S: Final = 30
 """Time on task is written this often (and on every task switch and at quit)."""
@@ -111,7 +111,7 @@ class FocusBridge(QObject):
     seconds = Property(int, _seconds, notify=changed)
     """Time on the task on screen, in whole seconds."""
     running = Property(bool, _get_running, notify=changed)
-    """Counting now (False while Tyler is away)."""
+    """Counting now (False while the user is away)."""
     focusing = Property(bool, _focusing, notify=changed)
     focusMinutes = Property(int, _get_focus_minutes, notify=changed)  # noqa: N815
     focusProgress = Property(float, _focus_progress, notify=changed)  # noqa: N815
@@ -137,7 +137,7 @@ class FocusBridge(QObject):
 
     @Slot()
     def activity(self) -> None:
-        """Tyler did something in Recon: he's here."""
+        """The user did something in Recon: they're here."""
         self._last_activity = self._monotonic()
 
     @Slot()
@@ -188,7 +188,7 @@ class FocusBridge(QObject):
 
     @Slot()
     def previewChime(self) -> None:  # noqa: N802 - Qt naming, used from QML
-        """Settings' "Play": let Tyler hear the chime before turning it on."""
+        """Settings' "Play": let the user hear the chime before turning it on."""
         self._chime()
 
     def _finish_focus(self) -> None:

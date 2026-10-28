@@ -6,7 +6,7 @@
 
 ## Context
 
-Voice capture (Phase 5) uses faster-whisper `large-v3-turbo` on the RTX 5070 Ti (sm_120). CLAUDE.md flagged this as the riskiest dependency and assumed it needs cuBLAS for CUDA 12 **and** cuDNN 9 from PyPI wheels, on `LD_LIBRARY_PATH` before Python starts. The Phase 0 smoke test checked each assumption on Tyler's machine.
+Voice capture (Phase 5) uses faster-whisper `large-v3-turbo` on the RTX 5070 Ti (sm_120). CLAUDE.md flagged this as the riskiest dependency and assumed it needs cuBLAS for CUDA 12 **and** cuDNN 9 from PyPI wheels, on `LD_LIBRARY_PATH` before Python starts. The Phase 0 smoke test checked each assumption on the user's machine.
 
 ## Findings
 
@@ -29,6 +29,6 @@ Voice capture (Phase 5) uses faster-whisper `large-v3-turbo` on the RTX 5070 Ti 
 
 ## Consequences
 
-- Phase 5's "release-to-text under 3 seconds" budget is realistic once the JIT cache is warm. Task 5.1 should warm it (or tell Tyler the first clip is slow) after driver updates, which invalidate the cache.
-- The fallbacks named in the build plan (whisper.cpp with CUDA, openai-whisper on PyTorch cu128) aren't needed. Tyler doesn't need to choose between them.
+- Phase 5's "release-to-text under 3 seconds" budget is realistic once the JIT cache is warm. Task 5.1 should warm it (or tell the user the first clip is slow) after driver updates, which invalidate the cache.
+- The fallbacks named in the build plan (whisper.cpp with CUDA, openai-whisper on PyTorch cu128) aren't needed. No choice between them is needed.
 - `uv sync` without `--extra voice` removes the voice packages. `recon-launch` runs `uv sync --frozen --extra voice --inexact` before it builds the loader path, so the next launch puts them back and still finds cuBLAS (fixed after the Phase 0 audit, F-06).

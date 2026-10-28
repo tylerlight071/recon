@@ -24,7 +24,7 @@ RETRY_S: Final = 1.0
 
 type Save = Callable[[int, BlockContent, bool], object]
 """(block, content, final): `final` is True for flushes (task switch, quit), False for
-timed saves while Tyler types."""
+timed saves while the user types."""
 type Clock = Callable[[], float]
 
 _log = logging.getLogger(__name__)

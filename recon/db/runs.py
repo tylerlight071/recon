@@ -76,7 +76,7 @@ class RunRepository:
         return self._finish(run_id, "applied", written, backed_up)
 
     def discarded(self, run_id: str) -> bool:
-        """Record that Tyler discarded the run. Returns whether a staged run was updated."""
+        """Record that the user discarded the run. Returns whether a staged run was updated."""
         return self._finish(run_id, "discarded", 0, 0)
 
     def _finish(self, run_id: str, status: str, written: int, backed_up: int) -> bool:

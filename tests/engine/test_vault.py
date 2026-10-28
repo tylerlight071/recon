@@ -83,7 +83,7 @@ def test_obsidian_settings_only_gain_missing_keys(tmp_path: Path) -> None:
 
     settings = json.loads((vault / ".obsidian" / "app.json").read_text())
     assert settings == {
-        "useMarkdownLinks": True,  # Tyler's choice wins
+        "useMarkdownLinks": True,  # the user's choice wins
         "vimMode": True,
         "alwaysUpdateLinks": True,
         "attachmentFolderPath": "Attachments",

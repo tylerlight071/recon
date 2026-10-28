@@ -22,7 +22,7 @@ Window {
     minimumHeight: Theme.mainWindowMinHeight
     visible: false
 
-    // Remember the width Tyler drags it to (saved shortly after he stops).
+    // Remember the width the user drags it to (saved shortly after the drag stops).
     onWidthChanged: if (visible) AppSettings.panelWidth = width
 
     function bringForward() {

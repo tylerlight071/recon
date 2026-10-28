@@ -1,7 +1,7 @@
 """Repositories for rooms, tasks and blocks. Parameterised SQL only; models out.
 
 Every query is a complete literal (no SQL built from strings), so nothing
-Tyler types can change a query's shape. Every text field passes through the
+The user types can change a query's shape. Every text field passes through the
 flag filter here, the last stop before the database (hard rule 2), so no
 caller can store a flag by forgetting to filter. Every change to a room's tasks or
 blocks also bumps the room's `updated_at`, which "recent rooms" and
@@ -126,7 +126,7 @@ def clean_text(text: str) -> str:
 
 
 def clean_content(content: BlockContent, *, typing: bool = False) -> BlockContent:
-    """Block content with flags removed (finished or not), except hex strings Tyler kept.
+    """Block content with flags removed (finished or not), except hex strings the user kept.
 
     `typing` (timed autosaves, undo snapshots) also holds back a hash still being typed.
     """
@@ -205,7 +205,7 @@ class RoomRepository:
         return [_room(row) for row in rows]
 
     def current(self) -> Room | None:
-        """The room Tyler is in the middle of: the most recently touched one still capturing."""
+        """The room the user is in the middle of: the most recently touched one still capturing."""
         with self._db.read() as conn:
             row = conn.execute(_SELECT_CURRENT_ROOM).fetchone()
         return _room(row) if row else None
@@ -218,7 +218,7 @@ class RoomRepository:
         add_time_s: int = 0,
         status: RoomStatus | None = None,
     ) -> bool:
-        """Record where Tyler is, time spent and status.
+        """Record where the user is, time spent and status.
 
         Returns:
             Whether the room exists.
@@ -351,7 +351,7 @@ class BlockRepository:
     def update_content(self, block_id: int, content: BlockContent, final: bool = True) -> bool:
         """Save a block's content (what autosave calls). Returns whether it exists.
 
-        `final` is False for timed autosaves while Tyler types: a hash still being
+        `final` is False for timed autosaves while the user types: a hash still being
         typed at a line's end is held back until the next save (audit F-07).
         """
         now = self._clock().isoformat()

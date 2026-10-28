@@ -72,7 +72,7 @@ Window {
     }
 
     // The theme follows Settings (one engine, so this covers the panel too).
-    // Asked once, at first launch (Tyler's choice), before any room starts.
+    // Asked once, at first launch (The user's choice), before any room starts.
     Component.onCompleted: {
         Theme.accentName = Qt.binding(() => AppSettings.accent)
         Theme.reduceMotion = Qt.binding(() => AppSettings.reduceMotion)

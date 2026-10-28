@@ -1,4 +1,4 @@
-"""Write a finished room to a Markdown file in a folder Tyler chose (task 1.13).
+"""Write a finished room to a Markdown file in a folder the user chose (task 1.13).
 
 Never overwrites: if "DNS in Detail.md" exists, the next is "DNS in Detail (2).md".
 The file name comes from `names.file_name`, and the final path is checked to

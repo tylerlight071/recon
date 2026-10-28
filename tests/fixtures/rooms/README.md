@@ -1,6 +1,6 @@
 # Fixture rooms
 
-Three sample rooms written from scratch for testing. **No TryHackMe text**: the notes are invented in the rough style Tyler writes in. Never add real notes or copied room content here.
+Three sample rooms written from scratch for testing. **No TryHackMe text**: the notes are invented in a rough note-taking style. Never add real notes or copied room content here.
 
 Each file mirrors the Phase 1 `app.db` tables (`rooms` → `tasks` → `blocks`); `tests/fixture_rooms.py` loads and validates them. IDs are unique across all three files, so they can share one database. `_fixture` is test-only metadata that the app never reads.
 

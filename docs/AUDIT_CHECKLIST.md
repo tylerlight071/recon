@@ -20,7 +20,7 @@ Critical, High and Medium are fixed before the gate. Every finding becomes an is
 - [ ] 1 No contact with tryhackme.com; no network outside `services/ollama.py`; loopback only.
 - [ ] 2 Flags stripped before db, vault, cards, backups, logs; "Not a flag, keep it" restores one string only.
 - [ ] 3 Only `stage.apply()` writes into the vault.
-- [ ] 4 `00 Raw notes/` never changed after writing; Tyler's text never edited.
+- [ ] 4 `00 Raw notes/` never changed after writing; the user's text never edited.
 - [ ] 5 Generated content labelled.
 - [ ] 6 Backups before overwrite; last 20 runs kept.
 - [ ] 7 Autosave ≤ 1 s.

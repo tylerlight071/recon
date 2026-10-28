@@ -24,7 +24,7 @@ REPO: Final = Path(__file__).resolve().parent.parent
 """This checkout: no vault may live inside it (it could end up committed)."""
 
 APP_NAME: Final = "Recon"
-"""Name shown to Tyler in window titles and notifications."""
+"""Name shown to the user in window titles and notifications."""
 
 PANEL_WIDTH_MIN: Final = 360
 PANEL_WIDTH_MAX: Final = 520
@@ -43,7 +43,7 @@ _log = logging.getLogger(__name__)
 
 
 class Settings(BaseModel):
-    """Tyler's preferences (the Settings screen, task 1.14).
+    """The user's preferences (the Settings screen, task 1.14).
 
     Unknown keys are ignored, so a newer settings file still loads.
     """
@@ -75,7 +75,7 @@ class Settings(BaseModel):
         return str(path)
 
     obsidian_vault: str = ""
-    """The vault folder Tyler confirmed he opened in Obsidian once ("" until then).
+    """The vault folder the user confirmed they opened in Obsidian once ("" until then).
 
     Obsidian only follows obsidian:// links to vaults it knows, so "Open in
     Obsidian" stays hidden until this matches the vault in use (task 2.1).
@@ -146,7 +146,7 @@ def load_settings(path: Path) -> tuple[Settings, ConfigError | None]:
 
 
 def save_settings(path: Path, settings: Settings) -> None:
-    """Write settings atomically as TOML, private to Tyler (0600).
+    """Write settings atomically as TOML, private to the user (0600).
 
     Args:
         path: `settings.toml`; its folder must exist.

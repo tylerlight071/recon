@@ -69,14 +69,14 @@ class UndoHistory:
             )
 
     def record(self, task_id: int, action: UndoAction) -> Step:
-        """Tyler did something new: remember how to go back; redo no longer applies."""
+        """The user did something new: remember how to go back; redo no longer applies."""
         self.close_group()
         return self._push(task_id, action)
 
     def typed(
         self, task_id: int, *, block_id: int, field_name: Field, before: BlockContent, new: str
     ) -> Step | None:
-        """Tyler typed: start a new step if this is a new group, else extend the open one.
+        """The user typed: start a new step if this is a new group, else extend the open one.
 
         Args:
             task_id: The task on screen.

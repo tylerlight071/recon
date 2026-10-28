@@ -2,7 +2,7 @@
 
 At launch, and whenever Settings points at another folder, `setUp` creates or
 completes the vault on a worker (`engine.vault.bootstrap`). Obsidian refuses
-`obsidian://` links to a vault it hasn't opened, so until Tyler says he's
+`obsidian://` links to a vault it hasn't opened, so until the user says they've
 opened this folder once ("Open folder as vault"), Home shows a one-time card
 with the path, "Copy path" and "I've done that", and Recon shows no "Open in
 Obsidian" buttons (`canOpenInObsidian`).
@@ -43,7 +43,7 @@ class VaultBridge(QObject):
         """Wire the vault to settings.
 
         Args:
-            settings: The vault folder, and the one Tyler opened in Obsidian.
+            settings: The vault folder, and the one the user opened in Obsidian.
             copy_text: Puts text on the clipboard ("Copy path").
             submit: Runs the bootstrap off the UI thread.
             parent: Qt parent.
@@ -113,7 +113,7 @@ class VaultBridge(QObject):
 
     @Slot()
     def confirmOpened(self) -> None:  # noqa: N802 - Qt naming, used from QML
-        """Tyler opened this folder in Obsidian once: links to it work from now on."""
+        """The user opened this folder in Obsidian once: links to it work from now on."""
         self._settings.setProperty("obsidianVault", self._path())
 
     @Slot()
