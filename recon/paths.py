@@ -62,6 +62,10 @@ class AppPaths:
         """
         for folder in (self.data, self.config, self.cache):
             ensure_private_dir(folder)
+        # Set on creation *and* checked at launch: older files keep whatever mode they
+        # were made with otherwise (audit F-09).
+        for folder in (self.data, self.config):
+            secure_tree(folder)
 
 
 def _ensure_mode(path: Path, mode: int) -> None:
@@ -85,8 +89,46 @@ def ensure_private_dir(folder: Path) -> None:
     Raises:
         InsecurePermissionsError: The folder is too open and couldn't be locked down.
     """
-    folder.mkdir(mode=PRIVATE_DIR_MODE, parents=True, exist_ok=True)
+    # mkdir(parents=True) applies `mode` to the last folder only; the ones above it
+    # would get the umask's 0755 (audit F-09). Create each missing level ourselves.
+    missing = [p for p in (folder, *folder.parents) if not p.exists()]
+    for level in reversed(missing):
+        level.mkdir(mode=PRIVATE_DIR_MODE, exist_ok=True)
+        _ensure_mode(level, PRIVATE_DIR_MODE)
     _ensure_mode(folder, PRIVATE_DIR_MODE)
+
+
+def secure_tree(root: Path) -> int:
+    """Bring every folder under `root` to 0700 and every file to 0600 (checked at launch).
+
+    Symlinks are left alone, never followed: Recon doesn't make them, and following
+    one could change a file outside its folders.
+
+    Args:
+        root: Recon's data or config folder.
+
+    Returns:
+        How many entries had to be fixed.
+
+    Raises:
+        InsecurePermissionsError: Something is too open and couldn't be locked down.
+    """
+    fixed = 0
+    for folder, dirs, files in root.walk(follow_symlinks=False):
+        for name in dirs:
+            fixed += _fix(folder / name, PRIVATE_DIR_MODE)
+        for name in files:
+            fixed += _fix(folder / name, PRIVATE_FILE_MODE)
+    return fixed
+
+
+def _fix(path: Path, mode: int) -> int:
+    if path.is_symlink():
+        return 0
+    if stat.S_IMODE(path.lstat().st_mode) == mode:
+        return 0
+    _ensure_mode(path, mode)
+    return 1
 
 
 def ensure_private_file(path: Path) -> None:

@@ -27,6 +27,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Every folder Recon creates is private (0700), not just the last one: `backups/` was 0755. Files and folders already there are locked down to 0600/0700 at launch, and Qt's compiled-QML cache now lives in Recon's private cache folder (audit F-09, F-22).
 - The UI thread no longer waits on storage. Reads use their own read-only connection that never waits for a write; "Not a flag, keep it" and settings saves run on workers (audit F-05).
 - Turning panel pinning on and quickly off (or the reverse) can no longer leave the wrong state in KDE: pin and unpin run in order and check the setting when they run (audit F-16).
 - Commands and notes that mention `flag{`, `THM{` or `HTB{` are no longer cut off at that word when saved. Only something that looks like a flag mid-typing is held back (audit F-03, ADR 0005 amended).
