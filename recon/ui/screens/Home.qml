@@ -144,7 +144,7 @@ Item {
                         title: modelData.name
                         detail: modelData.detail
                         trailing: modelData.when
-                        interactive: modelData.canResume
+                        interactive: modelData.canOpen
                         onClicked: HomeModel.resume(modelData.id)
                     }
                 }

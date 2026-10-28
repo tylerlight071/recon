@@ -74,6 +74,7 @@ class HomeBridge(QObject):
     changed = Signal()
     startRequested = Signal()  # noqa: N815 - Qt naming, used from QML
     resumeRequested = Signal(int)  # noqa: N815 - Qt naming, used from QML
+    finishedRequested = Signal(int)  # noqa: N815 - Qt naming; a done room's Finish screen
 
     def __init__(
         self,
@@ -116,6 +117,8 @@ class HomeBridge(QObject):
             "detail": f"{place} · {state}" if place else state,
             "when": ago(room.updated_at, now),
             "canResume": room.status == "capturing",
+            # A done room opens its Finish screen again: export, or back to the room (F-11).
+            "canOpen": room.status in {"capturing", "done"},
         }
 
     def _has_current(self) -> bool:
@@ -162,7 +165,11 @@ class HomeBridge(QObject):
 
     @Slot(int)
     def resume(self, room_id: int) -> None:
-        """Carry on with a recent room that's still being captured."""
+        """Open a recent room: carry on capturing it, or, if it's done, its Finish screen."""
         room = self._rooms.get(room_id)
-        if room is not None and room.status == "capturing":
+        if room is None:
+            return
+        if room.status == "capturing":
             self.resumeRequested.emit(room_id)
+        elif room.status == "done":
+            self.finishedRequested.emit(room_id)

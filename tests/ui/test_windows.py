@@ -1176,7 +1176,16 @@ def test_done_returns_home_where_the_room_is_listed_as_done(running: Running) ->
     room_id = running.rooms.recent(1)[0].id
     row = running.find(running.main, f"recent-{room_id}")
     assert row.property("detail") == "Done"
-    assert row.property("interactive") is False
+
+    # Audit F-11: the done room's row opens its Finish screen again, to export or reopen.
+    assert row.property("interactive") is True
+    QMetaObject.invokeMethod(row, "clicked")
+    assert wait_until(running.panel.isVisible)
+    assert wait_until(lambda: running.find(running.panel, "finishTitle").property("visible"))
+    assert running.find(running.panel, "finishTitle").property("text") == (
+        "DNS in Detail is finished."
+    )
+    assert running.rooms.get(room_id).status == "done"  # type: ignore[union-attr]  # unchanged
 
 
 def test_an_open_focus_menu_closes_when_the_room_finishes(running: Running) -> None:
