@@ -6,7 +6,13 @@ from pathlib import Path
 import pytest
 
 from recon import errors
-from recon.paths import AppPaths, ensure_private_dir, ensure_private_file, private_opener
+from recon.paths import (
+    AppPaths,
+    ensure_private_dir,
+    ensure_private_file,
+    private_opener,
+    secure_tree,
+)
 
 
 def test_xdg_defaults_when_unset(tmp_path: Path) -> None:
@@ -106,3 +112,33 @@ def test_ensure_private_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(Path, "chmod", lambda _self, _mode: None)
     with pytest.raises(errors.InsecurePermissionsError):
         ensure_private_file(path)
+
+
+def test_every_missing_level_is_created_private(tmp_path: Path) -> None:
+    # Audit F-09: mkdir(parents=True) left the levels above the last at 0755.
+    tmp_path.chmod(0o755)
+
+    ensure_private_dir(tmp_path / "a" / "b" / "c")
+
+    for level in (tmp_path / "a", tmp_path / "a" / "b", tmp_path / "a" / "b" / "c"):
+        assert stat.S_IMODE(level.stat().st_mode) == 0o700
+    assert stat.S_IMODE(tmp_path.stat().st_mode) == 0o755  # existing parents aren't touched
+
+
+def test_secure_tree_fixes_what_is_too_open_and_skips_symlinks(tmp_path: Path) -> None:
+    (tmp_path / "sub").mkdir(mode=0o755)
+    loose = tmp_path / "sub" / "notes.db"
+    loose.write_text("x")
+    loose.chmod(0o644)
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.txt"
+    outside.write_text("not Recon's")
+    outside.chmod(0o644)
+    (tmp_path / "link").symlink_to(outside)
+
+    fixed = secure_tree(tmp_path)
+
+    assert fixed == 2
+    assert stat.S_IMODE((tmp_path / "sub").stat().st_mode) == 0o700
+    assert stat.S_IMODE(loose.stat().st_mode) == 0o600
+    assert stat.S_IMODE(outside.stat().st_mode) == 0o644  # never followed
+    assert secure_tree(tmp_path) == 0
