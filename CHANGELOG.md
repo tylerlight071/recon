@@ -27,6 +27,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- In the Markdown export, a line of your notes starting with `<script`, `<style` or `<!--` no longer hides the rest of the note: a leading `<` is escaped, and so is any `<` in a table cell (audit F-08).
 - Commands and notes that mention `flag{`, `THM{` or `HTB{` are no longer cut off at that word when saved. Only something that looks like a flag mid-typing is held back (audit F-03, ADR 0005 amended).
 - A hash typed key by key no longer reaches the database before its last character: timed saves hold back a 20–31 character hex run ending a line (audit F-07).
 - A flag typed into a task title, room name, path or module now disappears as you type, with the "Flag skipped" notice (audit F-14).

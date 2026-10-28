@@ -3,7 +3,8 @@
 Pydantic in, Markdown out, through a Jinja2 template (`templates/export.md.j2`):
 Python decides what each block looks like; the template lays out the note.
 Tyler's text is escaped only where it could break the note's structure: a
-line that would become a heading, quote, code fence, rule or Obsidian comment.
+line that would become a heading, quote, code fence, rule, HTML block or
+Obsidian comment.
 Commands go in a fence longer than any backtick run inside them; tables
 become Markdown tables. Flags are stripped once more on the way out (hard
 rule 2), keeping only the hex strings Tyler marked "Not a flag, keep it".
@@ -31,8 +32,12 @@ LABELS: Final = {
     "room_question": "Room question",
     "voice": "Voice note",
 }
-# A line that Markdown (or Obsidian) would read as structure, not text.
-_STRUCTURE: Final = re.compile(r"^(\s{0,3})(#|>|```|~~~|-{3,}\s*$|={3,}\s*$|\*{3,}\s*$|_{3,}\s*$)")
+# A line that Markdown (or Obsidian) would read as structure, not text. A leading
+# `<` can open an HTML block (`<script`, `<!--`) that hides the rest of the note
+# (audit F-08), so it's escaped too; `\<` shows as a plain `<`.
+_STRUCTURE: Final = re.compile(
+    r"^(\s{0,3})(#|>|<|```|~~~|-{3,}\s*$|={3,}\s*$|\*{3,}\s*$|_{3,}\s*$)"
+)
 _BACKTICKS: Final = re.compile(r"`+")
 
 
@@ -161,7 +166,12 @@ def duration(seconds: int) -> str:
 
 
 def _cell(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("|", "\\|").replace("%%", "\\%\\%")
+    return (
+        text.replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("%%", "\\%\\%")
+        .replace("<", "\\<")  # no HTML from a cell either (audit F-08)
+    )
 
 
 def _clean(text: str, kept: tuple[str, ...]) -> str:
