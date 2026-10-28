@@ -110,7 +110,9 @@ def main(out: Path) -> list[str]:
         app = (
             existing if isinstance(existing, QGuiApplication) else create_application(sys.argv[:1])
         )
-        bridges, _pinning = create_bridges(app, paths, Settings(kwin_pinning="off"), db)
+        # A throwaway vault too: start-up creates the vault (task 2.1).
+        initial = Settings(kwin_pinning="off", vault_path=str(Path(scratch) / "vault"))
+        bridges, _pinning = create_bridges(app, paths, initial, db)
         qml = create_engine(bridges)
         main_window, panel = (
             (root_window(qml.engine, 0), root_window(qml.engine, 1))

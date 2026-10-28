@@ -29,6 +29,7 @@ def _launch(tmp_path: Path) -> subprocess.CompletedProcess[str]:
         "XDG_DATA_HOME": str(tmp_path / "data"),
         "XDG_CONFIG_HOME": str(tmp_path / "config"),
         "XDG_CACHE_HOME": str(tmp_path / "cache"),
+        "HOME": str(tmp_path / "home"),  # start-up creates ~/Cyber Vault (task 2.1)
         "QT_QPA_PLATFORM": "offscreen",
         "QT_QUICK_BACKEND": "software",
     }

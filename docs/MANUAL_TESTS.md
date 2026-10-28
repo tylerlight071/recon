@@ -17,3 +17,8 @@ Launch Recon the way it will really be used: from the KDE app menu (`uv run pyth
 - [ ] Finish the room and press "Export as Markdown". Check the folder picker is KDE's own, then open the file in Obsidian. Is anything missing or odd (including a line that starts with `%%` or `<`)?
 - [ ] Press Done, then click the room on Home: its Finish screen comes back, and "Back to the room" reopens it at the last task.
 - [ ] Anything that felt fiddly, slow, cluttered or unclear:
+
+## Phase 2: processing and review (in progress)
+
+- [ ] On first launch, `~/Cyber Vault` appears with its folders, `Home.md` and `Bases/`. Home in Recon shows "Open your vault in Obsidian, once": press Copy path, open the folder in Obsidian ("Open folder as vault"), then press "I've done that". The card goes and doesn't come back.
+- [ ] In Obsidian, `Home.md` shows the three dashboards (empty until rooms are applied), and Settings → Files and links shows wikilinks on, "Automatically update internal links" on, and new attachments in `Attachments`.

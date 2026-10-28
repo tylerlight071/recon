@@ -118,6 +118,67 @@ Item {
                 }
             }
 
+            // One-time: Obsidian only opens vaults it knows (task 2.1). Quiet buttons only;
+            // the screen's one accent button stays "Start a room" / "Carry on".
+            Card {
+                objectName: "obsidianStep"
+                width: parent.width
+                title: qsTr("Open your vault in Obsidian")
+                visible: Vault.needsObsidian || Vault.problem !== ""
+
+                Column {
+                    width: parent.width
+                    spacing: Theme.space2
+
+                    Text {
+                        text: Vault.problem !== "" ? qsTr("Your vault") : qsTr("Open your vault in Obsidian, once")
+                        font.family: Theme.fontUi
+                        font.pixelSize: Theme.fontSizeBody
+                        font.weight: Theme.weightMedium
+                        color: Theme.textPrimary
+                    }
+
+                    Text {
+                        objectName: "obsidianStepText"
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: Vault.problem !== ""
+                              ? Vault.problem
+                              : qsTr("Recon keeps your notes in %1. In Obsidian, choose \"Open folder as vault\" and pick that folder. Then Recon can open notes there for you.").arg(Vault.shown)
+                        font.family: Theme.fontUi
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.textSecondary
+                    }
+
+                    Row {
+                        spacing: Theme.space2
+                        visible: Vault.problem === ""
+
+                        Button {
+                            objectName: "copyVaultPath"
+                            variant: "secondary"
+                            text: qsTr("Copy path")
+                            onClicked: Vault.copyPath()
+                        }
+
+                        Button {
+                            objectName: "obsidianDone"
+                            variant: "quiet"
+                            text: qsTr("I've done that")
+                            onClicked: Vault.confirmOpened()
+                        }
+                    }
+
+                    Button {
+                        objectName: "vaultSettings"
+                        visible: Vault.problem !== ""
+                        variant: "quiet"
+                        text: qsTr("Open Settings")
+                        onClicked: Navigation.open("settings")
+                    }
+                }
+            }
+
             Column {
                 objectName: "recentRooms"
                 width: parent.width

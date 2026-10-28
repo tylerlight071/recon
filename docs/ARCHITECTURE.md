@@ -147,6 +147,16 @@ The room, its tasks' time and the export all go through one serial worker (`room
 
 New components: `Toggle` (a switch with its label) and `Slider`. `Choice` gains an optional colour swatch.
 
+## Vault (task 2.1)
+
+`engine/vault.bootstrap` creates or completes the vault Recon owns (`~/Cyber Vault` unless Settings says otherwise):
+- the folders from SPEC.md;
+- `Home.md`, a Bases dashboard, from `templates/vault/home.md.j2`;
+- three `.base` files in `Bases/`;
+- Obsidian's `.obsidian/app.json` (wikilinks, automatically update links, attachments in `Attachments/`).
+
+It never replaces a file, and `app.json` only gains missing keys. `bridge/vault.py` (`Vault`) runs it on the room worker at launch and whenever the vault setting changes. Until Tyler confirms he's opened the folder in Obsidian once (stored as `obsidian_vault`), Home shows a one-time card with Copy path and "I've done that", and `canOpenInObsidian` stays false. This is scaffolding, not room output, so hard rule 3 still holds: [ADR 0006](adr/0006-vault-bootstrap.md).
+
 ## Undo
 
 Ctrl+Z / Ctrl+Shift+Z undo and redo within the task on screen.

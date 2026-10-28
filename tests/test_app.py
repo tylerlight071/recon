@@ -30,6 +30,7 @@ from tests.ui.qml_harness import wait
 def private_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     for var in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
         monkeypatch.setenv(var, str(tmp_path / var.lower()))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))  # the vault goes in ~ (task 2.1)
     yield tmp_path
     for handler in list(logging.getLogger("recon").handlers):
         logging.getLogger("recon").removeHandler(handler)

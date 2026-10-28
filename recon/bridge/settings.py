@@ -30,6 +30,7 @@ class SettingsBridge(QObject):
     accentChanged = Signal()  # noqa: N815 - Qt naming, used from QML
     reduceMotionChanged = Signal()  # noqa: N815 - Qt naming, used from QML
     vaultPathChanged = Signal()  # noqa: N815 - Qt naming, used from QML
+    obsidianVaultChanged = Signal()  # noqa: N815 - Qt naming, used from QML
 
     def __init__(
         self,
@@ -153,6 +154,17 @@ class SettingsBridge(QObject):
     vaultUrl = Property(str, _get_vault_url, notify=vaultPathChanged)  # noqa: N815
     vaultShown = Property(str, _get_vault_shown, notify=vaultPathChanged)  # noqa: N815
     """The vault folder as Tyler would say it (~/Cyber Vault)."""
+
+    def _get_obsidian_vault(self) -> str:
+        return self._settings.obsidian_vault
+
+    def _set_obsidian_vault(self, folder: str) -> None:
+        self._change("obsidian_vault", folder, self.obsidianVaultChanged)
+
+    obsidianVault = Property(  # noqa: N815 - Qt naming, used from QML
+        str, _get_obsidian_vault, _set_obsidian_vault, notify=obsidianVaultChanged
+    )
+    """The vault Tyler confirmed he opened in Obsidian (task 2.1)."""
 
     @Slot(str)
     def chooseVault(self, folder_url: str) -> None:  # noqa: N802 - Qt naming, used from QML
