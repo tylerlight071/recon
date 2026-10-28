@@ -596,3 +596,67 @@ def test_flags_never_reach_the_vault(places: tuple[Path, Path, Path]) -> None:
 
     for path, data in _snapshot(vault).items():
         assert find_flags(data.decode(), unfinished=True) == [], path
+
+
+# ---- Restore from History (task 2.8) ----------------------------------------------------------
+
+
+def test_restore_puts_back_what_a_run_replaced_and_can_be_undone(
+    places: tuple[Path, Path, Path],
+) -> None:
+    from recon.engine.stage import restore  # noqa: PLC0415
+
+    vault, run, backups = places
+    (vault / "02 Concepts").mkdir()
+    old = "%% recon:start definition %%\nmine before\n%% recon:end %%\n"
+    (vault / CONCEPT).write_text(old)
+    stage(_rendered(), vault, run, room_id=1)
+    apply(run, vault, backups)
+    applied = (vault / CONCEPT).read_text()
+    created = vault / "02 Concepts/Decimal.md"
+    assert created.exists()
+
+    assert restore(backups / RUN, vault, backups / "20261028T130000-ef") == 1
+
+    assert (vault / CONCEPT).read_text() == old
+    assert (backups / "20261028T130000-ef" / CONCEPT).read_text() == applied
+    assert created.exists()  # notes the run created stay
+    assert restore(backups / "20261028T130000-ef", vault, backups / "20261028T140000-01") == 1
+    assert (vault / CONCEPT).read_text() == applied  # undone
+
+
+def test_restore_never_touches_raw_notes_or_follows_links(
+    places: tuple[Path, Path, Path],
+) -> None:
+    from recon.engine.stage import restore  # noqa: PLC0415
+
+    vault, _run, backups = places
+    backup = backups / RUN
+    (backup / "00 Raw notes").mkdir(parents=True)
+    (backup / RAW).write_text("not mine to put back")
+    outside = vault.parent / "outside.md"
+    outside.write_text("secret")
+    (backup / "link.md").symlink_to(outside)
+    (vault / "00 Raw notes").mkdir()
+    (vault / RAW).write_text("as typed")
+    # Real backups after the skipped ones: skipping must carry on, and count each.
+    (backup / "02 Concepts").mkdir()
+    (backup / CONCEPT).write_text("binary before")
+    (backup / "02 Concepts" / "Hex.md").write_text("hex before")
+
+    assert restore(backup, vault, backups / "new") == 2
+    assert (vault / RAW).read_text() == "as typed"
+    assert not (vault / "link.md").exists()
+    assert (vault / CONCEPT).read_text() == "binary before"
+    assert (vault / "02 Concepts" / "Hex.md").read_text() == "hex before"
+
+
+def test_restore_without_a_backup_changes_nothing(places: tuple[Path, Path, Path]) -> None:
+    from recon.engine.stage import restore  # noqa: PLC0415
+    from recon.errors import BackupMissingError  # noqa: PLC0415
+
+    vault, _run, backups = places
+
+    with pytest.raises(BackupMissingError):
+        restore(backups / "gone", vault, backups / "new")
+    assert _snapshot(vault) == {}

@@ -193,3 +193,24 @@ def test_requeue_discards_and_queues_the_room_again(tmp_path: Path, db: Database
     assert RoomRepository(db).get(room).status == "queued"  # type: ignore[union-attr]  # exists
     assert processing.records.get(run.run_id).status == "discarded"  # type: ignore[union-attr]  # exists
     assert processing.review(room) is None
+
+
+def test_restore_run_puts_back_the_replaced_versions(tmp_path: Path, db: Database) -> None:
+    from recon.errors import BackupMissingError  # noqa: PLC0415
+
+    processing = _processing(tmp_path, db)
+    room = _room(db)
+    concept = processing.vault / "02 Concepts" / "Binary.md"
+    concept.parent.mkdir(parents=True)
+    concept.write_text("%% recon:start definition %%\nmine\n%% recon:end %%\n")
+    run = processing.runs.start()
+    processing.stage_room(room, _rendered(), run)
+    processing.apply_run(run.run_id)
+
+    restore = processing.restore_run(run.run_id)
+
+    assert concept.read_text() == "%% recon:start definition %%\nmine\n%% recon:end %%\n"
+    assert (restore.restored_from, restore.written) == (run.run_id, 1)
+    assert processing.records.history()[0].run.id == restore.id
+    with pytest.raises(BackupMissingError):
+        processing.restore_run("20200101T000000-00")

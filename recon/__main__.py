@@ -32,6 +32,7 @@ from recon.bridge.flow import (
 )
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
+from recon.bridge.library import LibraryBridge
 from recon.bridge.models import ModelsBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
@@ -360,6 +361,15 @@ def _room_bridges(
         submit=room_worker,
         parent=app,
     )
+    library = LibraryBridge(
+        lambda: (rooms.in_vault(), RunRepository(db).history()),
+        lambda run: processing_for(paths, settings.settings, db).restore_run(run),
+        lambda: vault_folder(settings.settings, Path.home(), paths.data),
+        open_in_obsidian,
+        submit=room_worker,
+        parent=app,
+    )
+    review.applied.connect(lambda _room, _written: library.refresh())
     connect_room_flow(navigation, home, start, session, focus)
     connect_finish(navigation, home, session, focus, finish)
     connect_processing(navigation, home, finish, processing, review)
@@ -381,6 +391,7 @@ def _room_bridges(
         "Processing": processing,
         "ReviewModel": review,
         "DoneModel": done,
+        "LibraryModel": library,
     }
 
 

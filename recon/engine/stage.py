@@ -33,8 +33,8 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from recon.engine.notes import RAW_SUFFIX, NoteKind, Rendered, RenderedNote
-from recon.errors import ApplyConflict, StagingDamagedError, UnsafePathError
+from recon.engine.notes import RAW_FOLDER, RAW_SUFFIX, NoteKind, Rendered, RenderedNote
+from recon.errors import ApplyConflict, BackupMissingError, StagingDamagedError, UnsafePathError
 from recon.fs import atomic_create_text, atomic_write_bytes, atomic_write_text
 from recon.paths import ensure_private_dir
 
@@ -362,6 +362,42 @@ def discard(run_folder: Path) -> None:
         staged.unlink()
     elif staged.exists():
         shutil.rmtree(staged)
+
+
+def restore(backup: Path, vault: Path, before: Path) -> int:
+    """Put a run's backed-up files back into the vault; returns how many.
+
+    Every file it replaces is copied to `before` first (hard rule 6), so the
+    restore itself can be undone by restoring `before`. Raw notes are never
+    touched (hard rule 4), and symlinks in the backup are ignored.
+
+    Args:
+        backup: `backups/<run id>/`, as Apply wrote it.
+        vault: The vault folder.
+        before: Where the current versions go (`backups/<new run id>/`).
+
+    Raises:
+        BackupMissingError: The backup folder isn't there.
+        UnsafePathError: A path would land outside the vault.
+    """
+    if not backup.is_dir() or backup.is_symlink():
+        raise BackupMissingError
+    restored = 0
+    for source in sorted(backup.rglob("*")):
+        if source.is_symlink() or not source.is_file():
+            continue
+        relative = PurePosixPath(source.relative_to(backup).as_posix())
+        if relative.parts[0] == RAW_FOLDER:
+            continue
+        target = inside(vault, relative)
+        if target.is_file():
+            copy = inside(before, relative)
+            ensure_private_dir(copy.parent)
+            atomic_write_bytes(copy, target.read_bytes())
+        ensure_private_dir(target.parent)
+        atomic_write_bytes(target, source.read_bytes())
+        restored += 1
+    return restored
 
 
 def prune_backups(backups: Path, keep: int = KEEP_BACKUPS) -> int:

@@ -178,3 +178,11 @@ class StagingDamagedError(ReconError):
         "This review's prepared notes are missing or changed, so nothing was written. "
         "Finish the room again to prepare them afresh."
     )
+
+
+class BackupMissingError(ReconError):
+    """A run's backup isn't kept any more (only the newest 20 are)."""
+
+    user_message = (
+        "That backup isn't kept any more: Recon keeps the newest 20. Nothing was changed."
+    )

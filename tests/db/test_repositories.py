@@ -171,3 +171,16 @@ def test_text_is_stored_as_typed(
     assert stored is not None
     assert stored.content.text == tricky
     assert rooms.get(task.room_id) is not None
+
+
+def test_rooms_in_the_vault_are_done_rooms_newest_first(db: Database) -> None:
+    clock = FakeClock()
+    rooms = RoomRepository(db, clock)
+    first = rooms.create(NewRoom(name="First", task_count=1))
+    rooms.create(NewRoom(name="Still capturing", task_count=1))
+    rooms.update_progress(first.id, status="done")
+    clock.advance(60)
+    second = rooms.create(NewRoom(name="Second", task_count=1))
+    rooms.update_progress(second.id, status="done")
+
+    assert [r.name for r in rooms.in_vault()] == ["Second", "First"]

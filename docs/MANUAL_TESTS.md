@@ -35,3 +35,4 @@ Launch Recon the way it will really be used: from the KDE app menu (`uv run pyth
 - [ ] Apply: a toast says how many notes were written, and they're in the vault.
 - [ ] Apply a room: the done screen shows how many notes were written and the room's place in its path. Press "Open in Obsidian": the room note opens in Obsidian. If it doesn't, "Didn't open?" brings back the one-time vault step.
 - [ ] From Home, open a room that's already done: its done screen opens (without the count).
+- [ ] Library: your applied rooms are listed with path and date, and "Open in Obsidian" opens each one. Open History, press Restore on a run that replaced notes: the toast says what was restored, the notes in Obsidian are as they were before that run, and Undo puts them back.

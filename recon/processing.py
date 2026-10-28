@@ -16,6 +16,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+from recon.db.models import Run
 from recon.db.repositories import RoomRepository
 from recon.db.runs import RunRepository
 from recon.engine.notes import Rendered
@@ -30,9 +31,10 @@ from recon.engine.stage import (
     load_manifest,
     prune_backups,
     recover,
+    restore,
     stage,
 )
-from recon.errors import ReconError
+from recon.errors import BackupMissingError, ReconError
 from recon.logging_setup import Safe
 from recon.services.runs import RunLog, RunStore
 
@@ -140,6 +142,31 @@ class Processing:
         self.rooms.update_progress(manifest.room_id, status="queued")
         _log.info("run %s discarded to process again", Safe(run_id))
         return manifest.room_id
+
+    def restore_run(self, run_id: str) -> Run:
+        """Put back the files a run overwrote, as they were before it (Library > History).
+
+        The current versions are backed up first, under a new run that History
+        lists as a restore, so restoring that one undoes this.
+
+        Raises:
+            BackupMissingError: The run has no backup any more (only the newest 20 are kept).
+        """
+        original = self.records.get(run_id)
+        if original is None:
+            raise BackupMissingError
+        new_id = self.runs.start().run_id
+        files = restore(self.backups / run_id, self.vault, self.backups / new_id)
+        record = self.records.restored(new_id, original.room_id, run_id, files)
+        pruned = prune_backups(self.backups)
+        _log.info(
+            "run %s restored as %s: %s files, %s old backups pruned",
+            Safe(run_id),
+            Safe(new_id),
+            files,
+            pruned,
+        )
+        return record
 
     def recover_runs(self) -> int:
         """Finish every Apply a crash interrupted; returns how many were finished."""

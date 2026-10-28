@@ -22,6 +22,7 @@ from PySide6.QtQuick import QQuickWindow
 
 from recon.__main__ import create_bridges, open_database, processing_for
 from recon.app import create_application, create_engine, load_windows, root_window
+from recon.bridge.library import LibraryBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.review import ReviewBridge
 from recon.bridge.session import RoomSessionBridge
@@ -121,6 +122,24 @@ def stage_review(paths: AppPaths, settings: Settings, db: Database, room_id: int
     processing.stage_room(room_id, render_room(capture, check(invented, capture)), run)
 
 
+def grab_after_finishing(
+    bridges: dict[str, QObject], main_window: QQuickWindow, out: Path, room_id: int
+) -> None:
+    """The review, done and Library screens for a staged room (Apply goes to the scratch vault)."""
+    navigation = typed(bridges, "Navigation", NavigationBridge)
+    review = typed(bridges, "ReviewModel", ReviewBridge)
+    review.open(room_id)
+    wait_for(lambda: navigation.property("currentScreen") == "review")
+    grab(main_window, out, "review")
+    review.apply()
+    wait_for(lambda: navigation.property("currentScreen") == "done")
+    grab(main_window, out, "done")
+    navigation.open("library")
+    library = typed(bridges, "LibraryModel", LibraryBridge)
+    wait_for(lambda: len(library.property("history")) > 0)
+    grab(main_window, out, "library")
+
+
 def wait_for(condition: Callable[[], bool], timeout_ms: int = 3000) -> None:
     """Process events until `condition` holds (the review loads on a worker)."""
     timer = QElapsedTimer()
@@ -184,13 +203,7 @@ def main(out: Path) -> list[str]:
         grab(main_window, out, "settings-cyan")
         settings.setProperty("accent", "violet")
         stage_review(paths, initial, db, room_id)
-        review = typed(bridges, "ReviewModel", ReviewBridge)
-        review.open(room_id)
-        wait_for(lambda: navigation.property("currentScreen") == "review")
-        grab(main_window, out, "review")
-        review.apply()  # into the scratch vault
-        wait_for(lambda: navigation.property("currentScreen") == "done")
-        grab(main_window, out, "done")
+        grab_after_finishing(bridges, main_window, out, room_id)
         session.finishRequested.emit(room_id)
         grab(panel, out, "panel-finish")
 

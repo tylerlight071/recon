@@ -167,7 +167,7 @@ Rendering uses only these fields plus the user's original blocks.
 - [x] **2.5 Background processing.** Finish queues the room; a worker runs the pipeline; the panel shows plain-English progress; a desktop notification ("DNS in Detail is ready to review") with an action that opens the review screen. The user can keep using the app meanwhile.
 - [x] **2.6 Review screen.** Full window, sections with counts (Room note rendered as Markdown, New notes, Additions, Links, Flags), collapsible; sticky footer with Apply (primary) and Discard; Discard asks once.
 - [x] **2.7 Finish flow.** Replace the Phase 1 temporary Finish with: Finish → (quiz placeholder) → queued → review → Apply → done screen with "Open in Obsidian" (via `obsidian://open?vault=…&file=…`).
-- [ ] **2.8 Library (first pass).** Rooms list with path and date; open a room's note in Obsidian; History of runs with one-click restore from backup.
+- [x] **2.8 Library (first pass).** Rooms list with path and date; open a room's note in Obsidian; History of runs with one-click restore from backup.
 - [ ] **2.9 Model bake-off.** Run the three fixture rooms plus three real rooms through `qwen3.5:9b` and `gemma4:12b`. Score: schema failures, concepts missed (against a hand list), invented content, time taken. Write results to `docs/bakeoff.md`; recommend one; the user picks.
 
 ### Acceptance

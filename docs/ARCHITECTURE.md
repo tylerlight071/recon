@@ -2,7 +2,7 @@
 
 How Recon is put together. Behaviour is defined in [`SPEC.md`](SPEC.md); conventions in [`../CLAUDE.md`](../CLAUDE.md). This file is kept current in the same pull request as any change it describes.
 
-**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, pipeline steps 1, 3 and 6 (parse, extract and render), staging, Apply, Discard and backups, background processing with notifications, the review screen, and the finish flow with its done screen. `revision/` and the processing pipeline are still empty.
+**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, pipeline steps 1, 3 and 6 (parse, extract and render), staging, Apply, Discard and backups, background processing with notifications, the review screen, the finish flow with its done screen, and the Library's first pass. `revision/` and the processing pipeline are still empty.
 
 ## Layers
 
@@ -240,6 +240,14 @@ Finishing a room queues it (`Finish.processRequested` sets the room to `queued`)
 - **`screens/Done.qml` (`DoneModel`, `bridge/done.py`)** shows a completion tick, the room and how many notes were written, and the room's place in its path (`RoomRepository.done_in_path`). Its one accent button is "Open in Obsidian". Until the vault has been opened in Obsidian once, the screen shows that one-time step instead, and "Didn't open?" brings it back (`Vault.forgetOpened`). Home opens it for rooms already in the vault.
 - **`services/open_url.open_in_obsidian(note)`** opens `obsidian://open?path=<absolute path, fully percent-encoded>`, and only for an existing `.md` file. `engine/notes.room_note_path` gives the room note's place in the vault, the same as render uses.
 - **After Apply**, the panel's Finish screen is put away and processing forgets the room (`Processing.forget`).
+
+## Library (task 2.8, first pass)
+
+`screens/Library.qml` (sidebar entry), bound to `LibraryModel` (`bridge/library.py`). [ADR 0012](adr/0012-restore-from-history.md) records the restore design.
+
+- **Rooms:** `RoomRepository.in_vault()` lists rooms with their path, module and date. "Open in Obsidian" uses `room_note_path` and `open_in_obsidian`, shown once Obsidian knows the vault.
+- **History:** `RunRepository.history()` lists applied runs and restores, newest first, in a collapsed `Disclosure`.
+- **Restore** calls `Processing.restore_run`, which runs `engine/stage.restore`. That copies `backups/<run>/` back into the vault, after copying each current version to `backups/<new run>/`. The restore is recorded as a run with `restored_from` (migration 0005), so the toast's Undo restores the restore. Raw notes and symlinks are skipped, and notes a run created stay.
 
 ## Undo
 

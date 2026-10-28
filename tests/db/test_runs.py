@@ -47,3 +47,26 @@ def test_discarded_runs_and_newest_first(db: Database) -> None:
     assert runs.for_room(room)[1].status == "discarded"
     assert runs.get("nope") is None
     assert [r.id for r in runs.staged()] == [second.id]
+
+
+def test_history_lists_applied_runs_and_restores_newest_first(db: Database) -> None:
+    clock = FakeClock()
+    runs = RunRepository(db, clock)
+    room = _room(db)
+    staged = runs.start("20261025T090000-aa", room)
+    applied = runs.start("20261025T090100-bb", room)
+    clock.advance(60)
+    runs.applied(applied.id, written=5, backed_up=2)
+    clock.advance(60)
+
+    restore = runs.restored("20261025T090300-cc", room, applied.id, files=2)
+
+    history = runs.history()
+    assert [(e.run.id, e.room_name) for e in history] == [
+        (restore.id, "DNS in Detail"),
+        (applied.id, "DNS in Detail"),
+    ]
+    assert (restore.status, restore.written, restore.backed_up) == ("applied", 2, 2)
+    assert restore.restored_from == applied.id
+    assert staged.id not in {e.run.id for e in history}
+    assert len(runs.history(limit=1)) == 1

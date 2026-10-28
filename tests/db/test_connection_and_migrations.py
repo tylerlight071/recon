@@ -17,7 +17,7 @@ TABLES = {
 """sqlite_sequence is SQLite's own counter table, there since blocks became AUTOINCREMENT (0003)."""
 
 
-LATEST = 4
+LATEST = 5
 
 
 def _pragma(db: Database, name: str) -> object:
@@ -290,4 +290,31 @@ def test_0004_adds_runs_to_a_version_3_database_with_rooms(data_dir: Path, tmp_p
     ):
         with pytest.raises(StorageError), db.transaction() as conn:
             conn.execute(bad)
+    db.close()
+
+
+def test_0005_adds_restored_from_to_runs_with_data(data_dir: Path, tmp_path: Path) -> None:
+    folder = tmp_path / "v4"
+    folder.mkdir()
+    for path in sorted(MIGRATIONS_DIR.glob("000[1-4]_*.sql")):
+        shutil.copy(path, folder / path.name)
+    db = Database.open(data_dir / "app.db")
+    migrate(db, folder)
+    with db.transaction() as conn:
+        conn.execute(
+            "INSERT INTO rooms (platform, path, module, name, task_count, mode, status,"
+            " created_at, updated_at) VALUES ('TryHackMe', '', '', 'Old', 1, 'new', 'done',"
+            " '2026-10-01T09:00:00+00:00', '2026-10-01T09:00:00+00:00')"
+        )
+        conn.execute(
+            "INSERT INTO runs (id, room_id, status, created_at, written)"
+            " VALUES ('r1', 1, 'applied', '2026-10-01T09:00:00+00:00', 4)"
+        )
+
+    assert migrate(db) == LATEST
+
+    with db.read() as conn:
+        assert conn.execute("SELECT written, restored_from FROM runs").fetchone() == (4, None)
+    with pytest.raises(StorageError), db.transaction() as conn:
+        conn.execute("UPDATE runs SET restored_from = ''")
     db.close()
