@@ -38,7 +38,7 @@ from recon.db.repositories import (
 )
 from recon.errors import StorageError
 from recon.logging_setup import configure_logging
-from recon.paths import AppPaths
+from recon.paths import AppPaths, ensure_private_dir
 from recon.services.chime import Chime
 from recon.services.kwin import KWinPinning, run_command
 from recon.services.open_url import open_folder
@@ -67,6 +67,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(sys.argv[1:] if argv is None else list(argv))
     paths = AppPaths.from_environ(dict(os.environ), Path.home())
     paths.ensure()
+    # Qt's compiled-QML cache goes in Recon's private cache, not ~/.cache/Recon (audit F-22).
+    ensure_private_dir(paths.cache / "qmlcache")
+    os.environ["QML_DISK_CACHE_PATH"] = str(paths.cache / "qmlcache")
     configure_logging(paths.log_file)
     settings, problem = load_settings(paths.settings_file)
     if problem is not None:
