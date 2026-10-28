@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Final, Literal
 
 import tomli_w
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from recon.errors import ConfigError
 from recon.fs import atomic_write_text
@@ -19,6 +19,9 @@ It must match the `.desktop` file name, `QGuiApplication.setDesktopFileName`,
 the GlobalShortcuts portal `Registry.Register` call and the KWin window rule.
 Changing it breaks all four, so treat it as permanent.
 """
+
+REPO: Final = Path(__file__).resolve().parent.parent
+"""This checkout: no vault may live inside it (it could end up committed)."""
 
 APP_NAME: Final = "Recon"
 """Name shown to Tyler in window titles and notifications."""
@@ -53,15 +56,45 @@ class Settings(BaseModel):
     export_folder: str = ""
     """Where the last Markdown export went ("" until the first one)."""
     vault_path: str = ""
-    """The vault folder; "" means ~/Cyber Vault."""
+    """The vault folder; "" means ~/Cyber Vault. Always absolute (see `_vault_path`)."""
+
+    @field_validator("vault_path")
+    @classmethod
+    def _vault_path(cls, value: str) -> str:
+        # Hand-edited settings.toml (audit F-20): "~/Cyber Vault" or "Vault" would
+        # resolve against the launcher's working folder, the git checkout. Expand ~,
+        # and fall back to the default for anything relative or inside the checkout.
+        if not value:
+            return ""
+        path = Path(value).expanduser()
+        if not path.is_absolute() or _inside(path, REPO):
+            _log.warning("vault path ignored: not absolute, or inside recon's own folder")
+            return ""
+        return str(path)
+
     accent: Accent = "violet"
     reduce_motion: bool = False
     """Make every animation instant (Theme.reduceMotion)."""
 
 
-def vault_folder(settings: Settings, home: Path) -> Path:
-    """Where the vault lives: the chosen folder, or ~/Cyber Vault."""
-    return Path(settings.vault_path) if settings.vault_path else home / VAULT_DEFAULT
+def vault_folder(settings: Settings, home: Path, data: Path | None = None) -> Path:
+    """Where the vault lives: the chosen folder, or ~/Cyber Vault.
+
+    A chosen folder inside Recon's own data folder isn't used (audit F-20).
+    """
+    default = home / VAULT_DEFAULT
+    if not settings.vault_path:
+        return default
+    chosen = Path(settings.vault_path)
+    if data is not None and _inside(chosen, data):
+        _log.warning("vault path ignored: inside recon's data folder")
+        return default
+    return chosen
+
+
+def _inside(path: Path, folder: Path) -> bool:
+    resolved, root = path.resolve(strict=False), folder.resolve(strict=False)
+    return resolved == root or root in resolved.parents
 
 
 def clamp_panel_width(width: float) -> int:

@@ -213,3 +213,24 @@ def test_failed_snapshot_raises_and_leaves_nothing(
         backup.snapshot_if_due(db, folder, date(2026, 10, 25))
 
     assert list(folder.iterdir()) == []
+
+
+def test_a_failing_save_is_reported_once_and_recovery_too(recorder: Recorder) -> None:
+    # Audit F-17: on_error used to fire on every retry of every block.
+    errors: list[Exception] = []
+    recovered: list[bool] = []
+    recorder.fail_next = 2  # both blocks fail once, then retry and save
+    q = AutosaveQueue(
+        recorder,
+        delay_s=0.01,
+        on_error=errors.append,
+        on_recovered=lambda: recovered.append(True),
+    )
+    q.put(1, BlockContent(text="a"))
+    q.put(2, BlockContent(text="b"))
+
+    assert _wait(lambda: len(recorder.saved) == 2, timeout=10)
+    q.close()
+
+    assert len(errors) == 1
+    assert recovered == [True]

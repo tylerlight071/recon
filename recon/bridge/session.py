@@ -82,6 +82,8 @@ class RoomSessionBridge(QObject):
     finishRequested = Signal(int)  # noqa: N815 - Qt naming; the room ID (Finish, task 1.13)
     failed = Signal(str)
     """Something couldn't be saved: a calm message for a toast."""
+    saveRecovered = Signal()  # noqa: N815 - Qt naming, used from QML
+    """Autosave works again after failing: a quiet "Saved again"."""
     activity = Signal()
     """Tyler did something in the session (the timer counts while he's here)."""
     blockDeleted = Signal(int)  # noqa: N815 - Qt naming, used from QML

@@ -27,6 +27,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- A finished room's row on Home opens its Finish screen again, so it can still be exported or reopened after "Done", a quit or a crash (audit F-11).
+- Tab moves between blocks and controls instead of typing a tab; Table blocks keep their tabs, and Ctrl+Tab leaves them (audit F-13).
+- When saving fails, one calm notice says Recon keeps trying (not a new one every second), and "Saved again." appears when it works (audit F-17).
+- A vault path typed into `settings.toml` as `~/…` is expanded, and a relative path, or one inside Recon's checkout or data folder, falls back to `~/Cyber Vault` (audit F-20).
+- A notice that arrives while the delete toast shows its Undo waits its turn instead of taking the Undo away (audit F-21).
+- The app-menu installer escapes `%` in paths and won't replace a desktop entry it didn't write without `--force` (audit F-23).
+- README, ARCHITECTURE and the threat model match the code again (audit F-24).
 - Opening Recon while it's already open no longer starts a second copy that could overwrite your edits: it says "Recon is already open" and stops (audit F-10).
 - If Recon can't start (a database from a newer Recon, a database it can't open, folders it can't set up), it says why in a small window, not only in a terminal you can't see from the app menu, and the copy names the real cause (audit F-12).
 - In the Markdown export, a line of your notes starting with `<script`, `<style` or `<!--` no longer hides the rest of the note: a leading `<` is escaped, and so is any `<` in a table cell (audit F-08).

@@ -11,6 +11,7 @@ from recon.config import (
     PANEL_WIDTH_DEFAULT,
     PANEL_WIDTH_MAX,
     PANEL_WIDTH_MIN,
+    REPO,
     Settings,
     clamp_panel_width,
     load_settings,
@@ -111,3 +112,32 @@ def test_unknown_accent_falls_back_to_defaults(tmp_path: Path) -> None:
 
     assert settings == Settings()
     assert problem is not None
+
+
+@pytest.mark.parametrize(
+    ("given", "stored"),
+    [
+        ("/data/vaults/Cyber", "/data/vaults/Cyber"),
+        ("", ""),
+        ("Vault", ""),  # relative: would land in the working folder
+        ("./notes", ""),
+        (str(REPO / "vault"), ""),  # inside the checkout: could be committed
+    ],
+)
+def test_vault_paths_must_be_absolute_and_outside_the_checkout(given: str, stored: str) -> None:
+    # Audit F-20.
+    assert Settings(vault_path=given).vault_path == stored
+
+
+def test_a_tilde_vault_path_is_expanded(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert Settings(vault_path="~/Cyber Vault").vault_path == str(tmp_path / "Cyber Vault")
+
+
+def test_a_vault_inside_the_data_folder_is_not_used(tmp_path: Path) -> None:
+    data = tmp_path / "data" / "recon"
+    settings = Settings(vault_path=str(data / "vault"))
+
+    assert vault_folder(settings, tmp_path, data) == tmp_path / "Cyber Vault"
+    assert vault_folder(settings, tmp_path) == data / "vault"

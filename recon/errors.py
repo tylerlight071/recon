@@ -127,3 +127,12 @@ class AlreadyRunningError(ReconError):
     """Another copy of Recon is open on this profile."""
 
     user_message = "Recon is already open. Look for its window in the taskbar."
+
+
+class AutosaveFailedError(StorageError):
+    """Autosave can't write right now; it keeps retrying by itself."""
+
+    user_message = (
+        "Couldn't save your notes just now. Recon keeps trying by itself; "
+        "check there's free disk space. Nothing you've typed is lost while Recon is open."
+    )

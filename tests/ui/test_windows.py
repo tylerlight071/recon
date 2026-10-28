@@ -1326,3 +1326,48 @@ def test_a_flag_in_a_start_field_vanishes_with_a_notice(running: Running) -> Non
     assert name.property("text") == "Crack "
     toast = running.find(running.main, "toast")
     assert wait_until(lambda: toast.property("shown") is True)
+
+
+# Audit Lows: F-13 Tab, F-21 notices ------------------------------------------------------
+
+
+def test_tab_moves_between_blocks_and_tables_keep_their_tabs(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    table = _add(running, "table")
+    first, table = _blocks(running)
+    key_editor, table_editor = _in(first, "editor"), _in(table, "editor")
+    key_editor.forceActiveFocus()
+    running.panel.requestActivate()
+
+    QTest.keyClick(running.panel, Qt.Key.Key_Tab)
+    wait(20)
+    assert key_editor.property("text") == ""
+    assert key_editor.property("activeFocus") is False
+
+    table_editor.forceActiveFocus()
+    QTest.keyClick(running.panel, "a")
+    QTest.keyClick(running.panel, Qt.Key.Key_Tab)
+    QTest.keyClick(running.panel, "b")
+    wait(20)
+    assert table_editor.property("text") == "a\tb"
+    QTest.keyClick(running.panel, Qt.Key.Key_Tab, Qt.KeyboardModifier.ControlModifier)
+    wait(20)
+    assert table_editor.property("activeFocus") is False
+
+
+def test_a_later_notice_waits_for_the_delete_undo(running: Running) -> None:
+    _start_room(running, "DNS in Detail", 3)
+    command = _add(running, "command")
+    QMetaObject.invokeMethod(_in(command, "deleteBlock"), "clicked")
+    toast = running.find(running.panel, "panelToast")
+    assert wait_until(lambda: toast.property("actionText") == "Undo")
+
+    running.flag_guard.clean(1, "answer THM{x}", [])  # a "Flag skipped" notice
+    wait(20)
+
+    assert toast.property("message") == "Block deleted."
+    assert toast.property("actionText") == "Undo"
+    QMetaObject.invokeMethod(toast, "hide")  # the Undo toast goes (timed out)
+    wait(20)
+    assert toast.property("message") == "Flag skipped. Recon never saves flags."
+    assert toast.property("actionText") == ""
