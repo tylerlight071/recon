@@ -59,7 +59,8 @@ def exec_quote(path: Path) -> str:
     if any(char in text for char in " \t\n\"'\\><~|&;$*?#()`"):
         escaped = "".join(f"\\{char}" if char in '"`$\\' else char for char in text)
         text = f'"{escaped}"'
-    return text.replace("\\", "\\\\")
+    # A literal % would be read as a field code (%d, %f…); the spec writes it %%.
+    return text.replace("\\", "\\\\").replace("%", "%%")
 
 
 def render_entry(launcher: Path) -> str:
@@ -67,9 +68,20 @@ def render_entry(launcher: Path) -> str:
     return TEMPLATE.read_text(encoding="utf-8").replace("@RECON_LAUNCH@", exec_quote(launcher))
 
 
-def install(data: Path, launcher: Path = LAUNCHER) -> tuple[Path, Path]:
-    """Write the desktop entry and icon under `data`; returns their paths."""
+class NotOursError(FileExistsError):
+    """A desktop entry with Recon's name exists that this script didn't write."""
+
+
+def install(data: Path, launcher: Path = LAUNCHER, *, force: bool = False) -> tuple[Path, Path]:
+    """Write the desktop entry and icon under `data`; returns their paths.
+
+    Raises:
+        NotOursError: An entry with Recon's name is there that this script didn't
+            write (audit F-23); `force` replaces it anyway.
+    """
     entry, icon = targets(data)
+    if entry.exists() and not force and MARKER not in entry.read_text(encoding="utf-8"):
+        raise NotOursError(entry)
     for folder in (entry.parent, icon.parent):
         folder.mkdir(parents=True, exist_ok=True)
     atomic_write_text(entry, render_entry(launcher), mode=PUBLIC_FILE)
@@ -112,13 +124,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-refresh", action="store_true", help="don't ask KDE to rebuild its menu"
     )
+    parser.add_argument(
+        "--force", action="store_true", help="replace an entry this script didn't write"
+    )
     args = parser.parse_args(argv)
     data = data_home(dict(os.environ), Path.home())
     if args.uninstall:
         removed = uninstall(data)
         print("Removed:" if removed else "Nothing of Recon's to remove.", *removed, sep="\n  ")
     else:
-        entry, icon = install(data)
+        try:
+            entry, icon = install(data, force=args.force)
+        except NotOursError as exc:
+            print(
+                f"Not installed: {exc} wasn't written by this script. "
+                "Look at it first; run again with --force to replace it."
+            )
+            return 1
         print(f"Installed:\n  {entry}\n  {icon}")
     if not args.no_refresh:
         refresh_menu(data)

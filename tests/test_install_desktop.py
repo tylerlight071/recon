@@ -13,6 +13,7 @@ from scripts import install_desktop
 from scripts.install_desktop import (
     ICON,
     LAUNCHER,
+    NotOursError,
     data_home,
     exec_quote,
     install,
@@ -46,6 +47,7 @@ def test_data_home_follows_xdg(tmp_path: Path) -> None:
         ("/home/t/My Projects/recon-launch", '"/home/t/My Projects/recon-launch"'),
         ('/a"b/$x/`c`', '"/a\\\\"b/\\\\$x/\\\\`c\\\\`"'),
         ("/a\\b", '"/a\\\\\\\\b"'),
+        ("/home/t/100%done/recon-launch", "/home/t/100%%done/recon-launch"),  # F-23
     ],
 )
 def test_exec_quoting(path: str, quoted: str) -> None:
@@ -143,3 +145,44 @@ def test_main_installs_and_uninstalls(
     assert "Installed:" in out
     assert "Removed:" in out
     assert "Nothing of Recon's to remove." in out
+
+
+def test_install_wont_replace_someone_elses_entry(tmp_path: Path) -> None:
+    # Audit F-23.
+    entry, _icon = targets(tmp_path)
+    entry.parent.mkdir(parents=True)
+    entry.write_text("[Desktop Entry]\nName=Not ours\n")
+
+    with pytest.raises(NotOursError):
+        install(tmp_path)
+    assert entry.read_text() == "[Desktop Entry]\nName=Not ours\n"
+
+    install(tmp_path, force=True)
+    assert _keys(entry)["Name"] == "Recon"
+
+
+def test_main_explains_a_refused_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    entry, _icon = targets(tmp_path)
+    entry.parent.mkdir(parents=True)
+    entry.write_text("[Desktop Entry]\nName=Not ours\n")
+
+    assert main(["--no-refresh"]) == 1
+    assert "--force" in capsys.readouterr().out
+
+
+@pytest.mark.skipif(shutil.which("desktop-file-validate") is None, reason="desktop-file-utils")
+def test_a_percent_in_the_path_still_validates(tmp_path: Path) -> None:
+    entry, _icon = install(tmp_path, launcher=Path("/home/t/100%done/recon-launch"))
+
+    result = subprocess.run(  # noqa: S603 - fixed validator, temp file
+        [shutil.which("desktop-file-validate") or "", str(entry)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == ""

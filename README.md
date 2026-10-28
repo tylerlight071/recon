@@ -9,7 +9,7 @@ Recon is a desktop study companion for TryHackMe. It sits as a slim panel beside
 - How it's built: [`CLAUDE.md`](CLAUDE.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Security: [`SECURITY.md`](SECURITY.md), [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
 
-**Status:** Phase 0 (foundations). There's no app to run yet.
+**Status:** Phase 1 (shell and capture) is built: Home, Start a room, the room session panel with block editors, Undo, the focus timer, a temporary Finish with Markdown export, and Settings. Processing rooms into the vault comes in Phase 2.
 
 ## Requirements
 

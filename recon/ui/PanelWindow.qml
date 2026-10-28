@@ -44,7 +44,15 @@ Window {
     // What the toast's button does ("Not a flag, keep it", or Undo a delete).
     property var toastAction: null
 
+    // A notice without a button waits for an open Undo (or keep) toast to go, rather
+    // than taking its button away early (audit F-21).
+    property string waiting: ""
+
     function notify(message, actionText, action) {
+        if (action === undefined && toast.shown && toastAction !== null) {
+            waiting = message
+            return
+        }
         toastAction = action === undefined ? null : action
         toast.show(message, actionText)
     }
@@ -73,6 +81,7 @@ Window {
     Connections {
         target: RoomSession
         function onFailed(message) { panel.notify(message) }
+        function onSaveRecovered() { panel.notify(qsTr("Saved again.")) }
         // Deletions get a 10 s Undo (ADHD rule 4).
         function onBlockDeleted(blockId) {
             panel.notify(qsTr("Block deleted."), qsTr("Undo"), () => RoomSession.undoDelete(blockId))
@@ -164,6 +173,14 @@ Window {
         // Above the add bar and footer while a room is open, so it never hides them.
         anchors.bottomMargin: RoomSession.hasRoom ? sessionView.bottomChrome + Theme.space3 : Theme.space6
         width: parent.width - Theme.space4 * 2
+        onDismissed: {
+            panel.toastAction = null
+            if (panel.waiting !== "") {
+                const message = panel.waiting
+                panel.waiting = ""
+                panel.notify(message)
+            }
+        }
         onAction: {
             const action = panel.toastAction
             panel.toastAction = null

@@ -2,7 +2,7 @@
 
 How Recon is put together. Behaviour is defined in [`SPEC.md`](SPEC.md); conventions in [`../CLAUDE.md`](../CLAUDE.md). This file is kept current in the same pull request as any change it describes.
 
-**Built so far:** Phase 0 foundations: `config`, `errors`, `paths`, `logging_setup`, and empty packages for everything else.
+**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. `revision/` and the vault pipeline are still empty.
 
 ## Layers
 
@@ -158,6 +158,7 @@ Ctrl+Z / Ctrl+Shift+Z undo and redo within the task on screen.
   - Block IDs are never reused (`AUTOINCREMENT`, migration 0003), so a step about a block always means that block. `BlockRepository.restore` brings a deleted block back at its old place with its own ID.
   - A step leaves `undo_log` only after its change is saved. Bringing a block back and forgetting its step happen in one worker job, so a failed restore keeps the step. The delete toast's Undo works even after "Finish room".
 - **Deleting:** a block's × (Ctrl+Shift+Backspace) deletes it, never the last one. The panel shows "Block deleted." with Undo for 10 s, and that Undo brings back that block even if other things happened since.
+- **Tab:** Tab and Shift+Tab move between controls; in a Table block Tab types a tab and Ctrl+Tab leaves (audit F-13).
 - **Keys:** the block editors catch Ctrl+Z themselves, so it undoes across the task rather than inside one editor. The task title field keeps its own text undo.
 
 Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with `tomllib`, written with `tomli-w`). An unreadable file falls back to the defaults rather than stopping start-up. Every write goes through `recon/fs.py` (temp file, fsync, replace, fsync the folder).

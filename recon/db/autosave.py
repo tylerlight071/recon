@@ -46,6 +46,7 @@ class AutosaveQueue:
         delay_s: float = DELAY_S,
         clock: Clock = time.monotonic,
         on_error: Callable[[Exception], None] | None = None,
+        on_recovered: Callable[[], None] | None = None,
     ) -> None:
         """Start the writer thread.
 
@@ -53,12 +54,16 @@ class AutosaveQueue:
             save: Writes one block's content (normally `BlockRepository.update_content`).
             delay_s: Longest an edit waits before being written.
             clock: Monotonic seconds (tests may pass their own).
-            on_error: Told about a failed write (e.g. to show "Couldn't save").
+            on_error: Told once when saving starts failing (not on every retry), e.g. to
+                show "Couldn't save" (audit F-17).
+            on_recovered: Told when a save works again after failing ("Saved again").
         """
         self._save = save
         self._delay = delay_s
         self._clock = clock
         self._on_error = on_error
+        self._on_recovered = on_recovered
+        self._failing = False  # writer thread only
         self._pending: dict[int, _Pending] = {}
         self._cond = threading.Condition()
         self._stopping = False
@@ -138,12 +143,18 @@ class AutosaveQueue:
             content = item.content
             try:
                 self._save(block_id, content, item.final)
+                if self._failing:
+                    self._failing = False
+                    if self._on_recovered is not None:
+                        self._on_recovered()
             # Thread boundary (CLAUDE.md, Errors): catch everything, log, retry, report.
             except Exception as exc:
                 _log.warning("autosave of block %s failed: %s", block_id, Safe(type(exc).__name__))
                 self._requeue(block_id, content)
-                if self._on_error is not None:
-                    self._on_error(exc)
+                if not self._failing:
+                    self._failing = True
+                    if self._on_error is not None:
+                        self._on_error(exc)
 
     def _requeue(self, block_id: int, content: BlockContent) -> None:
         with self._cond:

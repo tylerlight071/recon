@@ -89,6 +89,7 @@ Block {
         hint: block.hint
         accessibleName: block.isRoomQuestion ? qsTr("Room question") : block.typeLabel
         mono: block.blockType === "command"
+        tabTypes: block.blockType === "table"  // pasted tables use tabs; Ctrl+Tab leaves
 
         property bool ready: false
 

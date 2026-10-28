@@ -45,6 +45,7 @@ from recon.db.repositories import (
 )
 from recon.errors import (
     AlreadyRunningError,
+    AutosaveFailedError,
     DatabaseTooNewError,
     DatabaseUnreadableError,
     DataFolderUnusableError,
@@ -253,7 +254,8 @@ def _room_bridges(
     start = StartRoomBridge(rooms, parent=app)
     autosave = AutosaveQueue(
         blocks.update_content,
-        on_error=lambda _exc: session.failed.emit(StorageError.user_message),
+        on_error=lambda _exc: session.failed.emit(AutosaveFailedError.user_message),
+        on_recovered=lambda: session.saveRecovered.emit(),  # noqa: PLW0108 - session is made below
     )
     session = RoomSessionBridge(
         (rooms, tasks, blocks, undo),

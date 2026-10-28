@@ -4,12 +4,40 @@ import "../theme"
 
 // Multi-line input with a hint that fades out on typing and comes back when
 // the text is cleared (SPEC.md, Room session). `mono` for commands.
+// Tab and Shift+Tab move to the next or previous control. With `tabTypes`, Tab
+// types a tab character instead (tables) and Ctrl+Tab / Ctrl+Shift+Tab leave.
 T.TextArea {
     id: control
 
     property string hint: ""
     property string accessibleName: hint
     property bool mono: false
+    property bool tabTypes: false
+
+    function moveFocus(forward) {
+        const next = nextItemInFocusChain(forward)
+        if (next)
+            next.forceActiveFocus(forward ? Qt.TabFocusReason : Qt.BacktabFocusReason)
+    }
+
+    // Audit F-13: Tab used to type a tab, so the keyboard could never leave a block.
+    // Keys handlers accept by default: hand the key back to type a tab.
+    Keys.onTabPressed: event => {
+        if (tabTypes && !(event.modifiers & Qt.ControlModifier)) {
+            event.accepted = false
+            return
+        }
+        moveFocus(true)
+        event.accepted = true
+    }
+    Keys.onBacktabPressed: event => {
+        if (tabTypes && !(event.modifiers & Qt.ControlModifier)) {
+            event.accepted = false
+            return
+        }
+        moveFocus(false)
+        event.accepted = true
+    }
     readonly property bool hintShown: length === 0 && preeditText === ""
 
     implicitWidth: Math.max(contentWidth + leftPadding + rightPadding, Theme.toastWidth)
