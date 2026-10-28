@@ -4,6 +4,7 @@ import argparse
 import datetime as dt
 import logging
 import os
+import secrets
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -25,13 +26,14 @@ from recon.bridge.flags import FlagGuard
 from recon.bridge.flow import connect_finish, connect_room_flow
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
+from recon.bridge.models import ModelsBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
 from recon.bridge.vault import VaultBridge
-from recon.bridge.workers import SerialWorker, drain_global_pool
+from recon.bridge.workers import SerialWorker, drain_global_pool, thread_pool_submit
 from recon.config import Settings, load_settings, save_settings
 from recon.db import backup
 from recon.db.autosave import AutosaveQueue
@@ -53,11 +55,13 @@ from recon.errors import (
     ReconError,
     StorageError,
 )
-from recon.logging_setup import configure_logging
+from recon.logging_setup import Safe, configure_logging
 from recon.paths import AppPaths, ensure_private_dir
 from recon.services.chime import Chime
 from recon.services.kwin import KWinPinning, run_command
+from recon.services.ollama import CHECK_TIMEOUT_S, OllamaService, make_client
 from recon.services.open_url import open_folder
+from recon.services.runs import RunStore
 
 _log = logging.getLogger(__name__)
 
@@ -232,14 +236,33 @@ def create_bridges(
     # the room's own savers follow in _room_bridges.
     app.aboutToQuit.connect(lambda: _drain(settings_worker, pin_worker))
     app.aboutToQuit.connect(settings_bridge.flush)
+    models = ModelsBridge(
+        settings_bridge,
+        lambda host: OllamaService(make_client(host, CHECK_TIMEOUT_S)),
+        lambda text: QGuiApplication.clipboard().setText(text),
+        submit=thread_pool_submit,
+        parent=app,
+    )
+    models.check()
+    thread_pool_submit(lambda: prune_runs(paths))
     bridges: dict[str, QObject] = {
         "AppSettings": settings_bridge,
         "Navigation": navigation,
         "Pinning": pinning,
         "Editors": EditorsBridge(parent=app),
+        "Models": models,
         **_room_bridges(app, db, settings_bridge, navigation),
     }
     return bridges, pinning
+
+
+def prune_runs(paths: AppPaths) -> None:
+    """Delete run folders over 30 days old (raw model responses are kept that long only)."""
+    # Thread boundary: an old folder that won't delete is retried next launch.
+    try:
+        RunStore(paths.runs, utc_now, lambda: secrets.token_hex(4)).prune()
+    except OSError as exc:
+        _log.warning("old runs not deleted: %s", Safe(type(exc).__name__))
 
 
 def _room_bridges(

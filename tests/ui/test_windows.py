@@ -26,6 +26,7 @@ from recon.bridge.flags import FlagGuard
 from recon.bridge.flow import connect_finish, connect_room_flow
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
+from recon.bridge.models import ModelsBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.session import RoomSessionBridge
@@ -43,8 +44,10 @@ from recon.db.repositories import (
     UndoRepository,
     utc_now,
 )
+from recon.services.ollama import OllamaService
 from tests.bridge.fakes import FakeAutosave
 from tests.bridge.test_pinning_bridge import FakePinner
+from tests.services.fakes import FakeClient
 from tests.ui.qml_harness import app, wait, wait_until
 
 
@@ -90,6 +93,8 @@ class Running:
     opened: list[Path]
     vault: "VaultBridge"
     copied: list[str]
+    models: ModelsBridge
+    ollama: FakeClient
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -171,6 +176,14 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     copied: list[str] = []
     vault = VaultBridge(settings, copied.append, submit=lambda job: job(), parent=owner)
     vault.setUp()
+    ollama = FakeClient(models=["qwen3.5:9b"])
+    models = ModelsBridge(
+        settings,
+        lambda _host: OllamaService(ollama),
+        copied.append,
+        submit=lambda job: job(),
+        parent=owner,
+    )
     qml = create_engine(
         {
             "AppSettings": settings,
@@ -183,6 +196,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "Focus": focus,
             "Finish": finish,
             "Vault": vault,
+            "Models": models,
             "Editors": EditorsBridge(parent=owner),
         }
     )
@@ -216,6 +230,8 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         opened,
         vault,
         copied,
+        models,
+        ollama,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -1233,6 +1249,37 @@ def test_settings_shows_every_first_pass_setting(running: Running) -> None:
     assert running.find_object(running.main, "vaultDialog").property("title") == (
         "Choose the folder for your vault"
     )
+    assert running.warnings == []
+
+
+def test_settings_shows_the_models_and_what_is_missing(running: Running) -> None:
+    _settings_screen(running)
+    find = running.find
+
+    # Opening Settings checks Ollama; the fake has the text model but not the embedder.
+    assert find(running.main, "model-qwen3-embedding:0.6b").property("text") == (
+        "qwen3-embedding:0.6b"
+    )
+    assert (
+        find(running.main, "modelsMessage")
+        .property("text")
+        .startswith("Ollama is running, but qwen3-embedding:0.6b isn't installed yet.")
+    )
+    assert find(running.main, "pullCommands").property("visible") is True
+    assert find(running.main, "modelsDot").property("color").name() == "#d9a441"
+
+    QMetaObject.invokeMethod(find(running.main, "copyCommands"), "clicked")
+    assert running.copied[-1] == "ollama pull qwen3-embedding:0.6b"
+
+    running.ollama.models.append("qwen3-embedding:0.6b")
+    QMetaObject.invokeMethod(find(running.main, "checkModels"), "clicked")
+    wait(20)
+
+    assert find(running.main, "modelsMessage").property("text") == (
+        "Ollama is running and has every model Recon uses."
+    )
+    assert find(running.main, "pullCommands").property("visible") is False
+    assert find(running.main, "modelsDot").property("color").name() == "#5fb47a"
     assert running.warnings == []
 
 

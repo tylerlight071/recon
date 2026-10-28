@@ -34,6 +34,8 @@ type PinningChoice = Literal["ask", "on", "off"]
 PINNING_CHOICES: Final = ("ask", "on", "off")
 type Accent = Literal["violet", "cyan", "green"]
 ACCENTS: Final = ("violet", "cyan", "green")
+MODEL_NAME: Final = r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$"
+"""An Ollama model name such as "qwen3.5:9b" (no spaces, quotes or shell characters)."""
 VAULT_DEFAULT: Final = "Cyber Vault"
 """The vault's folder name under the home folder, unless Settings says otherwise."""
 
@@ -81,6 +83,19 @@ class Settings(BaseModel):
     accent: Accent = "violet"
     reduce_motion: bool = False
     """Make every animation instant (Theme.reduceMotion)."""
+    text_model: str = Field(default="qwen3.5:9b", pattern=MODEL_NAME)
+    """Structuring, fact-checks, quizzes and Ask (the Phase 2 bake-off may change it)."""
+    vision_model: str = Field(default="qwen3.5:9b", pattern=MODEL_NAME)
+    """Reading screenshots; the same model as text by default, so nothing swaps."""
+    embedding_model: str = Field(default="qwen3-embedding:0.6b", pattern=MODEL_NAME)
+    """Matching concepts to existing notes."""
+    ollama_host: str = "http://127.0.0.1:11434"
+    """Ollama's address. Only this computer is ever used (`services.ollama.loopback`)."""
+
+    @property
+    def models(self) -> tuple[str, ...]:
+        """Every model Recon needs, once each, in the order Settings lists them."""
+        return tuple(dict.fromkeys((self.text_model, self.vision_model, self.embedding_model)))
 
 
 def vault_folder(settings: Settings, home: Path, data: Path | None = None) -> Path:

@@ -22,6 +22,7 @@ def test_xdg_defaults_when_unset(tmp_path: Path) -> None:
     assert paths.config == tmp_path / ".config/recon"
     assert paths.cache == tmp_path / ".cache/recon"
     assert paths.log_file == tmp_path / ".local/share/recon/app.log"
+    assert paths.runs == tmp_path / ".local/share/recon/runs"
 
 
 def test_xdg_variables_respected(tmp_path: Path) -> None:

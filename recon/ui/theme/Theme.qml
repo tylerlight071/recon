@@ -147,6 +147,8 @@ QtObject {
     readonly property int sidebarWidth: 200
     // Readable column width for main-window screens.
     readonly property int contentWidth: 560
+    // Settings' left-hand labels (e.g. what each model is for).
+    readonly property int settingsLabelWidth: 160
 
     // ---- Developer gallery (--gallery only) -------------------------------
     readonly property int galleryWidth: 960
