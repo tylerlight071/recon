@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-28
+
+Phase 1, shell and capture: Home, Start a room, the room session panel with block editors, Undo, the focus timer, a temporary Finish with Markdown export, Settings and an app-menu entry. Notes autosave within half a second, and flags never reach storage. Includes every fix from the independent Phase 1 audit (`docs/audits/phase-1.md`).
+
 ### Added
 
 - App menu entry: `scripts/install_desktop.py` installs `io.github.tylerlight071.Recon.desktop` (runs `packaging/recon-launch`, no terminal) and Recon's icon under `~/.local/share`, then refreshes KDE's menu; `--uninstall` removes only what it installed. The entry passes `desktop-file-validate`.
@@ -83,5 +87,6 @@ Phase 0, foundations: repository, tooling, environment checks and smoke tests pr
 - `main` can no longer be changed by a multi-ref push, `--all` or a delete: the pre-push guard is now a git hook that reads every ref (audit F-02). Install with `scripts/install-hooks`. The fast-test commit hook now runs on every commit (F-17).
 - Docs from the Phase 0 audit: when task issues are created, the fast-test command, the audit template's areas, ADR 0001's portal note, and README's network wording.
 
-[Unreleased]: https://github.com/tylerlight071/recon/compare/v0.0.0...HEAD
+[Unreleased]: https://github.com/tylerlight071/recon/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/tylerlight071/recon/compare/v0.0.0...v0.1.0
 [0.0.0]: https://github.com/tylerlight071/recon/releases/tag/v0.0.0
