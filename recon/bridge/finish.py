@@ -1,16 +1,18 @@
-"""Finishing a room, exposed to QML as `Finish` (task 1.13, temporary).
+"""Finishing a room, exposed to QML as `Finish` (task 1.13; queues processing since 2.5).
 
-"Finish room" marks the room done and shows a calm completion moment in the
-panel: what was written, how long it took, and "Export as Markdown" (one `.md`
-per room, into a folder the user picks; the folder is remembered). Phase 2
-replaces this with processing and review. "Back to the room" undoes the
-finish, so pressing it by mistake costs nothing.
+"Finish room" queues the room for processing (`processRequested`) and shows a
+calm completion moment in the panel: what was written, how long it took, how
+processing is going, and "Export as Markdown" (one `.md` per room, into a
+folder the user picks; the folder is remembered). Task 2.7 adds the review
+and Apply steps. "Back to the room" undoes the finish, discarding anything
+staged, so pressing it by mistake costs nothing.
 """
 
 import logging
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
+from typing import Final
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
@@ -29,6 +31,12 @@ from recon.errors import ReconError
 from recon.logging_setup import Safe
 
 type Then = Callable[[], None]
+
+_STATUS_LINES: Final = {
+    "queued": "Waiting to be processed.",
+    "processing": "Waiting to be processed.",
+    "in_review": "Ready to review.",
+}
 
 _log = logging.getLogger(__name__)
 
@@ -53,6 +61,7 @@ class FinishBridge(QObject):
 
     changed = Signal()
     reopenRequested = Signal(int)  # noqa: N815 - Qt naming; the room ID ("Back to the room")
+    processRequested = Signal(int)  # noqa: N815 - Qt naming; the room ID (finished: process it)
     closed = Signal()
     failed = Signal(str)
     _done = Signal(object)
@@ -64,6 +73,7 @@ class FinishBridge(QObject):
         open_folder: Callable[[Path], bool],
         *,
         submit: Submit,
+        discard_staged: Callable[[int], int] = lambda _room: 0,
         today: Callable[[], date] = date.today,
         home: Path | None = None,
         parent: QObject | None = None,
@@ -75,6 +85,7 @@ class FinishBridge(QObject):
             settings: Remembers the export folder.
             open_folder: Shows a folder in the file manager.
             submit: Runs a job off the UI thread, in order with the session's.
+            discard_staged: Throws away a room's staged notes ("Back to the room").
             today: The date written on the export.
             home: The user's home folder, for showing paths as ~/… (defaults to Path.home()).
             parent: Qt parent.
@@ -84,6 +95,7 @@ class FinishBridge(QObject):
         self._settings = settings
         self._open_folder = open_folder
         self._submit = submit
+        self._discard_staged = discard_staged
         self._today = today
         self._home = home or Path.home()
         self._room: Room | None = None
@@ -120,7 +132,12 @@ class FinishBridge(QObject):
         folder = self._settings.settings.export_folder
         return QUrl.fromLocalFile(folder).toString() if folder else ""
 
+    def _status_line(self) -> str:
+        return _STATUS_LINES.get(self._room.status, "") if self._room else ""
+
     shown = Property(bool, _shown, notify=changed)
+    statusLine = Property(str, _status_line, notify=changed)  # noqa: N815
+    """Where processing stands, from the room's status (the Processing bridge says more)."""
     roomName = Property(str, _room_name, notify=changed)  # noqa: N815
     summary = Property(str, _summary, notify=changed)
     timeSpent = Property(str, _time, notify=changed)  # noqa: N815
@@ -132,17 +149,22 @@ class FinishBridge(QObject):
     # ---- Actions ---------------------------------------------------------------------
 
     def open(self, room_id: int) -> None:
-        """Mark the room done and show the Finish screen."""
+        """Queue the room for processing and show the Finish screen."""
 
         def work() -> Then:
-            self._rooms.update_progress(room_id, status="done")
+            self._rooms.update_progress(room_id, status="queued")
             # Finished: its undo steps (old and deleted text) aren't needed any more (F-19).
             self._undo.clear_room(room_id)
             room = self._rooms.get(room_id)
             tasks = self._tasks.for_room(room_id)
-            return lambda: self._show(room, tasks)
+            return lambda: self._queued(room, tasks)
 
         self._background(work)
+
+    def _queued(self, room: Room | None, tasks: list[Task]) -> None:
+        self._show(room, tasks)
+        if room is not None:
+            self.processRequested.emit(room.id)
 
     def revisit(self, room_id: int) -> None:
         """Show a room that's already done (from Home), changing nothing (audit F-11)."""
@@ -150,7 +172,7 @@ class FinishBridge(QObject):
         def work() -> Then:
             room = self._rooms.get(room_id)
             tasks = self._tasks.for_room(room_id)
-            return lambda: self._show(room if room and room.status == "done" else None, tasks)
+            return lambda: self._show(room if room and room.status != "capturing" else None, tasks)
 
         self._background(work)
 
@@ -220,6 +242,7 @@ class FinishBridge(QObject):
             return
 
         def work() -> Then:
+            self._discard_staged(room.id)
             self._rooms.update_progress(room.id, status="capturing")
             return lambda: self._reopen(room.id)
 

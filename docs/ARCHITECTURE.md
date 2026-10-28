@@ -2,7 +2,7 @@
 
 How Recon is put together. Behaviour is defined in [`SPEC.md`](SPEC.md); conventions in [`../CLAUDE.md`](../CLAUDE.md). This file is kept current in the same pull request as any change it describes.
 
-**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, pipeline steps 1, 3 and 6 (parse, extract and render), and staging, Apply, Discard and backups. `revision/` and the processing pipeline are still empty.
+**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, pipeline steps 1, 3 and 6 (parse, extract and render), staging, Apply, Discard and backups, and background processing with notifications. `revision/` and the processing pipeline are still empty.
 
 ## Layers
 
@@ -206,6 +206,21 @@ Pure Python in `engine/`. The bridge will run it on a worker in task 2.5. [ADR 0
 - `recover_runs` finishes interrupted Applies.
 
 At launch, `__main__.tidy_runs` runs `recover_runs` and then deletes runs over 30 days old, on the global pool. Runs still waiting for Apply or Discard are kept.
+
+## Background processing (task 2.5)
+
+Finishing a room queues it (`Finish.processRequested` sets the room to `queued`). `bridge/processing.py` (`Processing`) runs one room at a time on `workers.DaemonWorker`, a daemon thread, so quitting never waits for the model. [ADR 0009](adr/0009-background-processing.md) records why.
+
+- **`recon/pipeline.py` (`Pipeline.run`)** sets the room to `processing` and works through three steps:
+  1. "Reading your notes": the capture.
+  2. "Structuring 4 tasks with qwen3.5:9b": extract and render.
+  3. "Preparing 12 notes for review": staging, which puts the room in review.
+
+  It checks a cancel flag between steps, and won't stage a room that was taken back meanwhile. On a `ReconError` the room goes back to `queued`, and the plain message is returned.
+- **The panel's Finish screen** shows the room's line (the step, "Waiting while another room is processed.", "Ready to review: N notes." or the problem), a thin progress bar, and Retry after a problem. `Finish.statusLine` covers rooms finished in an earlier session.
+- **At launch**, `Processing.resume` queues every room left `queued` or `processing`, oldest first. At quit, `Processing.close` stops the run at its next check.
+- **`services/notifications.py`** sends "<room> is ready to review" or "<room> couldn't be processed". One private thread owns one jeepney connection, which sends `Notify` and listens for `ActionInvoked`. A click opens that room's Finish screen (`connect_processing`), and the review screen replaces this in task 2.7.
+- **"Back to the room"** discards the room's staged runs (`Processing.discard_room`) and withdraws it from the queue.
 
 ## Undo
 

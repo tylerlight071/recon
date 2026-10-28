@@ -56,6 +56,10 @@ _SELECT_CURRENT_ROOM: Final = """
     SELECT id, platform, path, module, name, task_count, mode, status,
            created_at, updated_at, time_spent_s, last_task_index
     FROM rooms WHERE status = 'capturing' ORDER BY updated_at DESC, id DESC LIMIT 1"""
+_SELECT_WAITING_ROOMS: Final = """
+    SELECT id, platform, path, module, name, task_count, mode, status,
+           created_at, updated_at, time_spent_s, last_task_index
+    FROM rooms WHERE status IN ('queued', 'processing') ORDER BY updated_at, id"""
 _INSERT_ROOM: Final = """
     INSERT INTO rooms (platform, path, module, name, task_count, mode, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
@@ -209,6 +213,12 @@ class RoomRepository:
         with self._db.read() as conn:
             row = conn.execute(_SELECT_CURRENT_ROOM).fetchone()
         return _room(row) if row else None
+
+    def waiting(self) -> list[Room]:
+        """Rooms finished but not yet processed (queued, or cut off mid-run), oldest first."""
+        with self._db.read() as conn:
+            rows = conn.execute(_SELECT_WAITING_ROOMS).fetchall()
+        return [_room(row) for row in rows]
 
     def update_progress(
         self,

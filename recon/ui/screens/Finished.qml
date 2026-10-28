@@ -4,9 +4,9 @@ import QtQuick.Dialogs
 import "../components"
 import "../theme"
 
-// Finish (task 1.13, temporary until Phase 2's processing): a calm completion
-// moment, what was written and how long it took, and "Export as Markdown".
-// "Back to the room" undoes the finish. Bridge: Finish. One accent button.
+// Finish (task 1.13): a calm completion moment, what was written and how long
+// it took, how processing is going (task 2.5), and "Export as Markdown".
+// "Back to the room" undoes the finish. Bridges: Finish, Processing. One accent button.
 FocusScope {
     id: finish
 
@@ -81,6 +81,58 @@ FocusScope {
                 font.family: Theme.fontUi
                 font.pixelSize: Theme.fontSizeBody
                 color: Theme.textSecondary
+            }
+        }
+
+        // Processing, in plain words: the step, waiting, ready, or what went wrong.
+        Column {
+            objectName: "processingStatus"
+            width: parent.width
+            spacing: Theme.space2
+            visible: processingLine.text !== ""
+
+            Text {
+                id: processingLine
+                objectName: "processingLine"
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: Processing.line !== "" ? Processing.line : Finish.statusLine
+                font.family: Theme.fontUi
+                font.pixelSize: Theme.fontSizeBody
+                color: Processing.failed ? Theme.warning : Theme.textSecondary
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+            }
+
+            // A thin line filling step by step: progress, never a spinner.
+            Rectangle {
+                objectName: "processingProgress"
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width / 2
+                height: Theme.focusLineHeight
+                radius: height / 2
+                color: Theme.border
+                visible: Processing.busy
+
+                Rectangle {
+                    objectName: "processingFill"
+                    width: parent.width * Processing.stepNumber / Processing.steps
+                    height: parent.height
+                    radius: parent.radius
+                    color: Theme.accent
+
+                    Behavior on width { NumberAnimation { duration: Theme.durationBase; easing.type: Theme.easing } }
+                }
+            }
+
+            Button {
+                objectName: "retryProcessing"
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: Processing.failed
+                variant: "secondary"
+                text: qsTr("Retry")
+                onClicked: Processing.retry()
             }
         }
 

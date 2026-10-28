@@ -23,12 +23,13 @@ from recon.app import QmlEngine, create_engine, load_windows, root_window
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
-from recon.bridge.flow import connect_finish, connect_room_flow
+from recon.bridge.flow import connect_finish, connect_processing, connect_room_flow
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.models import ModelsBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
+from recon.bridge.processing import ProcessingBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
@@ -44,9 +45,11 @@ from recon.db.repositories import (
     UndoRepository,
     utc_now,
 )
+from recon.pipeline import Outcome, Step
 from recon.services.ollama import OllamaService
 from tests.bridge.fakes import FakeAutosave
 from tests.bridge.test_pinning_bridge import FakePinner
+from tests.bridge.test_processing import FakeRunner
 from tests.services.fakes import FakeClient
 from tests.ui.qml_harness import app, wait, wait_until
 
@@ -95,6 +98,9 @@ class Running:
     copied: list[str]
     models: ModelsBridge
     ollama: FakeClient
+    processing: ProcessingBridge
+    runner: "FakeRunner"
+    notices: list[object]
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -111,6 +117,15 @@ class Running:
         found = window.findChild(QObject, name)
         assert found is not None, name
         return found
+
+
+def _processing(owner: QObject) -> tuple[ProcessingBridge, FakeRunner, list[object]]:
+    runner = FakeRunner()
+    notices: list[object] = []
+    processing = ProcessingBridge(
+        runner, notices.append, list, submit=lambda job: job(), parent=owner
+    )
+    return processing, runner, notices
 
 
 @pytest.fixture
@@ -173,6 +188,8 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         parent=owner,
     )
     connect_finish(navigation, home, session, focus, finish)
+    processing, runner, notices = _processing(owner)
+    connect_processing(navigation, home, finish, processing)
     copied: list[str] = []
     vault = VaultBridge(settings, copied.append, submit=lambda job: job(), parent=owner)
     vault.setUp()
@@ -197,6 +214,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "Finish": finish,
             "Vault": vault,
             "Models": models,
+            "Processing": processing,
             "Editors": EditorsBridge(parent=owner),
         }
     )
@@ -232,6 +250,9 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         copied,
         models,
         ollama,
+        processing,
+        runner,
+        notices,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -1155,7 +1176,40 @@ def test_finish_room_shows_a_calm_completion_screen(running: Running) -> None:
     assert find(running.panel, "noRoom").property("visible") is False
     assert find(running.panel, "exportedArea").property("visible") is False
     assert _visible_primary_buttons(running.panel.contentItem()) == ["exportButton"]
-    assert running.rooms.recent(1)[0].status == "done"
+    assert running.rooms.recent(1)[0].status == "queued"
+    assert running.runner.rooms == [running.rooms.recent(1)[0].id]
+    assert find(running.panel, "processingLine").property("text") == "Waiting to be processed."
+    assert running.warnings == []
+
+
+def test_the_panel_shows_processing_steps_and_offers_retry(running: Running) -> None:
+    running.runner.script = [Step("DNS in Detail", 2, "Structuring 2 tasks with qwen3.5:9b")]
+    running.runner.outcome = Outcome(room="DNS in Detail", problem="Couldn't reach Ollama.")
+    seen: list[tuple[str, bool, int]] = []
+    running.runner.during = lambda: seen.append(
+        (
+            running.find(running.panel, "processingLine").property("text"),
+            running.find(running.panel, "processingProgress").property("visible"),
+            running.processing.property("stepNumber"),
+        )
+    )
+
+    _finish_room(running)
+    wait(20)
+
+    assert seen == [("Structuring 2 tasks with qwen3.5:9b", True, 2)]
+    line = running.find(running.panel, "processingLine")
+    retry = running.find(running.panel, "retryProcessing")
+    assert line.property("text") == "Couldn't reach Ollama."
+    assert retry.property("visible") is True
+    assert len(running.notices) == 1
+
+    running.runner.outcome = Outcome(room="DNS in Detail", cancelled=True)
+    QMetaObject.invokeMethod(retry, "clicked")
+    wait(20)
+
+    assert retry.property("visible") is False
+    assert len(running.runner.rooms) == 2
     assert running.warnings == []
 
 
@@ -1191,7 +1245,7 @@ def test_back_to_the_room_from_finish(running: Running) -> None:
     assert room.status == "capturing"
 
 
-def test_done_returns_home_where_the_room_is_listed_as_done(running: Running) -> None:
+def test_done_returns_home_where_the_finished_room_is_listed(running: Running) -> None:
     _finish_room(running)
 
     QMetaObject.invokeMethod(running.find(running.panel, "finishDone"), "clicked")
@@ -1202,9 +1256,9 @@ def test_done_returns_home_where_the_room_is_listed_as_done(running: Running) ->
     assert running.find(running.main, "primaryAction").property("text") == "Start a room"
     room_id = running.rooms.recent(1)[0].id
     row = running.find(running.main, f"recent-{room_id}")
-    assert row.property("detail") == "Done"
+    assert row.property("detail") == "Processing"
 
-    # Audit F-11: the done room's row opens its Finish screen again, to export or reopen.
+    # Audit F-11: a finished room's row opens its Finish screen again, to export or reopen.
     assert row.property("interactive") is True
     QMetaObject.invokeMethod(row, "clicked")
     assert wait_until(running.panel.isVisible)
@@ -1212,7 +1266,23 @@ def test_done_returns_home_where_the_room_is_listed_as_done(running: Running) ->
     assert running.find(running.panel, "finishTitle").property("text") == (
         "DNS in Detail is finished."
     )
-    assert running.rooms.get(room_id).status == "done"  # type: ignore[union-attr]  # unchanged
+    assert running.rooms.get(room_id).status == "queued"  # type: ignore[union-attr]  # unchanged
+
+
+def test_a_notification_click_opens_the_room_in_the_panel(running: Running) -> None:
+    _finish_room(running)
+    QMetaObject.invokeMethod(running.find(running.panel, "finishDone"), "clicked")
+    wait(50)
+    room_id = running.rooms.recent(1)[0].id
+    assert running.find(running.panel, "noRoom").property("visible") is True
+
+    running.processing.action(room_id, "default")  # from the notification thread in the app
+
+    assert wait_until(lambda: running.find(running.panel, "finishTitle").property("visible"))
+    assert running.panel.isVisible()
+    assert running.find(running.panel, "processingLine").property("text") == (
+        "Waiting to be processed."
+    )
 
 
 def test_an_open_focus_menu_closes_when_the_room_finishes(running: Running) -> None:

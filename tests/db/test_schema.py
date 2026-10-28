@@ -100,7 +100,7 @@ def test_deleting_a_room_removes_its_tasks_and_blocks(db: Database) -> None:
         assert conn.execute("SELECT count(*) FROM blocks").fetchone()[0] == 0
 
 
-def _insert_fixture_rooms(db: Database) -> None:
+def insert_fixture_rooms(db: Database) -> None:
     with db.transaction() as conn:
         for room in all_rooms().values():
             conn.execute(
@@ -128,7 +128,7 @@ def _insert_fixture_rooms(db: Database) -> None:
 
 
 def test_fixture_rooms_load_and_read_back_exactly(db: Database) -> None:
-    _insert_fixture_rooms(db)
+    insert_fixture_rooms(db)
     rooms, tasks, blocks = RoomRepository(db), TaskRepository(db), BlockRepository(db)
 
     for fixture in all_rooms().values():

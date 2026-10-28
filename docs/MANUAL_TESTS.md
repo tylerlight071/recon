@@ -26,3 +26,7 @@ Launch Recon the way it will really be used: from the KDE app menu (`uv run pyth
 - [ ] In `settings.toml`, set `embedding_model = "nomic-embed-text"` (or any model you don't have) and reopen Settings: it names the model and shows `ollama pull …` with Copy. Put the setting back afterwards.
 - [ ] After applying a room (once 2.4–2.7 land), open its room note, a concept note and a tool note in Obsidian. The properties panel shows every property, callouts fold, and the Mermaid diagram draws. No `%% recon` marker is visible in reading view. Note any point that misses or twists something you wrote.
 - [ ] Edit a concept note in Obsidian (outside and inside its `%% recon` markers), then process another room that touches it. Before Apply, edit it again: Recon stops and offers to re-check rather than overwriting. After Apply, your text outside the markers is untouched and the old version is in `~/.local/share/recon/backups/<run>/`.
+- [ ] Finish a room and watch the panel's processing line move through its steps. Close the panel while it runs: a notification says the room is ready (silently). Click it: the room opens in the panel.
+- [ ] Finish two rooms quickly: the second says it's waiting, then processes after the first.
+- [ ] Stop Ollama, finish a room: the panel says what went wrong with Retry, and a notification says so too. Start Ollama, press Retry.
+- [ ] Quit Recon mid-processing, then reopen it: the room processes again without being asked.

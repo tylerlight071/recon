@@ -93,6 +93,19 @@ class Processing:
         self.rooms.update_progress(manifest.room_id, status="capturing")
         _log.info("run %s discarded", Safe(run_id))
 
+    def discard_room(self, room_id: int) -> int:
+        """Discard every staged run of a room ("Back to the room"); returns how many.
+
+        The caller sets the room's status; this only removes staged notes.
+        """
+        count = 0
+        for run in self.records.for_room(room_id):
+            if run.status == "staged":
+                discard(self.folder(run.id))
+                self.records.discarded(run.id)
+                count += 1
+        return count
+
     def recover_runs(self) -> int:
         """Finish every Apply a crash interrupted; returns how many were finished."""
         finished = 0

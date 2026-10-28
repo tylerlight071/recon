@@ -44,6 +44,8 @@ RESTRICTED: dict[str, frozenset[str]] = {
     **dict.fromkeys(("faster_whisper", "huggingface_hub"), frozenset({"services/whisper.py"})),
     # QML's network access manager factory, which refuses every non-local scheme.
     "PySide6.QtNetwork": frozenset({"services/qml_network.py"}),
+    # D-Bus (a local Unix socket, ADR 0003/0009): desktop notifications and the shortcut portal.
+    "jeepney": frozenset({"services/notifications.py", "services/portal.py"}),
     # Running programs: only from modules CLAUDE.md allows (KWin reload, etc.).
     "subprocess": frozenset({"services/kwin.py"}),
     # Banned everywhere in recon/.
