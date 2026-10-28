@@ -2,7 +2,7 @@
 
 How Recon is put together. Behaviour is defined in [`SPEC.md`](SPEC.md); conventions in [`../CLAUDE.md`](../CLAUDE.md). This file is kept current in the same pull request as any change it describes.
 
-**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap and the Ollama service. `revision/` and the processing pipeline are still empty.
+**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, and pipeline steps 1, 3 and 6 (parse, extract and render). `revision/` and the processing pipeline are still empty.
 
 ## Layers
 
@@ -169,6 +169,16 @@ It never replaces a file, and `app.json` only gains missing keys. `bridge/vault.
 - **Run logs.** `services/runs.py`: `RunStore.start()` makes a `RunLog` for `runs/<UTC time>-<id>/`, and every attempt's messages and raw reply are written there as `<step>-<attempt>.json` (folder 0700, file 0600, atomic). `app.log` gets only the model, step, attempt, duration and error counts. Start-up deletes runs older than 30 days on the global pool, and never follows a symlink.
 
 Model names are settings (`text_model`, `vision_model`, `embedding_model`; defaults `qwen3.5:9b`, `qwen3.5:9b`, `qwen3-embedding:0.6b`), restricted to Ollama's name characters. `bridge/models.py` (`Models`) checks Ollama at launch, when Settings opens, and on "Check again", on the global pool. Settings shows what each model is for, a green or amber dot (never red), one plain line, and for missing models the exact `ollama pull` commands with Copy. Recon never pulls a model itself.
+
+## Pipeline: parse, extract, render (task 2.3)
+
+Pure Python in `engine/`. The bridge will run it on a worker in task 2.5. [ADR 0007](adr/0007-note-rendering.md) records why it works this way.
+
+1. **Parse** (`engine/capture.py`): `capture_room(room, tasks, finished_on)` builds a `Capture` from the database rows. Each block keeps its type, empty blocks are left out, screenshots wait for Phase 5, and flags are stripped again, keeping only "Not a flag, keep it" hashes.
+2. **Extract** (`engine/extract.py`, prompt `engine/prompts/extract.RoomExtract.md`, schema `engine/schemas.RoomExtract`): the room goes to the text model as numbered, typed blocks between `<room>` delimiters, described as data. `check` then applies every rule code can check: points cite their own block, concepts and tools must appear in his notes, `own_words` must be his, flags come from his commands, and tool names stay with tool notes.
+3. **Render** (`engine/notes.py`, templates in `engine/templates/notes/`): `render_room` returns a `Rendered` set of notes, each with a path relative to the vault, a kind (room, raw, concept or tool) and its text. Model text goes through `engine/sanitise.inline` and gets its links from the engine. Tyler's own text is escaped only where it could break structure. Generated parts are labelled, and generated sections sit between markers. Nothing is written yet: staging is task 2.4.
+
+`engine/commands.py` reads Command blocks in code: each command and its `# comment`, and the programs and flags it runs (`sudo -u root nmap -sV` runs `nmap` with `-sV`).
 
 ## Undo
 

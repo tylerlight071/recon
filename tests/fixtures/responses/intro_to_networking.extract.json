@@ -1,0 +1,528 @@
+{
+  "summary": [
+    "This room introduced the basic concept of a computer network and the internet as interconnected networks.",
+    "It explained the OSI model's seven layers and where specific protocols like HTTP and TCP fit.",
+    "The notes covered the differences between connection-oriented TCP and connectionless UDP.",
+    "Common ports for services like HTTP, HTTPS, DNS, SSH, and FTP were listed with their default numbers.",
+    "A question was raised about the location of TLS within the OSI model."
+  ],
+  "tasks": [
+    {
+      "task": 1,
+      "points": [
+        {
+          "block": 2001,
+          "text": "A network consists of devices that can send data to each other."
+        },
+        {
+          "block": 2001,
+          "text": "The internet is formed by joining many networks together."
+        }
+      ]
+    },
+    {
+      "task": 2,
+      "points": [
+        {
+          "block": 2002,
+          "text": "The OSI model divides networking into seven layers."
+        },
+        {
+          "block": 2003,
+          "text": "Layer 7 is the Application layer, used by HTTP."
+        },
+        {
+          "block": 2003,
+          "text": "Layer 4 is the Transport layer, using TCP and UDP."
+        },
+        {
+          "block": 2003,
+          "text": "Layer 3 is the Network layer, used by IP."
+        },
+        {
+          "block": 2003,
+          "text": "Layer 2 is the Data link layer, using Ethernet."
+        },
+        {
+          "block": 2003,
+          "text": "Layer 1 is the Physical layer, involving cables and Wi-Fi radio."
+        }
+      ]
+    },
+    {
+      "task": 3,
+      "points": [
+        {
+          "block": 2005,
+          "text": "TCP establishes a connection using a three-way handshake with SYN, SYN-ACK, and ACK packets."
+        },
+        {
+          "block": 2005,
+          "text": "TCP resends any data that gets lost during transmission."
+        },
+        {
+          "block": 2006,
+          "text": "UDP sends packets without a handshake."
+        },
+        {
+          "block": 2006,
+          "text": "UDP is quicker because it lacks a handshake."
+        },
+        {
+          "block": 2006,
+          "text": "UDP does not guarantee that packets will arrive."
+        }
+      ]
+    },
+    {
+      "task": 4,
+      "points": [
+        {
+          "block": 2008,
+          "text": "Port 80 is used for HTTP."
+        },
+        {
+          "block": 2008,
+          "text": "Port 443 is used for HTTPS."
+        },
+        {
+          "block": 2008,
+          "text": "Port 53 is used for DNS."
+        },
+        {
+          "block": 2009,
+          "text": "SSH runs on port 23."
+        },
+        {
+          "block": 2010,
+          "text": "FTP uses port 21 for its control connection."
+        }
+      ]
+    }
+  ],
+  "concepts": [
+    {
+      "name": "Network",
+      "aliases": [
+        "devices that can send data to each other"
+      ],
+      "topic": "Computer Basics",
+      "own_words": "",
+      "definition": "A network is a collection of devices capable of exchanging data. The internet is a large-scale example formed by connecting many such networks.",
+      "points": [
+        "The internet is loads of networks joined together."
+      ],
+      "gotchas": [],
+      "related": [
+        "Internet"
+      ],
+      "tasks": [
+        1
+      ]
+    },
+    {
+      "name": "OSI Model",
+      "aliases": [
+        "Open Systems Interconnection model"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "The OSI model is a conceptual framework that divides network communication into seven distinct layers. Layer 1 is Physical, Layer 2 is Data Link, Layer 3 is Network, Layer 4 is Transport, Layer 5 is Session, Layer 6 is Presentation, and Layer 7 is Application.",
+      "points": [
+        "OSI splits networking into 7 layers, from Physical (1) up to Application (7).",
+        "Layer 7 is the Application layer.",
+        "Layer 4 is the Transport layer.",
+        "Layer 3 is the Network layer.",
+        "Layer 2 is the Data link layer.",
+        "Layer 1 is the Physical layer."
+      ],
+      "gotchas": [
+        "It is unclear where TLS sits, possibly in the Session or Presentation layer."
+      ],
+      "related": [
+        "TCP",
+        "UDP",
+        "HTTP",
+        "IP",
+        "Ethernet"
+      ],
+      "tasks": [
+        2
+      ]
+    },
+    {
+      "name": "TCP",
+      "aliases": [
+        "Transmission Control Protocol"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "TCP is a transport layer protocol that ensures reliable data delivery. It establishes a connection using a three-way handshake involving SYN, SYN-ACK, and ACK packets. If any data is lost during transmission, TCP resends it.",
+      "points": [
+        "TCP opens a connection with a three-way handshake (SYN, SYN-ACK, ACK).",
+        "TCP resends anything that gets lost."
+      ],
+      "gotchas": [],
+      "related": [
+        "UDP",
+        "OSI Model"
+      ],
+      "tasks": [
+        3
+      ]
+    },
+    {
+      "name": "UDP",
+      "aliases": [
+        "User Datagram Protocol"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "UDP is a transport layer protocol that sends data without establishing a connection or guaranteeing delivery. It is faster than TCP because it skips the handshake process, but there is no assurance that packets will arrive.",
+      "points": [
+        "UDP just sends packets with no handshake.",
+        "It's quicker but nothing is guaranteed to arrive."
+      ],
+      "gotchas": [],
+      "related": [
+        "TCP",
+        "OSI Model"
+      ],
+      "tasks": [
+        3
+      ]
+    },
+    {
+      "name": "DNS",
+      "aliases": [
+        "Domain Name System"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "DNS is a system that translates domain names into IP addresses. It typically uses UDP for its queries because speed is prioritized over reliability for small data transfers.",
+      "points": [],
+      "gotchas": [
+        "The notes ask why DNS mostly uses UDP."
+      ],
+      "related": [
+        "UDP",
+        "HTTP"
+      ],
+      "tasks": [
+        3,
+        4
+      ]
+    },
+    {
+      "name": "HTTP",
+      "aliases": [
+        "Hypertext Transfer Protocol"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "HTTP is a protocol used for transmitting web pages over the internet. It operates at the Application layer of the OSI model and typically uses port 80.",
+      "points": [
+        "Layer 7 | Application | HTTP"
+      ],
+      "gotchas": [],
+      "related": [
+        "HTTPS",
+        "OSI Model"
+      ],
+      "tasks": [
+        2,
+        4
+      ]
+    },
+    {
+      "name": "HTTPS",
+      "aliases": [
+        "Hypertext Transfer Protocol Secure"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "HTTPS is the secure version of HTTP, using encryption to protect data in transit. It operates at the Application layer and typically uses port 443.",
+      "points": [
+        "Layer 7 | Application | HTTP",
+        "Port 443 is used for HTTPS."
+      ],
+      "gotchas": [
+        "TLS location within the OSI model is uncertain (Session or Presentation layer)."
+      ],
+      "related": [
+        "HTTP",
+        "TLS"
+      ],
+      "tasks": [
+        2,
+        4
+      ]
+    },
+    {
+      "name": "SSH",
+      "aliases": [
+        "Secure Shell"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "SSH is a protocol used for secure remote login and other secure network services over an insecure network. The notes state it runs on port 23, which is technically incorrect as SSH uses port 22.",
+      "points": [
+        "SSH runs on port 23."
+      ],
+      "gotchas": [],
+      "related": [
+        "FTP",
+        "HTTP"
+      ],
+      "tasks": [
+        4
+      ]
+    },
+    {
+      "name": "FTP",
+      "aliases": [
+        "File Transfer Protocol"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "FTP is a protocol used for transferring files between computers on a network. It uses port 21 for its control connection.",
+      "points": [
+        "FTP uses port 21 for its control connection."
+      ],
+      "gotchas": [],
+      "related": [
+        "SSH",
+        "HTTP"
+      ],
+      "tasks": [
+        4
+      ]
+    },
+    {
+      "name": "IP",
+      "aliases": [
+        "Internet Protocol"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "IP is a protocol used for routing packets across networks. It operates at the Network layer of the OSI model.",
+      "points": [
+        "Layer 3 | Network | IP"
+      ],
+      "gotchas": [],
+      "related": [
+        "OSI Model",
+        "TCP",
+        "UDP"
+      ],
+      "tasks": [
+        2
+      ]
+    },
+    {
+      "name": "Ethernet",
+      "aliases": [
+        "Data link layer technology"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "Ethernet is a family of wired networking technologies. It operates at the Data Link layer of the OSI model.",
+      "points": [
+        "Layer 2 | Data link | Ethernet"
+      ],
+      "gotchas": [],
+      "related": [
+        "OSI Model",
+        "Wi-Fi"
+      ],
+      "tasks": [
+        2
+      ]
+    },
+    {
+      "name": "Physical Layer",
+      "aliases": [
+        "Layer 1"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "The Physical layer is the lowest layer of the OSI model. It deals with the physical connection between devices, including cables and wireless radio signals.",
+      "points": [
+        "Layer 1 | Physical | cables, Wi-Fi radio"
+      ],
+      "gotchas": [],
+      "related": [
+        "OSI Model",
+        "Ethernet",
+        "Wi-Fi"
+      ],
+      "tasks": [
+        2
+      ]
+    },
+    {
+      "name": "TLS",
+      "aliases": [
+        "Transport Layer Security"
+      ],
+      "topic": "Networking",
+      "own_words": "",
+      "definition": "TLS is a cryptographic protocol used to secure communications over computer networks. The notes express confusion about whether it sits in the Session layer or the Presentation layer of the OSI model.",
+      "points": [],
+      "gotchas": [
+        "Where does TLS actually sit? Session layer or presentation?"
+      ],
+      "related": [
+        "HTTPS",
+        "OSI Model"
+      ],
+      "tasks": [
+        2
+      ]
+    }
+  ],
+  "tools": [],
+  "claims": [
+    {
+      "block": 2001,
+      "claim": "A network is just devices that can send data to each other."
+    },
+    {
+      "block": 2001,
+      "claim": "The internet is loads of networks joined together."
+    },
+    {
+      "block": 2002,
+      "claim": "OSI splits networking into 7 layers, from Physical (1) up to Application (7)."
+    },
+    {
+      "block": 2003,
+      "claim": "Layer 7 is the Application layer."
+    },
+    {
+      "block": 2003,
+      "claim": "Layer 4 is the Transport layer."
+    },
+    {
+      "block": 2003,
+      "claim": "Layer 3 is the Network layer."
+    },
+    {
+      "block": 2003,
+      "claim": "Layer 2 is the Data link layer."
+    },
+    {
+      "block": 2003,
+      "claim": "Layer 1 is the Physical layer."
+    },
+    {
+      "block": 2005,
+      "claim": "TCP opens a connection with a three-way handshake (SYN, SYN-ACK, ACK)."
+    },
+    {
+      "block": 2005,
+      "claim": "TCP resends anything that gets lost."
+    },
+    {
+      "block": 2006,
+      "claim": "UDP just sends packets with no handshake."
+    },
+    {
+      "block": 2006,
+      "claim": "UDP is quicker but nothing is guaranteed to arrive."
+    },
+    {
+      "block": 2008,
+      "claim": "Port 80 is used for HTTP."
+    },
+    {
+      "block": 2008,
+      "claim": "Port 443 is used for HTTPS."
+    },
+    {
+      "block": 2008,
+      "claim": "Port 53 is used for DNS."
+    },
+    {
+      "block": 2009,
+      "claim": "SSH runs on port 23."
+    },
+    {
+      "block": 2010,
+      "claim": "FTP uses port 21 for its control connection."
+    },
+    {
+      "block": 2011,
+      "claim": "HTTPS uses port 443 by default."
+    }
+  ],
+  "answers": [
+    {
+      "block": 2007,
+      "answer": "DNS mostly uses UDP because it is faster and the data packets are small enough that reliability can be handled at higher layers or via retries. Speed is prioritized for lookups."
+    },
+    {
+      "block": 2011,
+      "answer": "HTTPS uses port 443 by default."
+    }
+  ],
+  "explanations": [
+    {
+      "block": 2004,
+      "explanation": "TLS sits between the Session and Presentation layers in the OSI model. It is often considered part of Layer 6 (Presentation) because it handles encryption and decryption, but it also manages sessions, so it can be associated with Layer 5 (Session). In modern networking, it is frequently grouped with the Application layer for practical purposes."
+    }
+  ],
+  "cards": [
+    {
+      "question": "What are the three steps of a TCP three-way handshake?",
+      "answer": "SYN, SYN-ACK, ACK",
+      "concept": "TCP"
+    },
+    {
+      "question": "Which OSI layer does HTTP operate on?",
+      "answer": "Layer 7 (Application)",
+      "concept": "HTTP"
+    },
+    {
+      "question": "What is the default port for HTTPS?",
+      "answer": "443",
+      "concept": "HTTPS"
+    },
+    {
+      "question": "Why does UDP not guarantee delivery?",
+      "answer": "It sends packets without a handshake and has no built-in retransmission mechanism.",
+      "concept": "UDP"
+    },
+    {
+      "question": "Which layer of the OSI model handles physical cables and Wi-Fi radio?",
+      "answer": "Layer 1 (Physical)",
+      "concept": "Physical Layer"
+    },
+    {
+      "question": "What is the default port for DNS?",
+      "answer": "53",
+      "concept": "DNS"
+    },
+    {
+      "question": "Which protocol uses a three-way handshake to ensure reliable data transfer?",
+      "answer": "TCP",
+      "concept": "TCP"
+    },
+    {
+      "question": "What is the default port for SSH?",
+      "answer": "22 (Note: The notes incorrectly stated 23)",
+      "concept": "SSH"
+    },
+    {
+      "question": "Which OSI layer is responsible for routing packets using IP?",
+      "answer": "Layer 3 (Network)",
+      "concept": "IP"
+    },
+    {
+      "question": "What does the Transport layer of the OSI model handle?",
+      "answer": "End-to-end communication, reliability, and flow control (TCP/UDP).",
+      "concept": "OSI Model"
+    }
+  ],
+  "processes": []
+}

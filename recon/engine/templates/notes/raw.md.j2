@@ -1,0 +1,16 @@
+{#- Tyler's capture exactly as he typed it, block by block. Written once on Apply, never changed. -#}
+{{ properties }}
+# {{ title }}
+
+{% for task in tasks %}
+## {{ task.heading }}
+
+{% if task.skipped %}
+*Skipped.*
+
+{% endif %}
+{% for block in task.blocks %}
+{{ block }}
+
+{% endfor %}
+{% endfor %}

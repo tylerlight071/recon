@@ -20,12 +20,13 @@ class FakeClient:
             raise self.list_error
         return ollama.ListResponse(models=[ollama.ListResponse.Model(model=m) for m in self.models])
 
-    def chat(
+    def chat(  # noqa: PLR0913 - mirrors ollama.Client.chat
         self,
         model: str = "",
         messages: Sequence[Mapping[str, str]] | None = None,
         *,
         stream: bool = False,
+        think: bool | None = None,
         format: dict[str, object] | None = None,  # noqa: A002 - Ollama's own keyword
         options: Mapping[str, float] | None = None,
     ) -> object:
@@ -34,6 +35,7 @@ class FakeClient:
                 "model": model,
                 "messages": [dict(m) for m in messages or ()],
                 "stream": stream,
+                "think": think,
                 "format": format,
                 "options": dict(options or {}),
             }

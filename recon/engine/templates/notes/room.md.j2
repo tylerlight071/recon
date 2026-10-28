@@ -1,0 +1,101 @@
+{#- The room note (SPEC.md, Note types). Every value arrives already escaped from engine/notes.py. -#}
+{% from "notes/_macros.md.j2" import section %}
+{{ properties }}
+# {{ title }}
+
+## Summary
+
+{% call section("summary") %}
+{% for line in summary %}
+- {{ line }}
+{% endfor %}
+{% endcall %}
+
+
+## Tasks
+
+{% call section("tasks") %}
+{% for task in tasks %}
+### {{ task.heading }}
+
+{% if task.skipped %}
+*Skipped.*
+
+{% endif %}
+{% for point in task.points %}
+- {{ point }}
+{% endfor %}
+
+{% for question in task.room_questions %}
+**Room question:** {{ question.text }}
+
+{% if question.answer %}
+> [!question]- Answer
+{{ question.answer }}
+
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endcall %}
+
+{% if commands %}
+
+## Commands
+
+{% call section("commands") %}
+| Command | What it does | Task |
+| --- | --- | --- |
+{% for row in commands %}
+| {{ row.command }} | {{ row.comment }} | {{ row.task }} |
+{% endfor %}
+{% endcall %}
+
+{% endif %}
+{% if tables or diagrams %}
+
+## Tables and diagrams
+
+{% call section("tables") %}
+{% for table in tables %}
+**{{ table.label }}**
+
+{{ table.body }}
+
+{% endfor %}
+{% for diagram in diagrams %}
+**{{ diagram.title }}** *(diagram drawn from your notes, generated)*
+
+```mermaid
+flowchart LR
+{% for line in diagram.lines %}
+    {{ line }}
+{% endfor %}
+```
+
+{% endfor %}
+{% endcall %}
+
+{% endif %}
+{% if questions %}
+
+## Open questions
+
+{% call section("questions") %}
+{% for question in questions %}
+**{{ question.text }}**
+
+{% if question.answer %}
+> [!note]- Suggested answer (generated)
+> {{ question.answer }}
+
+{% endif %}
+{% endfor %}
+{% endcall %}
+
+{% endif %}
+
+## Source notes
+
+{% call section("source") %}
+Your notes as you wrote them: {{ raw_link }}
+{% endcall %}

@@ -39,6 +39,9 @@ DEFAULT_PORT: Final = 11434
 DEFAULT_HOST: Final = f"http://127.0.0.1:{DEFAULT_PORT}"
 TIMEOUT_S: Final = 300.0
 """Generous: the first call after a while loads the model into VRAM."""
+CONTEXT_TOKENS: Final = 16_384
+"""Context per call. Ollama's default is 4k on cards under 24 GB, too small for a
+whole room plus its schema, and it truncates silently, so every call sets it."""
 CHECK_TIMEOUT_S: Final = 5.0
 """Health checks only list models, so a slow answer means something's wrong."""
 _LOOPBACK_NAMES: Final = frozenset({"localhost"})
@@ -52,12 +55,13 @@ class Client(Protocol):
     def list(self) -> ollama.ListResponse:
         """Installed models."""
 
-    def chat(
+    def chat(  # noqa: PLR0913 - mirrors ollama.Client.chat
         self,
         model: str = "",
         messages: Sequence[Mapping[str, str]] | None = None,
         *,
         stream: bool = False,
+        think: bool | None = None,
         format: dict[str, object] | None = None,  # noqa: A002 - Ollama's own keyword
         options: Mapping[str, float] | None = None,
     ) -> object:
@@ -72,6 +76,8 @@ class _Call:
     step: str
     shape: dict[str, object]
     run: RunLog | None
+    think: bool
+    context: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +183,8 @@ class OllamaService:
         prompt: str,
         run: RunLog | None = None,
         step: str = "call",
+        think: bool = False,
+        context: int = CONTEXT_TOKENS,
     ) -> T:
         """Ask `model` for JSON matching `schema`, validated, with one retry.
 
@@ -187,6 +195,8 @@ class OllamaService:
             prompt: The step's input; untrusted text belongs between delimiters.
             run: Where raw replies are kept (none in health checks).
             step: The step's name, for the run's file names.
+            think: Let a thinking model reason first (slower; the bake-off decides).
+            context: Tokens of context for the call (`num_ctx`).
 
         Returns:
             The validated reply.
@@ -198,7 +208,14 @@ class OllamaService:
             ModelCallFailedError: Ollama answered with another error.
             ModelResponseInvalidError: Both replies failed validation.
         """
-        call = _Call(model=model, step=step, shape=schema.model_json_schema(), run=run)
+        call = _Call(
+            model=model,
+            step=step,
+            shape=schema.model_json_schema(),
+            run=run,
+            think=think,
+            context=context,
+        )
         messages = [
             {"role": "system", "content": f"{system}\n\n{_describe(call.shape)}"},
             {"role": "user", "content": prompt},
@@ -227,7 +244,8 @@ class OllamaService:
                 model=call.model,
                 messages=messages,
                 format=call.shape,
-                options={"temperature": 0},
+                options={"temperature": 0, "num_ctx": call.context},
+                think=call.think,
                 stream=False,
             )
         except ConnectionError as exc:

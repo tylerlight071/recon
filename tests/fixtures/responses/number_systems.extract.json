@@ -1,0 +1,261 @@
+{
+  "summary": [
+    "Computers store data as bits, so we use base 2 (binary) and base 16 (hexadecimal) to represent numbers.",
+    "Binary places correspond to powers of 2, while hexadecimal digits represent exactly 4 bits.",
+    "Converting between bases involves grouping binary digits or using arithmetic for decimal conversions."
+  ],
+  "tasks": [
+    {
+      "task": 1,
+      "points": [
+        {
+          "block": 1001,
+          "text": "Computers store bits, so we use base 2 or base 16 to see what is in memory."
+        }
+      ]
+    },
+    {
+      "task": 2,
+      "points": [
+        {
+          "block": 1003,
+          "text": "Each binary place represents a power of 2, increasing from right to left as 1, 2, 4, 8, 16."
+        },
+        {
+          "block": 1004,
+          "text": "The binary number 1101 equals 11 in decimal."
+        }
+      ]
+    },
+    {
+      "task": 3,
+      "points": [
+        {
+          "block": 1006,
+          "text": "Hexadecimal uses digits 0-9 and A-F, meaning one hex digit is exactly 4 bits."
+        },
+        {
+          "block": 1007,
+          "text": "The hexadecimal number 0x2F equals 46 in decimal."
+        }
+      ]
+    },
+    {
+      "task": 4,
+      "points": [
+        {
+          "block": 1009,
+          "text": "To convert binary to hex, split the bits into groups of four from the right and swap each group for a hex digit."
+        },
+        {
+          "block": 1010,
+          "text": "0xFF is 255 in decimal, which is the largest number one byte can hold."
+        }
+      ]
+    },
+    {
+      "task": 5,
+      "points": []
+    }
+  ],
+  "concepts": [
+    {
+      "name": "Binary",
+      "aliases": [
+        "base 2",
+        "bits"
+      ],
+      "topic": "Number Systems",
+      "own_words": "",
+      "definition": "A number system with base 2, using only digits 0 and 1. Each position represents a power of 2.",
+      "points": [
+        "Each binary place is a power of 2: 1, 2, 4, 8, 16 going right to left.",
+        "1101 in binary is 11 in decimal."
+      ],
+      "gotchas": [
+        "People often wonder why we bother with hex instead of just reading binary directly."
+      ],
+      "related": [
+        "Hexadecimal",
+        "Decimal"
+      ],
+      "tasks": [
+        2
+      ]
+    },
+    {
+      "name": "Hexadecimal",
+      "aliases": [
+        "hex",
+        "base 16",
+        "0x notation"
+      ],
+      "topic": "Number Systems",
+      "own_words": "",
+      "definition": "A number system with base 16, using digits 0-9 and letters A-F. One hex digit represents exactly 4 bits.",
+      "points": [
+        "Hex uses 0-9 then A-F, so one hex digit is exactly 4 bits.",
+        "0x2F is 46 in decimal."
+      ],
+      "gotchas": [],
+      "related": [
+        "Binary",
+        "Decimal"
+      ],
+      "tasks": [
+        3,
+        4
+      ]
+    },
+    {
+      "name": "Decimal",
+      "aliases": [
+        "base 10",
+        "denary"
+      ],
+      "topic": "Number Systems",
+      "own_words": "",
+      "definition": "The standard number system humans use, with base 10. It is the target for most conversions.",
+      "points": [],
+      "gotchas": [],
+      "related": [
+        "Binary",
+        "Hexadecimal"
+      ],
+      "tasks": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "name": "Byte",
+      "aliases": [
+        "8 bits"
+      ],
+      "topic": "Data Storage",
+      "own_words": "",
+      "definition": "A unit of digital information consisting of 8 bits. The maximum value it can hold is 255 (0xFF).",
+      "points": [],
+      "gotchas": [],
+      "related": [
+        "Binary",
+        "Hexadecimal"
+      ],
+      "tasks": [
+        4
+      ]
+    }
+  ],
+  "tools": [],
+  "claims": [
+    {
+      "block": 1001,
+      "claim": "Computers only store bits, so we write numbers in base 2 or base 16 to see what's actually in memory."
+    },
+    {
+      "block": 1003,
+      "claim": "Each binary place is a power of 2: 1, 2, 4, 8, 16 going right to left."
+    },
+    {
+      "block": 1004,
+      "claim": "1101 in binary is 11 in decimal."
+    },
+    {
+      "block": 1006,
+      "claim": "Hex uses 0-9 then A-F, so one hex digit is exactly 4 bits."
+    },
+    {
+      "block": 1007,
+      "claim": "0x2F is 46 in decimal."
+    },
+    {
+      "block": 1009,
+      "claim": "Binary to hex: split the bits into groups of 4 from the right and swap each group for one hex digit."
+    },
+    {
+      "block": 1010,
+      "claim": "0xFF is 255, the biggest number one byte can hold."
+    }
+  ],
+  "answers": [
+    {
+      "block": 1011,
+      "answer": "Yes. You can convert decimal to hex in your head by repeatedly dividing the number by 16 and noting the remainders. For example, 46 divided by 16 is 2 with a remainder of 14 (E), so 46 becomes 2E."
+    },
+    {
+      "block": 1012,
+      "answer": "10"
+    }
+  ],
+  "explanations": [
+    {
+      "block": 1002,
+      "explanation": "We use hexadecimal because it is a compact way to represent binary data. Since one hex digit equals four bits, a single byte (8 bits) can be written as just two hex characters. This makes reading and writing memory addresses much easier than using long strings of 0s and 1s."
+    }
+  ],
+  "cards": [
+    {
+      "question": "What base do computers use to store data?",
+      "answer": "Base 2 (Binary).",
+      "concept": "Binary"
+    },
+    {
+      "question": "How many bits are in one hexadecimal digit?",
+      "answer": "Exactly 4 bits.",
+      "concept": "Hexadecimal"
+    },
+    {
+      "question": "What is the decimal value of binary 1101?",
+      "answer": "13 (8 + 4 + 0 + 1).",
+      "concept": "Binary"
+    },
+    {
+      "question": "What does 0xFF represent in decimal?",
+      "answer": "255.",
+      "concept": "Hexadecimal"
+    },
+    {
+      "question": "How do you convert binary to hexadecimal?",
+      "answer": "Split the bits into groups of four from the right and replace each group with its hex digit.",
+      "concept": "Hexadecimal"
+    },
+    {
+      "question": "What is the maximum value a byte can hold in decimal?",
+      "answer": "255.",
+      "concept": "Byte"
+    },
+    {
+      "question": "Which hex digit represents the decimal number 10?",
+      "answer": "A.",
+      "concept": "Hexadecimal"
+    },
+    {
+      "question": "What is the binary equivalent of hex F?",
+      "answer": "1111.",
+      "concept": "Hexadecimal"
+    },
+    {
+      "question": "Why do we use hexadecimal instead of binary for memory addresses?",
+      "answer": "It is more compact and easier to read; one hex digit equals four bits.",
+      "concept": "Hexadecimal"
+    },
+    {
+      "question": "What is the decimal value of 0x2F?",
+      "answer": "46 (2*16 + 15).",
+      "concept": "Hexadecimal"
+    }
+  ],
+  "processes": [
+    {
+      "title": "Converting Binary to Hexadecimal",
+      "task": 4,
+      "steps": [
+        "Write down the binary number.",
+        "Split the bits into groups of four starting from the right.",
+        "Convert each group of four bits to its corresponding hex digit.",
+        "Combine the hex digits to form the final result."
+      ]
+    }
+  ]
+}
