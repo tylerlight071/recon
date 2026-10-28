@@ -1,8 +1,8 @@
 """The Home screen's data, exposed to QML as `HomeModel` (task 1.7).
 
 One primary action: "Start a room", or "Carry on with <room>" when one is in
-progress. The "Where was I?" card remembers for Tyler (ADHD rule 6): the
-room, "Task 4 of 7", how long ago, and the last line he wrote. Times are
+progress. The "Where was I?" card remembers for the user (ADHD rule 6): the
+room, "Task 4 of 7", how long ago, and the last line written. Times are
 calm ("2 days ago"), never overdue counts (ADHD rule 8).
 """
 

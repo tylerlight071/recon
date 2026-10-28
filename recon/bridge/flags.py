@@ -24,7 +24,7 @@ class FlagGuard(QObject):
     """Cleans editor text and handles "Not a flag, keep it"."""
 
     flagSkipped = Signal(int, str)  # noqa: N815 - Qt naming, used from QML
-    """(block id, keepable): `keepable` is the one hex string Tyler may keep, else ""."""
+    """(block id, keepable): `keepable` is the one hex string the user may keep, else ""."""
     keptRestored = Signal(int, str)  # noqa: N815 - Qt naming, used from QML
     """(block id, text): put the kept string back in that block's editor."""
     _kept = Signal(int, str, bool)
@@ -89,7 +89,7 @@ class FlagGuard(QObject):
 
     @Slot(int, str)
     def keep(self, block_id: int, text: str) -> None:
-        """Tyler said "Not a flag, keep it": remember it, then restore it in the editor."""
+        """The user said "Not a flag, keep it": remember it, then restore it in the editor."""
 
         def job() -> None:
             try:

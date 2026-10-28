@@ -1,4 +1,4 @@
-"""The Markdown export: golden file, escaping, and structure that Tyler's text can't break."""
+"""The Markdown export: golden file, escaping, and structure that the user's text can't break."""
 
 import os
 import re
@@ -219,7 +219,7 @@ def test_tylers_text_never_changes_the_notes_structure(
 
     headings, stray = _structure(render_export(_room(*tasks, name=name)))
 
-    # One title and one heading per task; no quotes, rules or comments of Tyler's own.
+    # One title and one heading per task; no quotes, rules or comments of the user's own.
     assert headings == ["#"] + ["##"] * len(tasks)
     assert stray == []
 

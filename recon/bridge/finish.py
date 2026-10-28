@@ -2,7 +2,7 @@
 
 "Finish room" marks the room done and shows a calm completion moment in the
 panel: what was written, how long it took, and "Export as Markdown" (one `.md`
-per room, into a folder Tyler picks; the folder is remembered). Phase 2
+per room, into a folder the user picks; the folder is remembered). Phase 2
 replaces this with processing and review. "Back to the room" undoes the
 finish, so pressing it by mistake costs nothing.
 """
@@ -44,7 +44,7 @@ def summary(tasks: list[Task]) -> str:
 
 
 def shown_path(path: Path, home: Path) -> str:
-    """A path as Tyler would say it: under his home folder it starts with ~."""
+    """A path as the user would say it: under the home folder it starts with ~."""
     return f"~/{path.relative_to(home)}" if path.is_relative_to(home) else str(path)
 
 
@@ -76,7 +76,7 @@ class FinishBridge(QObject):
             open_folder: Shows a folder in the file manager.
             submit: Runs a job off the UI thread, in order with the session's.
             today: The date written on the export.
-            home: Tyler's home folder, for showing paths as ~/… (defaults to Path.home()).
+            home: The user's home folder, for showing paths as ~/… (defaults to Path.home()).
             parent: Qt parent.
         """
         super().__init__(parent)

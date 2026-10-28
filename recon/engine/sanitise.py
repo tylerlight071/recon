@@ -1,6 +1,6 @@
 """Making model-derived text safe to put in a vault note (CLAUDE.md, Sanitise).
 
-Every model reply is untrusted: it may be wrong, or shaped by text Tyler
+Every model reply is untrusted: it may be wrong, or shaped by text the user
 pasted. Before any of it goes into Markdown, `inline` turns it into one line
 of plain text that can't:
 - link or embed (`[[…]]`, `![[…]]`, `![…](…)`): only the engine makes links;

@@ -1,4 +1,4 @@
-"""Reading Tyler's Command blocks: each command, what it does, which tools and flags.
+"""Reading the user's Command blocks: each command, what it does, which tools and flags.
 
 Pure Python and checked in code, never by the model (CLAUDE.md, Model rules):
 the room note's Commands table, the tool notes' examples, and which flags a
@@ -25,7 +25,7 @@ _WRAPPER_VALUES: Final = frozenset({"-u", "-g", "-U", "-C", "-D", "-h", "-p", "-
 
 @dataclass(frozen=True, slots=True)
 class CommandLine:
-    """One command and what Tyler said it does ("" if nothing)."""
+    """One command and what the user said it does ("" if nothing)."""
 
     command: str
     comment: str

@@ -28,7 +28,7 @@ QtObject {
     // handler (for `accent`), so the token is `textOnAccent`.
     readonly property color textOnAccent: "#0b0c0e"
 
-    // ---- Status (never red for anything Tyler did) ------------------------
+    // ---- Status (never red for anything the user did) ------------------------
     readonly property color success: "#5fb47a"
     readonly property color warning: "#d9a441"
 

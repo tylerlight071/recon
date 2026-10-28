@@ -109,11 +109,11 @@ def test_a_note_changed_since_staging_stops_apply_whole(
         target.write_text("%% recon:start definition %%\nold\n%% recon:end %%\n")
         stage(_rendered(), vault, run, room_id=1)
         if change == "edited":
-            target.write_text(target.read_text() + "Tyler's own line\n")
+            target.write_text(target.read_text() + "The user's own line\n")
         else:
             target.unlink()
     else:
-        target.write_text("Tyler made this note in Obsidian meanwhile\n")
+        target.write_text("The user made this note in Obsidian meanwhile\n")
     before = _snapshot(vault)
 
     with pytest.raises(ApplyConflict):
@@ -175,7 +175,7 @@ def test_merge_changes_only_marker_insides_and_adds_missing_sections() -> None:
         '---\ntype: concept\naliases: ["mine"]\n---\n# Binary\n\n'
         "## Definition\n\nTyler's own intro.\n\n"
         "%% recon:start definition %%\nold definition\n%% recon:end %%\n\n"
-        "Tyler's note after the section.\n"
+        "The user's note after the section.\n"
     )
     new = (
         "---\ntype: concept\n---\n# Binary\n\n## Definition\n\n"
@@ -189,7 +189,7 @@ def test_merge_changes_only_marker_insides_and_adds_missing_sections() -> None:
         '---\ntype: concept\naliases: ["mine"]\n---\n# Binary\n\n'
         "## Definition\n\nTyler's own intro.\n\n"
         "%% recon:start definition %%\nnew definition\n%% recon:end %%\n\n"
-        "Tyler's note after the section.\n\n"
+        "The user's note after the section.\n\n"
         "## Notes\n\n%% recon:start from-dns %%\n### From [[DNS]]\n- point\n%% recon:end %%\n"
     )
 
@@ -385,16 +385,16 @@ def test_recover_finishes_an_interrupted_apply(places: tuple[Path, Path, Path]) 
         target = vault / file.path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((run / STAGED / file.path).read_bytes())
-    # And Tyler edited one not yet written: it must be left alone.
+    # And the user edited one not yet written: it must be left alone.
     hand = vault / manifest.files[-1].path
     hand.parent.mkdir(parents=True, exist_ok=True)
-    hand.write_text("Tyler's own")
+    hand.write_text("The user's own")
 
     result = recover(run, vault)
 
     assert result is not None
     assert result.written == len(manifest.files) - 3
-    assert hand.read_text() == "Tyler's own"
+    assert hand.read_text() == "The user's own"
     for file in manifest.files[:-1]:
         assert hashlib.sha256((vault / file.path).read_bytes()).hexdigest() == file.sha256
     assert load_journal(run) == Journal(state="applied", written=result.written)
@@ -452,7 +452,7 @@ def test_runs_without_raw_notes_stage_fine(places: tuple[Path, Path, Path]) -> N
 def test_a_note_that_is_not_utf8_is_left_alone(places: tuple[Path, Path, Path]) -> None:
     vault, run, backups = places
     (vault / "02 Concepts").mkdir()
-    odd = b"Tyler's note \xff\xfe in another encoding\n"
+    odd = b"The user's note \xff\xfe in another encoding\n"
     (vault / CONCEPT).write_bytes(odd)
 
     manifest = stage(_rendered(), vault, run, room_id=1)
@@ -507,13 +507,13 @@ def test_recover_keeps_the_backup_count_and_skips_hand_edits_anywhere(
     (run / JOURNAL).write_text(Journal(state="applying", backed_up=3).model_dump_json())
     first = vault / manifest.files[0].path
     first.parent.mkdir(parents=True, exist_ok=True)
-    first.write_text("Tyler's own, made after Apply began")
+    first.write_text("The user's own, made after Apply began")
 
     result = recover(run, vault)
 
     assert result is not None
     assert (result.written, result.backed_up) == (len(manifest.files) - 1, 3)
-    assert first.read_text() == "Tyler's own, made after Apply began"
+    assert first.read_text() == "The user's own, made after Apply began"
     assert (vault / manifest.files[1].path).exists()
     journal = load_journal(run)
     assert journal is not None

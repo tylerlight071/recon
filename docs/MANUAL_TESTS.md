@@ -1,6 +1,6 @@
 # Manual tests
 
-Tyler runs these once, on the finished app, as one session (decided at Gate 1). Each phase gate adds its steps here instead of waiting for them. Tick them off in the final test; note anything fiddly, slow, cluttered or unclear beside the step.
+These are run once, on the finished app, as one session (decided at Gate 1). Each phase gate adds its steps here instead of waiting for them. Tick them off in the final test; note anything fiddly, slow, cluttered or unclear beside the step.
 
 Launch Recon the way it will really be used: from the KDE app menu (`uv run python -m scripts.install_desktop` installs the entry).
 

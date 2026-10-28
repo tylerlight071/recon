@@ -1,7 +1,7 @@
 """Render every screen headless into a folder (CLAUDE.md, Testing: screenshots at gates).
 
 Builds the app exactly as `python -m recon` does (`create_bridges`), against a
-throwaway data folder seeded with an invented room, so nothing of Tyler's is
+throwaway data folder seeded with an invented room, so nothing of the user's is
 read or written. Run: `uv run python -m scripts.screenshots tests/screenshots`.
 """
 

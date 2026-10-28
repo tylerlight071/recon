@@ -165,7 +165,7 @@ def test_own_words_must_really_be_his() -> None:
     )
     udp, osi, network = result.concepts
 
-    # The model's "his words" weren't his: generated, unless a sentence of his names it first.
+    # The model's "own words" weren't the user's: generated, unless one of theirs names it first.
     assert udp.own_words.startswith("UDP just sends packets with no handshake")
     assert osi.own_words.startswith("OSI splits networking into 7 layers")
     assert osi.definition == ""

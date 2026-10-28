@@ -37,14 +37,14 @@ class _Schema(BaseModel):
 
 
 class Point(_Schema):
-    """One of Tyler's points, tidied, with the block it came from."""
+    """One of the user's points, tidied, with the block it came from."""
 
     block: int = Field(description="The number of the block this point comes from.")
     text: Line = Field(description="The point as a short, tidy sentence. Only what he wrote.")
 
 
 class TaskPoints(_Schema):
-    """Tyler's points for one task, tidied."""
+    """The user's points for one task, tidied."""
 
     task: int = Field(ge=1, description="The task number, as in the notes.")
     points: list[Point] = Field(

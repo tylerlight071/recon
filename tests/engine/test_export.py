@@ -37,13 +37,13 @@ def test_writes_one_private_markdown_file(tmp_path: Path) -> None:
 
 
 def test_never_overwrites(tmp_path: Path) -> None:
-    (tmp_path / "DNS in Detail.md").write_text("Tyler's own file")
+    (tmp_path / "DNS in Detail.md").write_text("The user's own file")
 
     second = export_room(_room(), tmp_path)
     third = export_room(_room(), tmp_path)
 
     assert (second.name, third.name) == ("DNS in Detail (2).md", "DNS in Detail (3).md")
-    assert (tmp_path / "DNS in Detail.md").read_text() == "Tyler's own file"
+    assert (tmp_path / "DNS in Detail.md").read_text() == "The user's own file"
 
 
 @pytest.mark.parametrize("name", ["../../escape", "/etc/passwd", "..", "a/../../b", "CON"])

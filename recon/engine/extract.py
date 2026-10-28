@@ -7,9 +7,9 @@ schema, its length limits and the checks below are the defence.
 Anything checkable in code is checked here, and code wins:
 - task points only for tasks the room has;
 - answers and explanations only for Question and Confused by blocks;
-- concepts and tools only if Tyler's notes mention them (no invented notes);
-- `own_words` only if it really is his sentence, otherwise it's generated;
-- a tool's flags only if they appear in his commands for that tool;
+- concepts and tools only if the user's notes mention them (no invented notes);
+- `own_words` only if it really is the user's sentence, otherwise it's generated;
+- a tool's flags only if they appear in the user's commands for that tool;
 - `related` only to other concepts from this room; duplicates merged;
 - flags stripped from everything the model wrote (hard rule 2).
 """
@@ -32,7 +32,7 @@ from recon.services.runs import RunLog
 PROMPT: Final = Path(__file__).resolve().parent / "prompts" / "extract.RoomExtract.md"
 STEP: Final = "extract"
 POINT_SOURCES: Final = frozenset({"key_idea", "command", "table", "voice"})
-"""Block types a task point may come from: his own statements."""
+"""Block types a task point may come from: the user's own statements."""
 LABELS: Final = {
     "key_idea": "key idea",
     "command": "command",
@@ -143,7 +143,7 @@ def _block_lines(block: CaptureBlock) -> str:
 
 
 def _data(text: str) -> str:
-    # Tyler's text can't open or close the delimiters: "</room>" gets a look-alike "<".
+    # The user's text can't open or close the delimiters: "</room>" gets a look-alike "<".
     return _DELIMITER.sub(lambda m: f"{_GUARD}{m.group(1)}{m.group(2)}", text)
 
 
@@ -191,7 +191,7 @@ def check(raw: RoomExtract, capture: Capture) -> RoomExtract:
 
 
 def _tasks(tasks: Iterable[TaskPoints], capture: Capture) -> list[TaskPoints]:
-    """Points only from his own statements, in the task they belong to.
+    """Points only from the user's own statements, in the task they belong to.
 
     A point must name a Key idea, Command, Table or Voice block of its task:
     questions and confusions are answered elsewhere, never restated as facts.
@@ -260,7 +260,7 @@ def _tools(tools: Iterable[Tool], notes: str, capture: Capture) -> list[Tool]:
 
 
 def _own_words(own: str, generated: str, notes: str) -> tuple[str, str]:
-    """His sentence only if it's really in his notes; otherwise it counts as generated."""
+    """The user's sentence only if it's really in the notes; otherwise it counts as generated."""
     own = " ".join(own.split())
     if own and _normalise(own) in notes:
         return own, ""
@@ -283,7 +283,7 @@ def _without_tool_names(concepts: list[Concept], tools: list[Tool]) -> list[Conc
 
 
 def _sentences(capture: Capture) -> list[str]:
-    """His Key idea and Voice sentences, in order: where his own definitions live."""
+    """The user's Key idea and Voice sentences, in order: where their own definitions live."""
     found: list[str] = []
     for block in capture.blocks():
         if block.type in {"key_idea", "voice"}:
@@ -293,10 +293,10 @@ def _sentences(capture: Capture) -> list[str]:
 
 
 def _with_own_words(concept: Concept, sentences: Iterable[str]) -> Concept:
-    """His first sentence that starts by naming the concept, as its definition.
+    """The user's first sentence that starts by naming the concept, as its definition.
 
-    "TCP opens a connection with…" defines TCP in his words; the model often
-    misses these, and his words beat a generated definition (SPEC.md, Concept note).
+    "TCP opens a connection with…" defines TCP in the user's words; the model often
+    misses these, and their words beat a generated definition (SPEC.md, Concept note).
     """
     names = [_normalise(n) for n in (concept.name, *concept.aliases)]
     for sentence in sentences:

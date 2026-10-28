@@ -1,7 +1,7 @@
-"""Reading structure out of what Tyler typed or pasted: tables and command comments.
+"""Reading structure out of what the user typed or pasted: tables and command comments.
 
-Pure Python, no Qt. The Table block's grid preview uses `parse_table` while he
-types, and the vault templates (Phase 2) will use the same parse, so what he
+Pure Python, no Qt. The Table block's grid preview uses `parse_table` while the
+user types, and the vault templates (Phase 2) will use the same parse, so what the user
 sees is what the note gets. `comment_start` finds the `# what it does` part of
 a command line so the editor can show it dimmer.
 """

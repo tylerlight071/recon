@@ -41,7 +41,7 @@ SHORTCUT_DESCRIPTION = "Hold to talk (Recon)"
 PREFERRED_TRIGGER = "F9"
 _REPLY_TIMEOUT_S = 10.0
 _DIALOG_TIMEOUT_S = 120.0
-"""BindShortcuts waits for Tyler to answer KDE's permission dialog."""
+"""BindShortcuts waits for the user to answer KDE's permission dialog."""
 
 type Variant = tuple[str, Any]
 """A D-Bus variant as jeepney writes it: (signature, value)."""

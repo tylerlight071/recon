@@ -1,7 +1,7 @@
 import QtQuick
 import "../theme"
 
-// The Table block's grid preview: the parsed cells under the text, so Tyler
+// The Table block's grid preview: the parsed cells under the text, so the user
 // sees how the note will read the table. Shows a capped slice; the note keeps all.
 Rectangle {
     id: preview

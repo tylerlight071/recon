@@ -46,7 +46,7 @@ class SettingsBridge(QObject):
             settings: Settings loaded at start-up.
             save: Persists settings (injected so tests can fake it).
             parent: Qt parent.
-            home: Tyler's home folder, for ~/ paths (defaults to Path.home()).
+            home: The user's home folder, for ~/ paths (defaults to Path.home()).
             submit: Runs a save off the UI thread (a serial worker, so the last change
                 wins; tests pass a synchronous one).
         """
@@ -153,7 +153,7 @@ class SettingsBridge(QObject):
     vaultPath = Property(str, _get_vault_path, notify=vaultPathChanged)  # noqa: N815
     vaultUrl = Property(str, _get_vault_url, notify=vaultPathChanged)  # noqa: N815
     vaultShown = Property(str, _get_vault_shown, notify=vaultPathChanged)  # noqa: N815
-    """The vault folder as Tyler would say it (~/Cyber Vault)."""
+    """The vault folder as the user would say it (~/Cyber Vault)."""
 
     def _get_obsidian_vault(self) -> str:
         return self._settings.obsidian_vault
@@ -164,7 +164,7 @@ class SettingsBridge(QObject):
     obsidianVault = Property(  # noqa: N815 - Qt naming, used from QML
         str, _get_obsidian_vault, _set_obsidian_vault, notify=obsidianVaultChanged
     )
-    """The vault Tyler confirmed he opened in Obsidian (task 2.1)."""
+    """The vault the user confirmed they opened in Obsidian (task 2.1)."""
 
     @Slot(str)
     def chooseVault(self, folder_url: str) -> None:  # noqa: N802 - Qt naming, used from QML

@@ -1,15 +1,15 @@
 # Recon: TryHackMe Study Companion — Design Spec
 
-As of 23 October 2026 · Tyler
+As of 23 October 2026
 
 ## Overview and goals
 
-Recon is a desktop app for CachyOS (KDE Plasma) that sits as a slim panel beside the browser while Tyler does a TryHackMe room. It tells him exactly what to write and where, one task at a time, then turns his rough notes into a tidy, linked Obsidian vault and short flashcard sessions. It is built for an ADHD brain: low friction to start, nothing to remember, nothing lost, small wins along the way. All AI runs locally through Ollama and Whisper; nothing leaves the PC.
+Recon is a desktop app for CachyOS (KDE Plasma) that sits as a slim panel beside the browser while the user does a TryHackMe room. It says exactly what to write and where, one task at a time, then turns those rough notes into a tidy, linked Obsidian vault and short flashcard sessions. It is built for an ADHD brain: low friction to start, nothing to remember, nothing lost, small wins along the way. All AI runs locally through Ollama and Whisper; nothing leaves the PC.
 
 It succeeds when:
 
-- Starting a room takes under ten seconds, and Tyler always knows what to type next without thinking about it.
-- Closing the app mid-room loses nothing, and reopening it shows where he was in one line.
+- Starting a room takes under ten seconds, and the user always knows what to type next without thinking about it.
+- Closing the app mid-room loses nothing, and reopening it shows where you left off in one line.
 - Finishing a room takes one button, a quick quiz and a short review, ending in a finished Obsidian note.
 - A concept learned in one room has exactly one note, which every later room adds to and links to.
 - Wrong facts are caught and explained, never silently changed.
@@ -34,15 +34,15 @@ These came out of two rounds of Q&A on 23 October and drive everything below.
 | ADHD supports | One task at a time, flexible focus timer, "Where was I?" resume, subtle progress and rewards |
 | Look | Researched professional dark UI (Linear and Raycast style); no gimmicks |
 | Scope | TryHackMe now; designed to take HackTheBox later without changes |
-| Fact-checking | Flag and suggest; Tyler's original text is never changed |
+| Fact-checking | Flag and suggest; the user's original text is never changed |
 | Review | Preview first, in the app, with Apply and Discard |
-| Re-runs | Reopen a finished room in the app; changes merge, keeping Tyler's edits |
+| Re-runs | Reopen a finished room in the app; changes merge, keeping the user's edits |
 | Flashcards | Suggested from notes, quick keep or skip; stored in concept notes; reviewed in the app |
 | Nudges | One daily desktop notification when cards are due |
 | Timer | Flexible 15, 25 or 45 minutes, soft chime, break nudge after 90 minutes |
 | Extras | End-of-room quiz, Ask my notes, weekly recap |
-| Vault | Owned by the app, in Tyler's home folder, on CachyOS only; no sync needed |
-| Backup | Daily copy of vault and app data to a folder or drive Tyler picks, last 14 kept |
+| Vault | Owned by the app, in the user's home folder, on CachyOS only; no sync needed |
+| Backup | Daily copy of vault and app data to a folder or drive the user picks, last 14 kept |
 | Screenshots | Embedded, with text and tables read by a local vision model |
 | Dashboards | In the app, with matching Obsidian Bases views in the vault |
 | Linking | Embedding search plus model confirmation |
@@ -50,20 +50,20 @@ These came out of two rounds of Q&A on 23 October and drive everything below.
 | Terminal logging | Not for now |
 | Paths | Nothing hardcoded to one path or room |
 
-Also settled: Recon is built by Claude Code in a new private GitHub repo, and earlier rooms are back-filled with a From memory mode.
+Also settled: Recon is developed with Claude Code as the coding agent, in a private GitHub repo, and earlier rooms are back-filled with a From memory mode.
 
 ## Ground rules
 
-The tool only ever reads what Tyler wrote or pasted himself; it never touches tryhackme.com. TryHackMe's [Terms of Service](https://tryhackme.com/legal/terms-of-use) ban automated or programmatic extraction from the site, and its [Acceptable Use Policy](https://tryhackme.com/r/legal/acceptable-use-policy) bans systematically copying or compiling its content into an archive.
+The tool only ever reads what the user wrote or pasted; it never touches tryhackme.com. TryHackMe's [Terms of Service](https://tryhackme.com/legal/terms-of-use) ban automated or programmatic extraction from the site, and its [Acceptable Use Policy](https://tryhackme.com/r/legal/acceptable-use-policy) bans systematically copying or compiling its content into an archive.
 
-- **No fetching, scraping or browser automation** against TryHackMe, ever. While running, the app talks only to the local Ollama server. One-off setup downloads (packages, fonts, models) happen once, with Tyler told first.
-- **Notes in Tyler's own words.** Pasting the odd table or snippet is normal note-taking; pasting whole tasks is not. The capture panel shows this as a quiet one-line reminder.
+- **No fetching, scraping or browser automation** against TryHackMe, ever. While running, the app talks only to the local Ollama server. One-off setup downloads (packages, fonts, models) happen once, with the user told first.
+- **Notes in the user's own words.** Pasting the odd table or snippet is normal note-taking; pasting whole tasks is not. The capture panel shows this as a quiet one-line reminder.
 - **Private vault.** It is never published or shared. TryHackMe discourages sharing answers to active rooms, so answers stay out of anything public.
-- **Honest output.** The tool never invents content Tyler didn't write. Additions it makes (a definition, a diagram) are marked as generated so he can tell them apart from his own notes.
+- **Honest output.** The tool never invents content the user didn't write. Additions it makes (a definition, a diagram) are marked as generated so they can be told apart from the user's own notes.
 
 ## The app
 
-Two windows. While a room is open, a slim panel window is docked to the right of the browser, showing only the current task. Everything else opens in a normal main window with a left sidebar; the panel stays put. (On Wayland a pinned window can't also resize itself to full screen, so the two views are separate windows sharing the same data.) Tyler does rooms on CachyOS using TryHackMe's in-browser AttackBox, so the browser and Recon share one 2560×1440 screen: the panel defaults to 420 px (adjustable from 360 to 520), leaving about 2,100 px for the room and the AttackBox split. Review, revision and the library always open in the main window.
+Two windows. While a room is open, a slim panel window is docked to the right of the browser, showing only the current task. Everything else opens in a normal main window with a left sidebar; the panel stays put. (On Wayland a pinned window can't also resize itself to full screen, so the two views are separate windows sharing the same data.) The user does rooms on CachyOS using TryHackMe's in-browser AttackBox, so the browser and Recon share one 2560×1440 screen: the panel defaults to 420 px (adjustable from 360 to 520), leaving about 2,100 px for the room and the AttackBox split. Review, revision and the library always open in the main window.
 
 | Screen | Window | What it's for |
 | --- | --- | --- |
@@ -82,12 +82,12 @@ Two windows. While a room is open, a slim panel window is docked to the right of
 1. **Start.** Type the room name and number of tasks (path and module are remembered from last time). Ten seconds, then the first task is on screen.
 2. **Capture.** One task at a time. Add blocks, paste screenshots, hold a key to talk. Everything saves as you type.
 3. **Next task.** A single button moves on, with a small tick animation. The progress ring fills.
-4. **Finish.** A quiz of three to five questions from what was just written. Then processing runs in the background; Tyler can close the panel.
+4. **Finish.** A quiz of three to five questions from what was just written. Then processing runs in the background; the user can close the panel.
 5. **Review.** A notification says the room is ready. Review the changes and any flags, then Apply.
 6. **Cards.** Flick through suggested flashcards: keep, edit or skip.
 7. **Done.** A short completion animation, the room added to the path's progress, and an "Open in Obsidian" button.
 
-**Rooms already done: From memory mode.** For back-filling earlier rooms, Start offers "From memory". Recon first shows one blank Key idea block per task and asks Tyler to write whatever he remembers, without looking. Then it switches to the normal flow with the room open, and everything he adds in this second pass is quietly tagged as "filled in". The finished room note marks those points, and they get priority as flashcards, because they are exactly what didn't stick.
+**Rooms already done: From memory mode.** For back-filling earlier rooms, Start offers "From memory". Recon first shows one blank Key idea block per task and asks the user to write whatever they remember, without looking. Then it switches to the normal flow with the room open, and everything added in this second pass is quietly tagged as "filled in". The finished room note marks those points, and they get priority as flashcards, because they are exactly what didn't stick.
 
 ## Room session: what to write and where
 
@@ -129,7 +129,7 @@ Every screen follows these rules; a design that breaks one gets changed, not exc
 | Never a blank page | Pre-placed first block with a hint; room setup is two fields |
 | Nothing can be lost | Autosave on every keystroke; Undo everywhere; nothing deletes without a 10-second Undo toast |
 | Same thing, same place | Buttons and shortcuts never move between screens or rooms |
-| Remember for him | "Where was I?" card on open: "Task 4 of 7 in DNS in Detail, 2 days ago. Last note: 'TXT records hold text'." One click resumes |
+| Remember for the user | "Where was I?" card on open: "Task 4 of 7 in DNS in Detail, 2 days ago. Last note: 'TXT records hold text'." One click resumes |
 | Small wins, often | Tick on each task, ring filling, a calm completion moment per room; no pressure mechanics |
 | No shame | No red overdue counts, no "you broke your streak". A missed day just shows as a gap; copy is always kind and plain |
 | Short sessions | Revision capped at 10 minutes by default; "Stop here" always visible and always fine |
@@ -145,7 +145,7 @@ The target is the restrained dark style of tools like Linear and Raycast: a near
 | Background | Near-black with a faint cool tint; panels and cards one or two small steps lighter |
 | Borders | 1 px hairlines, low contrast |
 | Accent | One colour, used only for the primary button (with near-black text on it, since white fails contrast on these accents), focus and progress; default muted violet, with cyan or green as alternatives in settings |
-| Status colours | Amber for flags, green for done; never red for anything Tyler did |
+| Status colours | Amber for flags, green for done; never red for anything the user did |
 | Block types | A thin coloured left edge per type, muted, so type is visible at a glance without noise |
 | Type | Inter for UI (13 to 15 px, medium weights); JetBrains Mono for commands and code |
 | Spacing | 4 px grid; generous padding in the panel so it never feels cramped |
@@ -159,19 +159,19 @@ The target is the restrained dark style of tools like Linear and Raycast: a near
 
 ## Vault structure
 
-The app owns a vault folder in Tyler's home folder and creates it on first launch; Obsidian simply opens it. Folders are by note type rather than by path. Path and room live in each note's properties, so any path, module or room works with no setup.
+The app owns a vault folder in the user's home folder and creates it on first launch; Obsidian simply opens it. Folders are by note type rather than by path. Path and room live in each note's properties, so any path, module or room works with no setup.
 
 `text
 ~/Cyber Vault/
 ├── Home.md                 Bases dashboard for browsing in Obsidian
-├── 00 Raw notes/           Tyler's original capture per room, saved on Apply
+├── 00 Raw notes/           the user's original capture per room, saved on Apply
 ├── 01 Rooms/
 │   └── TryHackMe/
 │       └── <Path>/         created from the room's path
 ├── 02 Concepts/            one idea per note: Hexadecimal, TCP handshake…
 ├── 03 Tools/               nmap, Wireshark, Burp: usage and flags
 ├── Attachments/            screenshots, named <room>-<task>-<n>.png
-├── Recaps/                 weekly recaps Tyler chooses to save
+├── Recaps/                 weekly recaps the user chooses to save
 └── Bases/                  .base files behind the Obsidian dashboards
 `
 
@@ -181,27 +181,27 @@ The app owns a vault folder in Tyler's home folder and creates it on first launc
 
 ## Note types
 
-Five note types in the vault, each with a fixed property set so Bases can query them and the tool knows what it owns. Generated sections sit between hidden markers (`%% recon:start summary %%` … `%% recon:end %%`) so the tool can update its own parts without touching anything Tyler adds outside them.
+Five note types in the vault, each with a fixed property set so Bases can query them and the tool knows what it owns. Generated sections sit between hidden markers (`%% recon:start summary %%` … `%% recon:end %%`) so the tool can update its own parts without touching anything the user adds outside them.
 
 ### Raw notes (saved from the app)
 
-On Apply, Tyler's capture for the room is written to `00 Raw notes/` exactly as he typed it, block by block, with the room's properties at the top. It is never changed afterwards, so the original is always there to compare against.
+On Apply, the user's capture for the room is written to `00 Raw notes/` exactly as typed, block by block, with the room's properties at the top. It is never changed afterwards, so the original is always there to compare against.
 
 ### Room note (generated)
 
 One per room in `01 Rooms/<Platform>/<Path>/`. Sections, in order:
 
 1. **Summary**: three to five lines on what the room taught.
-2. **Tasks**: one heading per task, Tyler's points tidied, with `[[links]]` to concepts and tools.
+2. **Tasks**: one heading per task, the user's points tidied, with `[[links]]` to concepts and tools.
 3. **Commands**: table of command, what it does, example, from anything in code blocks.
-4. **Tables and diagrams**: Tyler's pasted tables cleaned up, screenshots embedded, Mermaid diagrams where a process was described.
+4. **Tables and diagrams**: The user's pasted tables cleaned up, screenshots embedded, Mermaid diagrams where a process was described.
 5. **Check this**: warning callouts for flagged claims (see Fact-checking).
-6. **Open questions**: Tyler's questions, each with a suggested answer marked as generated.
+6. **Open questions**: The user's questions, each with a suggested answer marked as generated.
 7. **Source notes**: a link to the raw notes in `00 Raw notes/`.
 
 ### Concept note (generated, then shared)
 
-One idea per note in `02 Concepts/`, e.g. `Hexadecimal`, `Two's complement`, `TCP three-way handshake`. Sections: plain-English definition (Tyler's own; if his notes are too thin, one or two generated lines in a labelled "Generated definition" callout, fact-checked like everything else), explanation, tables and examples, gotchas, related concepts, flashcards. Later rooms append under a dated "From <room>" sub-heading rather than rewriting earlier text.
+One idea per note in `02 Concepts/`, e.g. `Hexadecimal`, `Two's complement`, `TCP three-way handshake`. Sections: plain-English definition (the user's own; if the notes are too thin, one or two generated lines in a labelled "Generated definition" callout, fact-checked like everything else), explanation, tables and examples, gotchas, related concepts, flashcards. Later rooms append under a dated "From <room>" sub-heading rather than rewriting earlier text.
 
 ### Tool note (generated, then shared)
 
@@ -228,15 +228,15 @@ A Bases dashboard for browsing in Obsidian: rooms done by path, notes with open 
 
 ## Processing pipeline
 
-Finishing a room starts eight steps that run in the background and end at the review screen; only Apply writes to the vault. Tyler can close the panel while it runs and gets a notification when it is ready.
+Finishing a room starts eight steps that run in the background and end at the review screen; only Apply writes to the vault. The user can close the panel while it runs and gets a notification when it is ready.
 
 *Diagram in the design doc (processing pipeline · 8 steps, 1 approval gate); the steps are listed below.*
 
-Discard returns to the room session exactly as it was, so Tyler can add more and finish again.
+Discard returns to the room session exactly as it was, so the user can add more and finish again.
 
 1. **Parse (Python).** Read the room's blocks straight from the app's database: their types already say what is a command, a table, a screenshot or a question, so nothing has to be guessed.
 2. **Read screenshots.** Each screenshot goes to the vision model, which returns any text and tables as structured data. Skipped when there are none.
-3. **Extract.** The model reads the whole room and fills a fixed schema: summary, points per task, concepts, tools, commands, factual claims, answers to Tyler's questions, explanations for "Confused by" blocks, flashcard suggestions.
+3. **Extract.** The model reads the whole room and fills a fixed schema: summary, points per task, concepts, tools, commands, factual claims, answers to the user's questions, explanations for "Confused by" blocks, flashcard suggestions.
 4. **Link.** Concepts and tools are matched to existing notes (see Linking).
 5. **Fact-check.** Code checks, then the model review pass (see Fact-checking).
 6. **Render.** Python templates turn the validated data into Markdown in a staging area, never the vault.
@@ -249,21 +249,21 @@ A progress indicator in the panel shows which step is running, with a plain-Engl
 
 Every concept or tool the model pulls out is matched against what already exists before anything new is created, so "TCP handshake", "three-way handshake" and "SYN/SYN-ACK/ACK" all land on one note.
 
-1. **Index.** Every concept and tool note's title, aliases and definition are embedded and stored in the tool's index. The index refreshes on each run for any note whose file has changed, including ones Tyler edited by hand.
+1. **Index.** Every concept and tool note's title, aliases and definition are embedded and stored in the tool's index. The index refreshes on each run for any note whose file has changed, including ones the user edited by hand.
 2. **Exact match.** A candidate whose name or alias exactly matches an existing note (case-insensitive) links straight to it.
 3. **Similarity search.** Otherwise its name plus one-line definition is embedded and the closest five notes are retrieved.
 4. **Model decision.** The model sees the candidate and the five neighbours and answers in a fixed format: same as an existing note, related to one, or new. Same → link and add the new wording as an alias. New → create the note.
-5. **Thresholds.** Very close matches skip the model and link directly; distant ones are created as new without asking. The two cut-offs are config values, tuned in the build on Tyler's own notes.
+5. **Thresholds.** Very close matches skip the model and link directly; distant ones are created as new without asking. The two cut-offs are config values, tuned in the build on the user's own notes.
 
-Every merge or new note appears in the review note, so a wrong "same as" is caught before it is applied. Links inside a room note use the concept's canonical title with display text where Tyler's wording differs, e.g. `[[TCP three-way handshake|the handshake]]`.
+Every merge or new note appears in the review note, so a wrong "same as" is caught before it is applied. Links inside a room note use the concept's canonical title with display text where the user's wording differs, e.g. `[[TCP three-way handshake|the handshake]]`.
 
 ## Fact-checking
 
-Flags are suggestions, never edits: Tyler's sentence stays as written, and a warning callout beside it says what looks wrong and why. Checks run in two layers, and the deterministic layer always wins where it applies.
+Flags are suggestions, never edits: The user's sentence stays as written, and a warning callout beside it says what looks wrong and why. Checks run in two layers, and the deterministic layer always wins where it applies.
 
 **Layer 1: checked in code, never by the model**
 
-- Number conversions (binary, decimal, hex, octal) and anything that is arithmetic, such as subnet sizes from CIDR, worked out in Python and compared with what Tyler wrote.
+- Number conversions (binary, decimal, hex, octal) and anything that is arithmetic, such as subnet sizes from CIDR, worked out in Python and compared with what the user wrote.
 - Well-known port numbers and protocols against a fixed reference table shipped with the tool.
 - Command syntax only where it can be checked offline (e.g. a flag that doesn't exist in the tool's reference table). Unknown commands are left alone, not flagged.
 
@@ -284,7 +284,7 @@ A separate pass, with its own prompt, reads each factual claim and returns one o
 
 ## Preview, apply and re-runs
 
-Nothing touches the vault until Tyler presses Apply. The review screen opens full-window and is split into short sections he can work through top to bottom, each collapsible, with a count in its header.
+Nothing touches the vault until the user presses Apply. The review screen opens full-window and is split into short sections to work through top to bottom, each collapsible, with a count in its header.
 
 1. **The room note:** rendered as Obsidian will show it.
 2. **New notes:** concepts and tools it will create, marked New.
@@ -292,12 +292,12 @@ Nothing touches the vault until Tyler presses Apply. The review screen opens ful
 4. **Links:** every merge it made ("treating 'three-way handshake' as TCP three-way handshake"), each with an Undo.
 5. **Flags:** as cards (see Fact-checking).
 
-**Apply** writes everything, saves the raw notes, updates the index, then moves on to keeping or skipping flashcards. **Discard** throws away the staged changes and returns to the room session as it was. A sticky footer keeps both buttons visible however far he scrolls.
+**Apply** writes everything, saves the raw notes, updates the index, then moves on to keeping or skipping flashcards. **Discard** throws away the staged changes and returns to the room session as it was. A sticky footer keeps both buttons visible however far the page scrolls.
 
 **Re-runs on a finished room.** Library > the room > "Add more notes" reopens it in the panel with its blocks intact. Finishing again:
 
 - Rebuilds generated sections that are unchanged since the last Apply, with the new material folded in.
-- Leaves sections Tyler has edited in Obsidian alone, and shows the new material as "Suggested additions" for that section instead.
+- Leaves sections the user has edited in Obsidian alone, and shows the new material as "Suggested additions" for that section instead.
 - Keeps resolved flags resolved, and keeps anything outside the generated markers untouched.
 
 **Safety nets:** before Apply overwrites any file, the previous version is copied to the app's backup folder; the last 20 runs are kept, and Library > History can restore any of them with one click.
@@ -318,11 +318,11 @@ After Apply, suggested cards appear one at a time, large and centred: **Keep** (
 
 ### Daily nudge
 
-One desktop notification at a time Tyler picks, only on days with cards due: "12 cards ready, about 5 minutes." Clicking it opens straight into revision. It is sent by a tiny background job, so it works even when the app is closed. Skipping it does nothing; there is no follow-up nag.
+One desktop notification at a time the user picks, only on days with cards due: "12 cards ready, about 5 minutes." Clicking it opens straight into revision. It is sent by a tiny background job, so it works even when the app is closed. Skipping it does nothing; there is no follow-up nag.
 
 ### End-of-room quiz
 
-When Tyler presses Finish room, he gets three to five quick questions written from the notes he has just made, before processing starts. Answers are typed in a line or picked from options; the model marks them generously and shows the right answer either way. It never blocks finishing, and anything he got wrong becomes his first flashcards for that room. A "Skip quiz" link is always there.
+Pressing Finish room brings up three to five quick questions written from the notes just made, before processing starts. Answers are typed in a line or picked from options; the model marks them generously and shows the right answer either way. It never blocks finishing, and anything answered wrongly becomes the first flashcards for that room. A "Skip quiz" link is always there.
 
 ### Ask my notes
 
@@ -330,24 +330,24 @@ A search box that also takes questions ("what's the difference between TCP and U
 
 ### Weekly recap
 
-Every week on a day Tyler picks, Home shows a recap card: rooms finished, time spent, new concepts, the cards he finds hardest, and open flags. It is written in plain, encouraging language with no comparison to previous weeks unless he asks for it. A "Save to vault" button keeps a copy as a note.
+Every week on a day the user picks, Home shows a recap card: rooms finished, time spent, new concepts, the hardest cards, and open flags. It is written in plain, encouraging language with no comparison to previous weeks unless asked for. A "Save to vault" button keeps a copy as a note.
 
 ## Obsidian setup
 
-Obsidian needs no community plugins: the app does the writing, processing and revision, and Obsidian is where Tyler reads, browses and follows links. The app creates the vault with these core settings already in place.
+Obsidian needs no community plugins: the app does the writing, processing and revision, and Obsidian is where the user reads, browses and follows links. The app creates the vault with these core settings already in place.
 
 | Feature | Type | Job |
 | --- | --- | --- |
 | [Bases](https://help.obsidian.md/bases) | Core | Home dashboard for browsing: rooms by path, open flags, recent concepts |
 | Callouts, Mermaid, Graph view | Core | Flags, diagrams, seeing links grow |
 | Properties | Core | Room, concept and tool metadata |
-| [Spaced Repetition](https://community.obsidian.md/plugins/obsidian-spaced-repetition) | Community, optional | Only if Tyler ever wants to revise inside Obsidian; the card format already suits it |
+| [Spaced Repetition](https://community.obsidian.md/plugins/obsidian-spaced-repetition) | Community, optional | Only if the user ever wants to revise inside Obsidian; the card format already suits it |
 
 **Why Bases over Dataview.** Bases is maintained by the Obsidian team and is faster; Dataview's latest release is still beta and development has slowed ([guide](https://www.dsebastien.net/the-complete-guide-to-dataview-in-obsidian/)). The dashboard only needs filtering and grouping on properties, which Bases covers.
 
 **Settings set on creation.** Wikilinks on; "Automatically update internal links" on, so renaming a concept doesn't break rooms; new attachments to `Attachments/`.
 
-**Opening notes from the app.** Every room, concept and tool in the app has "Open in Obsidian", which uses Obsidian's own `obsidian://open` link, so no plugin is needed for the two to work together. Obsidian only follows these links for vaults it already knows, so after creating the vault Recon asks Tyler to open the folder in Obsidian once, and shows the buttons only after that.
+**Opening notes from the app.** Every room, concept and tool in the app has "Open in Obsidian", which uses Obsidian's own `obsidian://open` link, so no plugin is needed for the two to work together. Obsidian only follows these links for vaults it already knows, so after creating the vault Recon asks the user to open the folder in Obsidian once, and shows the buttons only after that.
 
 ## Models and hardware
 
@@ -360,7 +360,7 @@ Default: Qwen 3.5 9B for the thinking work and screenshots, Qwen3 Embedding 0.6B
 | Embeddings | `qwen3-embedding:0.6b` | `nomic-embed-text` | Small (about 640 MB) with a 32K-token window ([comparison](https://localaimaster.com/blog/best-ollama-embedding-models)) |
 | Voice | Whisper `large-v3-turbo` via faster-whisper | `distil-large-v3` | Much faster than large-v3 with close accuracy in English; about 3.5 GB of VRAM ([benchmarks](https://gigagpu.com/whisper-turbo-v3-self-hosted/), [VRAM](https://pypi.org/project/speakerscribe/0.1.0/)) |
 
-**Bake-off before committing.** Phase 2 runs both text candidates on three of Tyler's real rooms and compares them on schema errors, missed concepts, wrong merges and false flags. The winner goes in the config; switching later is a one-line change.
+**Bake-off before committing.** Phase 2 runs both text candidates on three of the user's real rooms and compares them on schema errors, missed concepts, wrong merges and false flags. The winner goes in the config; switching later is a one-line change.
 
 **How the model is used.** Every call uses Ollama's [structured outputs](https://docs.ollama.com/capabilities/structured-outputs): a JSON schema in the `format` field and temperature 0. Responses are validated with Pydantic and retried once on failure. The model never writes Markdown directly; Python templates render every note, so formatting is identical every time and a bad model response can't break a note.
 
@@ -386,13 +386,13 @@ Screenshots for rooms still in progress sit in a `media/` folder in the same pla
 - Every keystroke in a room session is saved within a second; a crash or power cut loses at most that second.
 - Nothing in `00 Raw notes/` is ever changed after it is written.
 - Only one room processes at a time; finishing a second room queues it and says so.
-- If the vault changed between review and Apply (Tyler edited a concept in Obsidian meanwhile), Apply stops and offers to re-check rather than overwriting.
+- If the vault changed between review and Apply (the user edited a concept in Obsidian meanwhile), Apply stops and offers to re-check rather than overwriting.
 
 **Off-machine backup.** Settings has one field: a backup folder, ideally on another drive. Each day Recon copies the vault and `app.db` there and keeps the last 14 copies. If the folder is missing (drive unplugged), Home shows a quiet note, never a warning pop-up.
 
 ## Build phases
 
-Claude Code builds Recon in a new private GitHub repo called `recon`, running locally on CachyOS so it can launch and test the app against the real GPU, Ollama and KDE. Its first job is checking how Ollama is installed and whether it is recent enough, before any model choices are relied on. Before any code, the repo gets this spec, a phased build plan with acceptance checks, and a CLAUDE.md holding the design rules, stack and conventions, so every session starts from the same ground. Production standards apply throughout: strict typing, high test coverage, mutation testing on the safety-critical parts, a security and privacy threat model, and an independent code audit at every phase gate. Then five phases, each leaving something usable, so Tyler is taking notes in the app after phase 1 and can start back-filling earlier Pre Security rooms as a refresher straight away.
+Recon is developed in a private GitHub repo called `recon`, with Claude Code as the coding agent, running locally on CachyOS so the app can be launched and tested against the real GPU, Ollama and KDE. Its first job is checking how Ollama is installed and whether it is recent enough, before any model choices are relied on. Before any code, the repo gets this spec, a phased build plan with acceptance checks, and a CLAUDE.md holding the design rules, stack and conventions, so every session starts from the same ground. Production standards apply throughout: strict typing, high test coverage, mutation testing on the safety-critical parts, a security and privacy threat model, and an independent code audit at every phase gate. Then five phases, each leaving something usable, so the user is taking notes in the app after phase 1 and can start back-filling earlier Pre Security rooms as a refresher straight away.
 
 1. **Shell and capture.** Design system and components, Home, start a room, the side panel with blocks and hints, autosave, "Where was I?", timer. Finished rooms export as plain Markdown for now. *Done when:* a real room is captured comfortably start to finish without touching the mouse more than needed.
 2. **Processing and review.** Vault creation, the pipeline, review screen, Apply and Discard, backups. Model bake-off happens here. *Done when:* three real rooms produce clean room and concept notes with no hand fixes to formatting.
@@ -410,7 +410,7 @@ Claude Code builds Recon in a new private GitHub repo called `recon`, running lo
 | A 9B model is confidently wrong | Bad flag, quiz answer or suggested answer | Code checks override it; flags are suggestions; "unsure" is dropped; dismissed flags are logged |
 | Very thin notes | Thin room note | It structures what's there and never pads with invented content; hints nudge for a little more |
 | Wrong concept merge | Two ideas end up in one note | Every merge shows on the review screen with Undo |
-| Screenshot text misread | Wrong value in a table | Vision text sits in a collapsed callout under the image, never merged into Tyler's tables without review |
+| Screenshot text misread | Wrong value in a table | Vision text sits in a collapsed callout under the image, never merged into the user's tables without review |
 | Whisper mishears jargon ("nmap" as "in map") | Odd words in a voice block | Transcripts land as editable text; a short custom vocabulary of tool names is passed to Whisper |
 | Speed | A long room could take a few minutes | Runs in the background with a notification when ready |
 

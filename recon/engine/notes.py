@@ -1,9 +1,9 @@
-"""Pipeline step 6, render: the checked extract and Tyler's notes as vault notes.
+"""Pipeline step 6, render: the checked extract and the user's notes as vault notes.
 
 Python decides what every value looks like, already escaped; Jinja2 templates
 in `templates/notes/` lay the notes out (the model never writes Markdown).
 
-- Tyler's own text (raw notes, questions, commands, tables) is escaped only
+- The user's own text (raw notes, questions, commands, tables) is escaped only
   where it could break the note's structure (`render.escape_lines` and friends).
 - Model-derived text goes through `sanitise` first, then the engine adds the
   only links: to the concepts and tools found in this room.
@@ -92,7 +92,7 @@ def render_room(capture: Capture, extract: RoomExtract) -> Rendered:
     """Render the room note, raw notes, and a note per concept and tool.
 
     Args:
-        capture: Tyler's notes, flags removed (step 1).
+        capture: The user's notes, flags removed (step 1).
         extract: The checked extract (step 3).
 
     Returns:
@@ -290,7 +290,7 @@ def _task(
     if points:
         shown = [linked(inline(point), targets) for point in points]
     else:
-        # No points from the model: his own key ideas, as written, so nothing goes missing.
+        # No points from the model: the user's own key ideas, as written, so nothing goes missing.
         shown = [
             one_line(escape_lines(b.text)) for b in task.blocks if b.type in {"key_idea", "voice"}
         ]
@@ -312,7 +312,7 @@ def _task_label(task: CaptureTask) -> str:
 
 
 def _quote(text: str) -> str:
-    """Tyler's text inside a callout, every line prefixed with `> `."""
+    """The user's text inside a callout, every line prefixed with `> `."""
     if not text.strip():
         return ""
     return "\n".join(f"> {line}".rstrip() for line in escape_lines(text).splitlines())
@@ -337,7 +337,7 @@ def code_cell(text: str) -> str:
 
 
 def text_cell(text: str) -> str:
-    """Tyler's text in a table cell: one line, pipes and markup that could escape escaped."""
+    """The user's text in a table cell: one line, pipes and markup that could escape escaped."""
     return one_line(text).replace("\\", "\\\\").replace("|", "\\|").replace("<", "\\<")
 
 

@@ -2,7 +2,7 @@
 
 ## What and why
 
-<!-- What changed and why. Mention any decision Tyler should know about. -->
+<!-- What changed and why. Mention any decision worth recording. -->
 
 Closes #
 

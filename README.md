@@ -6,10 +6,35 @@ Recon is a desktop study companion for TryHackMe. It sits as a slim panel beside
 
 - What it does: [`docs/SPEC.md`](docs/SPEC.md)
 - Build order and progress: [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md)
-- How it's built: [`CLAUDE.md`](CLAUDE.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- How it's built: [below](#how-its-built), [`CLAUDE.md`](CLAUDE.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Security: [`SECURITY.md`](SECURITY.md), [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
 
-**Status:** Phase 1 (shell and capture) is built: Home, Start a room, the room session panel with block editors, Undo, the focus timer, a temporary Finish with Markdown export, and Settings. Processing rooms into the vault comes in Phase 2.
+**Status:** Phase 1 (shell and capture) is built: Home, Start a room, the room session panel with block editors, Undo, the focus timer, a temporary Finish with Markdown export, and Settings. Phase 2 (processing rooms into the vault) is in progress: vault setup, the Ollama service, the parse, extract and render steps, and staging and Apply are done.
+
+## How it's built
+
+Recon is built spec-first, with Claude Code as the coding agent. I own the product: what it does and who it's for. The decisions that shape it are mine: the design rules, the stack, and every trade-off that changes what the app does. Claude Code writes most of the code inside guardrails I set up, and nothing reaches `main` without passing them.
+
+**The process**
+
+- **Spec, then plan, then code.** [`docs/SPEC.md`](docs/SPEC.md) defines the behaviour. [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) splits it into phases with acceptance checks. [`CLAUDE.md`](CLAUDE.md) holds the engineering rules the agent works to.
+- **One task, one issue, one branch, one PR.** Changes are squash-merged only after CI passes. Each significant decision has an ADR in [`docs/adr/`](docs/adr/).
+- **Phase gates.** Each phase ends with an independent audit against [`docs/AUDIT_CHECKLIST.md`](docs/AUDIT_CHECKLIST.md), run by a separate agent that didn't write the code. Findings go to [`docs/audits/`](docs/audits/), and every Critical, High and Medium finding is fixed before the phase is tagged and released.
+
+**The gates every change passes**
+
+- `mypy --strict` and a broad ruff rule set across the whole package
+- About 1,450 tests, with 98% branch coverage, enforced per module in CI
+- Mutation testing on the safety-critical code: the flag filter, the Markdown sanitiser, and staging and Apply all have 100% of mutants killed
+- Property tests (Hypothesis) on parsing, sanitising and merging
+- Golden-file tests for every note type
+- A crash test that kills the process mid-Apply and checks the vault comes out whole
+- A threat model ([`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)) whose mitigations each point to the tests that prove them
+- gitleaks, dependency audits, and GitHub Actions pinned by commit SHA
+
+**Why this way**
+
+I wanted to see how far an AI coding agent can go when it's held to the standards of production software rather than a demo. That means a written spec, strict typing, adversarial tests, independent review, and a human deciding what ships.
 
 ## Requirements
 

@@ -2,8 +2,8 @@
 
 Home's "Start a room" opens Start. A new room, and Home's "Carry on", load the
 room into the panel and show it. The main window goes back to Home without
-jumping in front, so the panel and the browser stay where Tyler's eyes are,
-and Home keeps "Where was I?" current as he moves through tasks.
+jumping in front, so the panel and the browser stay where the user's eyes are,
+and Home keeps "Where was I?" current as the user moves through tasks.
 """
 
 from recon.bridge.finish import FinishBridge

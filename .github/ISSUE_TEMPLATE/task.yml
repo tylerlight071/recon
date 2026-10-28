@@ -28,4 +28,4 @@ body:
     id: notes
     attributes:
       label: Notes
-      description: Dependencies, risks, decisions to raise with Tyler.
+      description: Dependencies, risks, decisions worth recording.

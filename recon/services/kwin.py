@@ -1,12 +1,12 @@
 """Pin the panel to the right edge of the screen with a KWin window rule (task 1.4).
 
-Opt-in only: nothing here runs until Tyler says yes. The rule matches Recon's
+Opt-in only: nothing here runs until the user says yes. The rule matches Recon's
 app ID *and* the panel's title, so the main window (same app ID) stays free,
-and it forces the panel to the right edge at the width from Settings (Tyler
+and it forces the panel to the right edge at the width from Settings (The user
 chose "width from Settings only" while pinned). The height isn't a number:
 the rule forces vertical maximise, so KWin fills exactly the area above the
 taskbar. On Wayland, Qt reports the whole screen as "available", so a numeric
-height ran under the taskbar on Tyler's desktop.
+height ran under the taskbar on the user's desktop.
 
 If writing the rule or reloading KWin fails, a small KWin script does the same
 for this session instead. Removing the pin deletes Recon's rule group and its

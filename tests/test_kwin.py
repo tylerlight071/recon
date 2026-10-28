@@ -25,7 +25,7 @@ from recon.services.kwin import (
 )
 
 GEOMETRY = PanelGeometry.right_edge((0, 0, 1280, 720), 420)
-# Tyler's real kwinrulesrc before Recon (Phase 0): one unrelated Order entry, no rules.
+# The user's real kwinrulesrc before Recon (Phase 0): one unrelated Order entry, no rules.
 TYLERS_CONFIG: dict[str, dict[str, str]] = {"General": {"Order": "steam", "rules": ""}}
 
 
@@ -220,7 +220,7 @@ def test_unpin_restores_tylers_config_exactly(pinning: KWinPinning, kde: FakeKde
 
     assert pinning.unpin() is True
 
-    # No "count=0" left behind: Tyler's file had no count key (found on his desktop).
+    # No "count=0" left behind: the existing file had no count key (seen on a real desktop).
     assert kde.config["General"] == {"Order": "steam", "rules": ""}
     assert kde.config.get(RULE_GROUP, {}) == {}
     assert kde.made("/KWin reconfigure")

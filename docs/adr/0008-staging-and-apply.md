@@ -22,10 +22,10 @@ Hard rules 3, 4, 6, 8 and 9 meet in one place: getting a room's notes into the v
    - Then `apply.json` records "applying", each note is written atomically, and the journal is marked "applied".
    - New notes are created with a hard link, which fails rather than overwrite a file that appeared in the meantime.
 4. **A crash mid-Apply is finished, not undone.**
-   - At launch, `recover` completes any run whose journal says "applying". Tyler pressed Apply, so completing it is what he asked for.
+   - At launch, `recover` completes any run whose journal says "applying". The user pressed Apply, so completing it is what was asked for.
    - It writes only files whose content still matches the hash recorded at staging. Files already written are left as they are, and a file changed by hand since is left alone.
    - The vault therefore ends fully after the change. A crash before the journal exists leaves it fully before.
-   - The alternative, rolling back from backups, would also overwrite any edit made after the crash, and would undo work Tyler confirmed.
+   - The alternative, rolling back from backups, would also overwrite any edit made after the crash, and would undo work the user confirmed.
 5. **Updating an existing note only touches marker insides.**
    - `merge` replaces the inside of each `%% recon:start <name> %%` section present in both versions, and adds new sections at the end under their heading.
    - Frontmatter and everything outside the markers stay byte for byte. Phase 3 will update properties such as `seen_in` within this rule.
@@ -39,6 +39,6 @@ Hard rules 3, 4, 6, 8 and 9 meet in one place: getting a room's notes into the v
 
 - `engine/stage.py` is mutation-tested, and all 448 of its mutants are killed. Two simplifications came out of that work:
   - `inside()` relies on resolving the path, which catches absolute paths, `..` and symlinks in one check.
-  - Notes that aren't UTF-8 are now skipped. Decoding them with replacement characters would have changed Tyler's text on write.
+  - Notes that aren't UTF-8 are now skipped. Decoding them with replacement characters would have changed the user's text on write.
 - `tests/engine/test_stage_crash.py` kills a child process with SIGKILL after its first, second or third vault write, then runs recovery. Every note matches its staged hash. Killed before the first write, the vault is unchanged.
-- Re-runs don't yet keep sections Tyler edited inside the markers. SPEC.md's "Suggested additions" behaviour needs the section hashes that Phase 3's index stores. Until then, the backup holds his version.
+- Re-runs don't yet keep sections the user edited inside the markers. SPEC.md's "Suggested additions" behaviour needs the section hashes that Phase 3's index stores. Until then, the backup holds the user's version.

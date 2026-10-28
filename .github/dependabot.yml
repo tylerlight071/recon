@@ -23,7 +23,7 @@ updates:
       - dependency-name: "av"
         versions: [">=19"]
       # CLAUDE.md pins PySide6 to 6.11.x. Moving the UI framework to 6.12 is a
-      # deliberate change, tested on Tyler's desktop, not a routine bump.
+      # deliberate change, tested on the development machine, not a routine bump.
       - dependency-name: "pyside6*"
         versions: [">=6.12"]
       - dependency-name: "shiboken6"

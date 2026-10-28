@@ -34,7 +34,7 @@ FocusScope {
 
     Keys.onEscapePressed: Navigation.open("home")
 
-    // Moves focus to the field that needs fixing, so Tyler can just type.
+    // Moves focus to the field that needs fixing, so the user can just type.
     Connections {
         target: StartRoom
         function onChanged() {

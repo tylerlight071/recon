@@ -1,8 +1,8 @@
-"""Pipeline step 1, parse: the room as Tyler wrote it, ready for the model and templates.
+"""Pipeline step 1, parse: the room as the user wrote it, ready for the model and templates.
 
 Read straight from the app's rows: each block's type already says what it is
 (a command, a table, a question), so nothing is guessed. Flags are stripped
-once more here (hard rule 2), keeping only the hex strings Tyler marked "Not
+once more here (hard rule 2), keeping only the hex strings the user marked "Not
 a flag, keep it", so nothing flag-shaped reaches the model, the vault or a
 run log. Empty blocks are left out. Screenshot blocks wait for the vision
 step (Phase 5).
@@ -77,7 +77,7 @@ def capture_room(
     Args:
         room: The room.
         tasks: Each task with its blocks, in order.
-        finished_on: The day it was finished (Tyler's local date).
+        finished_on: The day it was finished (The user's local date).
 
     Returns:
         The capture, flags stripped and empty blocks left out.

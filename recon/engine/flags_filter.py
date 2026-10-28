@@ -7,7 +7,7 @@ the vault, cards or backups:
   on one line): always removed. These are answers, never study material.
 - A *lone* run of 32 or more hex characters (nothing alphanumeric touching
   either end): removed by default, because hashing rooms show example hashes
-  that look exactly like flags. Tyler can say "Not a flag, keep it" for one
+  that look exactly like flags. The user can say "Not a flag, keep it" for one
   such string; it's then listed in `kept` and left alone from then on.
 
 When saving, an *unfinished* braced flag is removed too: typed one key at a
@@ -18,7 +18,7 @@ and prose that mention `flag{` keep every word (audit F-03). While typing (timed
 autosaves, undo snapshots), a 20-31 character hex run ending a line is held
 back too, so a hash typed key by key never reaches the database (audit F-07);
 a final save stores it, so a real ID ending a line isn't lost. Editors don't
-do either, so Tyler sees what he types until a flag is complete.
+do either, so the user sees what they type until a flag is complete.
 
 Removing a match can join the text around it into a new flag-shaped string
 (two hex halves either side of a `THM{…}`), so stripping repeats until the
@@ -41,7 +41,7 @@ UNFINISHED: Final = re.compile(
 )
 # A hash still being typed: 20 to 31 hex characters ending a line (audit F-07). Held
 # back from timed autosaves only, never from a final save, so a real ID ending a line
-# is stored once Tyler moves on.
+# is stored once the user moves on.
 TYPING_HEX: Final = re.compile(r"(?<![0-9A-Za-z])[0-9A-Fa-f]{20,31}$", re.MULTILINE)
 LONE_HEX: Final = re.compile(r"(?<![0-9A-Za-z])[0-9A-Fa-f]{32,}(?![0-9A-Za-z])")
 _MAX_ROUNDS: Final = 50
@@ -80,7 +80,7 @@ class Filtered:
 def find_flags(
     text: str, kept: Collection[str] = (), *, unfinished: bool = False, typing: bool = False
 ) -> list[Finding]:
-    """Flag-shaped strings in `text`, in order, ignoring hex strings Tyler kept.
+    """Flag-shaped strings in `text`, in order, ignoring hex strings the user kept.
 
     Braced flags are found first and blanked out (same length, so positions
     hold) before looking for the rest, so no finding can overlap another.
@@ -121,7 +121,7 @@ def strip_flags(
 ) -> Filtered:
     """Remove every flag-shaped string, repeating until none is left.
 
-    Only the matched characters are removed; everything else Tyler wrote is
+    Only the matched characters are removed; everything else the user wrote is
     left exactly as it was.
 
     Args:

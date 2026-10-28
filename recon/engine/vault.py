@@ -5,9 +5,9 @@ Bases dashboard), the `.base` files behind it, and Obsidian's settings:
 wikilinks, "Automatically update internal links", and attachments to
 `Attachments/`. It's safe to run on every launch:
 
-- A file that exists is never replaced. Home and the dashboards are Tyler's
+- A file that exists is never replaced. Home and the dashboards are the user's
   to change once written.
-- `.obsidian/app.json` only gains keys it doesn't have; Tyler's own values
+- `.obsidian/app.json` only gains keys it doesn't have; the user's own values
   win, and an unreadable file is left alone.
 
 This is fixed scaffolding, not room output: generated notes still reach the
@@ -98,13 +98,13 @@ def _home(name: str) -> str:
         undefined=StrictUndefined,
         keep_trailing_newline=True,
     )
-    # The vault's name is Tyler's choice of folder; keep it to one plain line.
+    # The vault's name is the user's choice of folder; keep it to one plain line.
     title = " ".join(name.replace("%%", "").split()) or "Cyber Vault"
     return environment.get_template("home.md.j2").render(name=title)
 
 
 def _create(path: Path, text: str) -> bool:
-    # Only if missing; an existing file is Tyler's (or Obsidian's) and stays as it is.
+    # Only if missing; an existing file is the user's (or Obsidian's) and stays as it is.
     if path.exists():
         return False
     try:

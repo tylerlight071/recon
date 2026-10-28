@@ -221,7 +221,7 @@ def test_concept_note_in_his_words_with_a_dated_section() -> None:
     assert "- Uses a handshake before sending, unlike [[UDP]]." in tcp
     assert "**Easy to get wrong**\n\n- Resends lost data." in tcp
     assert "## Related\n\n%% recon:start related %%\n- [[UDP]]\n%% recon:end %%" in tcp
-    assert "UDP just sends packets" in udp  # his sentence beats the model's definition
+    assert "UDP just sends packets" in udp  # the user's sentence beats the model's definition
 
 
 def test_a_generated_definition_is_labelled() -> None:

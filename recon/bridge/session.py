@@ -78,14 +78,14 @@ class RoomSessionBridge(QObject):
     replaceText = Signal(int, str, str)  # noqa: N815 - Qt naming, used from QML
     """(block, "text" or "answer", text): show this in that editor ("Not a flag, keep it")."""
     taskCompleted = Signal()  # noqa: N815 - Qt naming, used from QML
-    """Tyler finished a task with Next: play the tick."""
+    """The user finished a task with Next: play the tick."""
     finishRequested = Signal(int)  # noqa: N815 - Qt naming; the room ID (Finish, task 1.13)
     failed = Signal(str)
     """Something couldn't be saved: a calm message for a toast."""
     saveRecovered = Signal()  # noqa: N815 - Qt naming, used from QML
     """Autosave works again after failing: a quiet "Saved again"."""
     activity = Signal()
-    """Tyler did something in the session (the timer counts while he's here)."""
+    """The user did something in the session (the timer counts while they're here)."""
     blockDeleted = Signal(int)  # noqa: N815 - Qt naming, used from QML
     """A block was deleted: show the 10 s Undo toast (ADHD rule 4)."""
     _done = Signal(object)
@@ -200,7 +200,7 @@ class RoomSessionBridge(QObject):
 
     @Slot(int)
     def open(self, room_id: int) -> None:
-        """Load a room still being captured, at the task Tyler was on."""
+        """Load a room still being captured, at the task the user was on."""
         # A title still waiting to save belongs to the task on screen now.
         self._save_title()
 
@@ -247,7 +247,7 @@ class RoomSessionBridge(QObject):
 
     @Slot(int, str, result=str)
     def edit(self, block_id: int, text: str) -> str:
-        """Tyler typed in a block: strip flags, queue the save, return what to show.
+        """The user typed in a block: strip flags, queue the save, return what to show.
 
         Args:
             block_id: The block.
@@ -260,7 +260,7 @@ class RoomSessionBridge(QObject):
 
     @Slot(int, str, result=str)
     def editAnswer(self, block_id: int, text: str) -> str:  # noqa: N802 - Qt naming, used from QML
-        """Tyler typed a Room question's answer: same rules as `edit` (answers attract flags)."""
+        """The user typed a Room question's answer: same rules as `edit` (answers attract flags)."""
         return self._edit(block_id, "answer", text)
 
     def _edit(self, block_id: int, field: Field, text: str) -> str:
@@ -300,7 +300,7 @@ class RoomSessionBridge(QObject):
 
     @Slot(str)
     def setTitle(self, title: str) -> None:  # noqa: N802 - Qt naming, used from QML
-        """Tyler typed the task title; it saves within half a second, even while he types."""
+        """The user typed the task title; it saves within half a second, even mid-typing."""
         if self._task() is None:
             return
         self.activity.emit()

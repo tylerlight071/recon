@@ -21,7 +21,7 @@ class SerialWorker:
     """Runs jobs one at a time, in order, on a private worker thread.
 
     Session writes use this so a title save, a new block and "Next task" land in
-    the order Tyler did them. Call it like a Submit; `drain()` at quit waits for
+    the order the user did them. Call it like a Submit; `drain()` at quit waits for
     every queued job, so nothing is still waiting when the database closes.
     """
 

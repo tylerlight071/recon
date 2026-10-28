@@ -176,7 +176,7 @@ class BlockListModel(QAbstractListModel):
         Args:
             block_id: The block.
             content: Its new content.
-            notify: Tell QML (False while Tyler types, so his cursor stays put).
+            notify: Tell QML (False while the user types, so the cursor stays put).
 
         Returns:
             Whether the block is in this task.

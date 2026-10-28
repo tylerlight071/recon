@@ -22,14 +22,14 @@ class _Row(BaseModel):
 class BlockContent(_Row):
     """The `content` JSON: text, plus fields some block types use.
 
-    Text may be empty: a new block is saved before Tyler types into it.
+    Text may be empty: a new block is saved before the user types into it.
     """
 
     text: str = ""
     answer: str | None = None
     """Room question blocks: the answer, kept hidden in the note."""
     kept: tuple[str, ...] = ()
-    """Hex strings Tyler marked "Not a flag, keep it" (hard rule 2's one exception)."""
+    """Hex strings the user marked "Not a flag, keep it" (hard rule 2's one exception)."""
 
 
 class NewRoom(_Row):

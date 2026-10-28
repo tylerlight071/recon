@@ -43,7 +43,7 @@ class Setup:
         return self.tasks.for_room(self.room_id)[index]
 
     def run(self, seconds: int, *, working: bool = True) -> None:
-        """Let `seconds` pass, one tick a second; `working` keeps Tyler active."""
+        """Let `seconds` pass, one tick a second; `working` keeps the user active."""
         for _ in range(seconds):
             self.clock.now += 1
             if working:

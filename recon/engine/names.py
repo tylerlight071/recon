@@ -1,6 +1,6 @@
 """Safe file names built from room and concept names (CLAUDE.md, Path safety).
 
-A name Tyler typed (or pasted) becomes a file name only through `file_name`:
+A name the user typed (or pasted) becomes a file name only through `file_name`:
 no path separators, no `..`, no control characters, no names Windows or
 Obsidian reserve, nothing hidden (a leading dot), and short enough for any
 filesystem. Callers still check the resolved path stays inside its folder.

@@ -5,7 +5,7 @@ import "../theme"
 
 // Developer-only component gallery: `uv run python -m recon --gallery`.
 // It shows every variant side by side, so it breaks the one-accent-button
-// rule on purpose; it's never shown to Tyler as part of the app.
+// rule on purpose; it's never shown to the user as part of the app.
 Window {
     id: gallery
 

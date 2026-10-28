@@ -10,7 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - Vault bootstrap: Recon creates `~/Cyber Vault` (or the folder in Settings) with SPEC.md's folders, a Bases `Home.md` with three dashboards, and Obsidian's settings (wikilinks, links kept up to date when notes are renamed, attachments in `Attachments/`). It never replaces a file you've changed. Home shows a one-time "Open your vault in Obsidian, once" card with Copy path and "I've done that". ADR 0006.
 - Ollama service (`services/ollama.py`): talks only to Ollama on this computer, checks it's running and has Recon's models, and makes structured calls (schema in `format` and in the prompt, temperature 0, one retry with the validation errors) with plain errors for "not running", "too slow", "model missing" and "didn't make sense twice". Raw replies go only to `runs/<run_id>/` (private, deleted after 30 days at start-up). Model names and the Ollama address are settings. Settings has a Models section with Ollama's status, "Check again", and the `ollama pull` command for anything missing.
-- Pipeline steps 1, 3 and 6 (parse, extract and render) for text blocks. The room goes to the text model, and code checks the reply. Recon then renders a room note, Tyler's raw notes (as typed), and a note per concept and tool. Properties follow SPEC.md, generated sections sit between `%% recon:start … %%` markers, and generated content is labelled. Model text is sanitised, so it can't add links, embeds, HTML, markers or structure. Every model call now sets a 16k context, and `model_thinking` (off) is a setting. Nothing is written to the vault yet. ADR 0007.
+- Pipeline steps 1, 3 and 6 (parse, extract and render) for text blocks. The room goes to the text model, and code checks the reply. Recon then renders a room note, the user's raw notes (as typed), and a note per concept and tool. Properties follow SPEC.md, generated sections sit between `%% recon:start … %%` markers, and generated content is labelled. Model text is sanitised, so it can't add links, embeds, HTML, markers or structure. Every model call now sets a 16k context, and `model_thinking` (off) is a setting. Nothing is written to the vault yet. ADR 0007.
 - Staging, Apply, Discard and backups (`engine/stage.py`, `recon/processing.py`):
   - **Staging:** a room's notes are staged under `runs/<run id>/staged/` with a manifest of hashes, and the vault isn't touched.
   - **Apply:** it re-checks every note and stops, writing nothing, if any changed in Obsidian meanwhile. Otherwise it backs up each file it will overwrite (keeping the newest 20 runs) and writes atomically. Existing notes change only inside Recon's markers.
@@ -68,7 +68,7 @@ Phase 1, shell and capture: Home, Start a room, the room session panel with bloc
 
 ## [0.0.0] - 2026-10-24
 
-Phase 0, foundations: repository, tooling, environment checks and smoke tests proving the stack runs on Tyler's machine. No app to run yet.
+Phase 0, foundations: repository, tooling, environment checks and smoke tests proving the stack runs on the development machine. No app to run yet.
 
 ### Added
 
