@@ -201,3 +201,23 @@ def test_an_unexpected_failure_never_leaves_finish_stuck(db: Database, setup: Se
 
     assert failures == [ReconError.user_message]
     assert finish.property("busy") is False
+
+
+def test_revisit_shows_a_done_room_without_changing_it(setup: Setup) -> None:
+    setup.finish.open(setup.room_id)
+    setup.finish.close()
+
+    setup.finish.revisit(setup.room_id)
+
+    assert setup.finish.property("shown") is True
+    assert setup.finish.property("roomName") == "DNS in Detail"
+    room = setup.rooms.get(setup.room_id)
+    assert room is not None
+    assert room.status == "done"
+
+
+def test_revisit_ignores_a_room_that_isnt_done(setup: Setup) -> None:
+    setup.finish.revisit(setup.room_id)  # still capturing
+    setup.finish.revisit(9999)
+
+    assert setup.finish.property("shown") is False

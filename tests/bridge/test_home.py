@@ -147,9 +147,14 @@ def test_finished_rooms_are_listed_not_resumed(
         ("Intro to Networking", "Ready to review", False),
         ("Linux Basics", "Pre Security · Linux · Done", False),
     ]
+    finished: list[int] = []
+    home.finishedRequested.connect(finished.append)
     home.resume(done.id)
+    home.resume(waiting.id)
     home.resume(9999)
     assert resumed.count == 0
+    assert finished == [done.id]  # a done room opens its Finish screen (audit F-11)
+    assert [r["canOpen"] for r in home.property("recentRooms")] == [False, True]
 
 
 def test_recent_rooms_exclude_the_current_one_and_stop_at_five(

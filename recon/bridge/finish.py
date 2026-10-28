@@ -144,6 +144,16 @@ class FinishBridge(QObject):
 
         self._background(work)
 
+    def revisit(self, room_id: int) -> None:
+        """Show a room that's already done (from Home), changing nothing (audit F-11)."""
+
+        def work() -> Then:
+            room = self._rooms.get(room_id)
+            tasks = self._tasks.for_room(room_id)
+            return lambda: self._show(room if room and room.status == "done" else None, tasks)
+
+        self._background(work)
+
     def _show(self, room: Room | None, tasks: list[Task]) -> None:
         self._room, self._task_list, self._exported = room, tasks, None
         self.changed.emit()

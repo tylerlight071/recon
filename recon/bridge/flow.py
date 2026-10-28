@@ -57,7 +57,12 @@ def connect_finish(
         session.open(room_id)
         navigation.showPanel()
 
+    def revisit(room_id: int) -> None:
+        finish.revisit(room_id)
+        navigation.showPanel()
+
     session.finishRequested.connect(finish_room)
+    home.finishedRequested.connect(revisit)
     finish.reopenRequested.connect(reopen)
     finish.closed.connect(home.refresh)
     finish.closed.connect(lambda: navigation.open("home"))
