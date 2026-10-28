@@ -43,6 +43,8 @@ def test_round_trip_is_private(tmp_path: Path) -> None:
     assert path.read_text() == (
         'panel_width = 470\nkwin_pinning = "ask"\nchime = false\nexport_folder = ""\n'
         'vault_path = ""\nobsidian_vault = ""\naccent = "violet"\nreduce_motion = false\n'
+        'text_model = "qwen3.5:9b"\nvision_model = "qwen3.5:9b"\n'
+        'embedding_model = "qwen3-embedding:0.6b"\nollama_host = "http://127.0.0.1:11434"\n'
     )
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
@@ -141,3 +143,24 @@ def test_a_vault_inside_the_data_folder_is_not_used(tmp_path: Path) -> None:
 
     assert vault_folder(settings, tmp_path, data) == tmp_path / "Cyber Vault"
     assert vault_folder(settings, tmp_path) == data / "vault"
+
+
+def test_models_default_to_the_spec_and_are_listed_once() -> None:
+    settings = Settings()
+
+    assert settings.models == ("qwen3.5:9b", "qwen3-embedding:0.6b")
+    assert Settings(vision_model="qwen3-vl:8b").models == (
+        "qwen3.5:9b",
+        "qwen3-vl:8b",
+        "qwen3-embedding:0.6b",
+    )
+
+
+@pytest.mark.parametrize("name", ["", "qwen 3", "x; rm -rf ~", "-flag", "a" * 201, "q`id`"])
+def test_odd_model_names_fall_back_to_defaults(tmp_path: Path, name: str) -> None:
+    path = tmp_path / "settings.toml"
+    path.write_text(f"text_model = {name!r}\n".replace("'", '"') if '"' not in name else "")
+
+    settings, _problem = load_settings(path)
+
+    assert settings.text_model == "qwen3.5:9b"

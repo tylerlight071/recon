@@ -2,7 +2,7 @@
 
 How Recon is put together. Behaviour is defined in [`SPEC.md`](SPEC.md); conventions in [`../CLAUDE.md`](../CLAUDE.md). This file is kept current in the same pull request as any change it describes.
 
-**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. `revision/` and the vault pipeline are still empty.
+**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap and the Ollama service. `revision/` and the processing pipeline are still empty.
 
 ## Layers
 
@@ -144,6 +144,7 @@ The room, its tasks' time and the export all go through one serial worker (`room
 - **Pin the panel:** a toggle calling `Pinning.pin()` / `unpin()` (ADR 0004). A failed unpin gets a calm toast.
 - **Panel width:** a slider from 360 to 520 px in 4 px steps. While pinned, the rule is rewritten once the width settles.
 - **Chime:** a toggle, with "Play" (`Focus.previewChime`) to hear it first.
+- **Models** (task 2.2): what each model is for and whether Ollama has it; see Ollama service.
 
 New components: `Toggle` (a switch with its label) and `Slider`. `Choice` gains an optional colour swatch.
 
@@ -156,6 +157,18 @@ New components: `Toggle` (a switch with its label) and `Slider`. `Choice` gains 
 - Obsidian's `.obsidian/app.json` (wikilinks, automatically update links, attachments in `Attachments/`).
 
 It never replaces a file, and `app.json` only gains missing keys. `bridge/vault.py` (`Vault`) runs it on the room worker at launch and whenever the vault setting changes. Until Tyler confirms he's opened the folder in Obsidian once (stored as `obsidian_vault`), Home shows a one-time card with Copy path and "I've done that", and `canOpenInObsidian` stays false. This is scaffolding, not room output, so hard rule 3 still holds: [ADR 0006](adr/0006-vault-bootstrap.md).
+
+## Ollama service (task 2.2)
+
+`services/ollama.py` is the only module that touches the network.
+
+- **This computer only.** `loopback()` accepts http(s) addresses for `localhost`, `127.0.0.0/8` or `::1` and raises `UnsafeHostError` for anything else, before a client exists. `make_client()` builds every `ollama.Client` through it. The address is `ollama_host` in settings (default `http://127.0.0.1:11434`).
+- **Health.** `OllamaService.status(models)` lists installed models and returns whether Ollama answered and which models are missing (`qwen3` matches `qwen3:latest`). It never raises.
+- **Structured calls.** `structured(model=, schema=, system=, prompt=, run=, step=)` sends the pydantic schema as `format`, also appends it to the system prompt, uses temperature 0 and doesn't stream. The reply is validated with `model_validate_json`. On failure it retries once, adding the reply and a note with each error's location and message (never the input). A second failure raises `ModelResponseInvalidError`.
+- **Errors.** A refused connection or HTTP failure becomes `OllamaUnavailable`; a timeout becomes `OllamaTimeoutError` (300 s for calls, 5 s for health checks). A 404 becomes `ModelMissing`, and any other Ollama error `ModelCallFailedError`. Each has plain copy.
+- **Run logs.** `services/runs.py`: `RunStore.start()` makes a `RunLog` for `runs/<UTC time>-<id>/`, and every attempt's messages and raw reply are written there as `<step>-<attempt>.json` (folder 0700, file 0600, atomic). `app.log` gets only the model, step, attempt, duration and error counts. Start-up deletes runs older than 30 days on the global pool, and never follows a symlink.
+
+Model names are settings (`text_model`, `vision_model`, `embedding_model`; defaults `qwen3.5:9b`, `qwen3.5:9b`, `qwen3-embedding:0.6b`), restricted to Ollama's name characters. `bridge/models.py` (`Models`) checks Ollama at launch, when Settings opens, and on "Check again", on the global pool. Settings shows what each model is for, a green or amber dot (never red), one plain line, and for missing models the exact `ollama pull` commands with Copy. Recon never pulls a model itself.
 
 ## Undo
 

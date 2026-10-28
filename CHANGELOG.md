@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - Vault bootstrap: Recon creates `~/Cyber Vault` (or the folder in Settings) with SPEC.md's folders, a Bases `Home.md` with three dashboards, and Obsidian's settings (wikilinks, links kept up to date when notes are renamed, attachments in `Attachments/`). It never replaces a file you've changed. Home shows a one-time "Open your vault in Obsidian, once" card with Copy path and "I've done that". ADR 0006.
+- Ollama service (`services/ollama.py`): talks only to Ollama on this computer, checks it's running and has Recon's models, and makes structured calls (schema in `format` and in the prompt, temperature 0, one retry with the validation errors) with plain errors for "not running", "too slow", "model missing" and "didn't make sense twice". Raw replies go only to `runs/<run_id>/` (private, deleted after 30 days at start-up). Model names and the Ollama address are settings. Settings has a Models section with Ollama's status, "Check again", and the `ollama pull` command for anything missing.
 
 ## [0.1.0] - 2026-10-28
 

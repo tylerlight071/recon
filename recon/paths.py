@@ -27,6 +27,11 @@ class AppPaths:
         return self.data / "app.log"
 
     @property
+    def runs(self) -> Path:
+        """Raw model responses per processing run (`runs/<run_id>/`, kept 30 days)."""
+        return self.data / "runs"
+
+    @property
     def settings_file(self) -> Path:
         """Path of Tyler's settings (`settings.toml`)."""
         return self.config / "settings.toml"

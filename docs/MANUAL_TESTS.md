@@ -22,3 +22,5 @@ Launch Recon the way it will really be used: from the KDE app menu (`uv run pyth
 
 - [ ] On first launch, `~/Cyber Vault` appears with its folders, `Home.md` and `Bases/`. Home in Recon shows "Open your vault in Obsidian, once": press Copy path, open the folder in Obsidian ("Open folder as vault"), then press "I've done that". The card goes and doesn't come back.
 - [ ] In Obsidian, `Home.md` shows the three dashboards (empty until rooms are applied), and Settings → Files and links shows wikilinks on, "Automatically update internal links" on, and new attachments in `Attachments`.
+- [ ] Settings → Models with Ollama running: the three models are listed and the dot is green. Stop Ollama (`systemctl stop ollama`, or quit it) and press Check again: an amber dot and "Couldn't reach Ollama…". Start it again and press Check again.
+- [ ] In `settings.toml`, set `embedding_model = "nomic-embed-text"` (or any model you don't have) and reopen Settings: it names the model and shows `ollama pull …` with Copy. Put the setting back afterwards.

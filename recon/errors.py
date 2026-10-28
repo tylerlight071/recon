@@ -145,3 +145,27 @@ class VaultSetupError(ReconError):
         "Couldn't set up your vault folder. Check it in Settings: it needs to be a folder "
         "you own, not a file."
     )
+
+
+class OllamaTimeoutError(OllamaUnavailable):
+    """Ollama didn't answer in time (often a model still loading)."""
+
+    user_message = (
+        "The model took too long to answer. It may still be loading; "
+        "Recon will try again when you press Retry."
+    )
+
+
+class ModelCallFailedError(ReconError):
+    """Ollama answered with an error that isn't a missing model."""
+
+    user_message = "Ollama couldn't finish that step. You can run it again."
+
+
+class UnsafeHostError(ReconError):
+    """The configured Ollama address isn't this computer."""
+
+    user_message = (
+        "Recon only talks to Ollama on this computer. "
+        "Check the Ollama address in settings.toml: it should be http://127.0.0.1:11434."
+    )

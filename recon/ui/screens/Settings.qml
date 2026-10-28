@@ -4,14 +4,17 @@ import QtQuick.Dialogs
 import "../components"
 import "../theme"
 
-// Settings (task 1.14, first pass): vault folder, accent colour, reduce motion,
-// panel pinning and width, and the focus chime. Every change saves on its own
-// (shortly after it settles); "Done" goes back to Home. Bridges: AppSettings,
-// Pinning, Focus, Navigation.
+// Settings (task 1.14, first pass): vault folder, Ollama's models (task 2.2),
+// accent colour, reduce motion, panel pinning and width, and the focus chime.
+// Every change saves on its own (shortly after it settles); "Done" goes back to
+// Home. Bridges: AppSettings, Models, Pinning, Focus, Navigation.
 Item {
     id: settings
 
     objectName: "settingsScreen"
+
+    // Fresh news each time Settings opens (a check takes a few seconds at most).
+    Component.onCompleted: Models.check()
 
     component SectionTitle: Text {
         topPadding: Theme.space4
@@ -86,6 +89,123 @@ Item {
                     onClicked: vaultDialog.open()
                 }
             }
+
+            // ---- Models --------------------------------------------------------------
+            SectionTitle { text: qsTr("Models") }
+
+            Repeater {
+                model: Models.roles
+
+                Row {
+                    required property var modelData
+                    width: page.width
+                    spacing: Theme.space3
+
+                    Text {
+                        width: Theme.settingsLabelWidth
+                        text: modelData.role
+                        font.family: Theme.fontUi
+                        font.pixelSize: Theme.fontSizeBody
+                        color: Theme.textSecondary
+                    }
+
+                    Text {
+                        objectName: "model-" + modelData.name
+                        width: parent.width - Theme.settingsLabelWidth - parent.spacing
+                        elide: Text.ElideRight
+                        text: modelData.name
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeMono
+                        color: Theme.textPrimary
+                    }
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: Theme.space3
+
+                Row {
+                    width: parent.width - checkModels.width - parent.spacing
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.space2
+
+                    // Green when ready, amber when something needs doing: never red.
+                    Rectangle {
+                        objectName: "modelsDot"
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Theme.space2
+                        height: Theme.space2
+                        radius: width / 2
+                        color: Models.state === "ready" ? Theme.success
+                             : Models.state === "checking" ? Theme.textTertiary
+                             : Theme.warning
+                    }
+
+                    Text {
+                        objectName: "modelsMessage"
+                        width: parent.width - Theme.space2 - parent.spacing
+                        anchors.verticalCenter: parent.verticalCenter
+                        wrapMode: Text.Wrap
+                        text: Models.message
+                        font.family: Theme.fontUi
+                        font.pixelSize: Theme.fontSizeBody
+                        color: Theme.textPrimary
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: text
+                    }
+                }
+
+                Button {
+                    id: checkModels
+                    objectName: "checkModels"
+                    anchors.verticalCenter: parent.verticalCenter
+                    variant: "secondary"
+                    enabled: !Models.checking
+                    text: qsTr("Check again")
+                    onClicked: Models.check()
+                }
+            }
+
+            // The exact command for each missing model: Recon never downloads one itself.
+            Row {
+                objectName: "pullCommands"
+                visible: Models.commands !== ""
+                width: parent.width
+                spacing: Theme.space3
+
+                Rectangle {
+                    width: parent.width - copyCommands.width - parent.spacing
+                    height: commandText.implicitHeight + Theme.space2 * 2
+                    radius: Theme.radiusSmall
+                    color: Theme.raised
+                    border.width: Theme.hairline
+                    border.color: Theme.border
+
+                    Text {
+                        id: commandText
+                        x: Theme.space3
+                        y: Theme.space2
+                        width: parent.width - Theme.space3 * 2
+                        wrapMode: Text.WrapAnywhere
+                        text: Models.commands
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeMono
+                        color: Theme.textPrimary
+                    }
+                }
+
+                Button {
+                    id: copyCommands
+                    objectName: "copyCommands"
+                    anchors.verticalCenter: parent.verticalCenter
+                    variant: "quiet"
+                    text: qsTr("Copy")
+                    onClicked: Models.copyCommands()
+                }
+            }
+
+            Note { text: qsTr("Everything runs on this computer through Ollama. To use other models, change their names in settings.toml.") }
 
             // ---- Look ----------------------------------------------------------------
             SectionTitle { text: qsTr("Look") }
