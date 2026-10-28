@@ -12,6 +12,7 @@ type BlockPass = Literal["recall", "fill"]
 type TaskStatus = Literal["open", "done", "skipped"]
 type RoomStatus = Literal["capturing", "queued", "processing", "in_review", "done"]
 type RoomMode = Literal["new", "from_memory"]
+type RunStatus = Literal["staged", "applied", "discarded"]
 
 
 class _Row(BaseModel):
@@ -136,3 +137,20 @@ class UndoEntry(_Row):
     room_id: int
     task_id: int
     action: UndoAction
+
+
+# ---- Processing runs (task 2.4) ---------------------------------------------------
+
+
+class Run(_Row):
+    """A row of `runs`: one processing of a room, from staging to Apply or Discard."""
+
+    id: str
+    room_id: int
+    status: RunStatus
+    created_at: datetime
+    finished_at: datetime | None
+    written: int
+    """Vault files Apply wrote."""
+    backed_up: int
+    """Files Apply copied to `backups/<run id>/` before overwriting them."""

@@ -169,3 +169,12 @@ class UnsafeHostError(ReconError):
         "Recon only talks to Ollama on this computer. "
         "Check the Ollama address in settings.toml: it should be http://127.0.0.1:11434."
     )
+
+
+class StagingDamagedError(ReconError):
+    """A run's staged files are missing or don't match its manifest."""
+
+    user_message = (
+        "This review's prepared notes are missing or changed, so nothing was written. "
+        "Finish the room again to prepare them afresh."
+    )

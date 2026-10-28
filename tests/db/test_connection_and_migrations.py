@@ -11,8 +11,13 @@ from recon.db.connection import Database
 from recon.db.migrate import MIGRATIONS_DIR, available, current_version, migrate
 from recon.errors import StorageError
 
-TABLES = {"rooms", "tasks", "blocks", "sessions", "settings_kv", "undo_log", "sqlite_sequence"}
+TABLES = {
+    "rooms", "tasks", "blocks", "sessions", "settings_kv", "undo_log", "sqlite_sequence", "runs",
+}  # fmt: skip
 """sqlite_sequence is SQLite's own counter table, there since blocks became AUTOINCREMENT (0003)."""
+
+
+LATEST = 4
 
 
 def _pragma(db: Database, name: str) -> object:
@@ -84,12 +89,12 @@ def test_fresh_database_migrates_to_the_latest_schema(db: Database) -> None:
     with db.read() as conn:
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
-    assert current_version(db) == len(available()) == 3
+    assert current_version(db) == len(available()) == LATEST
     assert tables == TABLES
 
 
 def test_migrating_twice_changes_nothing(db: Database) -> None:
-    assert migrate(db) == 3
+    assert migrate(db) == LATEST
 
 
 def test_database_from_a_newer_recon_is_refused(db: Database) -> None:
@@ -151,7 +156,7 @@ def test_0002_adds_task_time_to_a_version_1_database_with_rooms(
             [(1, "First"), (2, "Second")],
         )
 
-    assert migrate(db) == 3
+    assert migrate(db) == LATEST
 
     with db.read() as conn:
         rows = conn.execute("SELECT title, status, time_spent_s FROM tasks ORDER BY id").fetchall()
@@ -189,7 +194,7 @@ def test_0003_keeps_blocks_and_never_reuses_an_id_undo_remembers(
             " VALUES ('insert_block', 7, '{}', 'x')"
         )
 
-    assert migrate(db) == 3
+    assert migrate(db) == LATEST
 
     with db.transaction() as conn:
         rows = conn.execute("SELECT id, json_extract(content, '$.text') FROM blocks").fetchall()
@@ -251,3 +256,38 @@ def test_reads_use_a_read_only_connection_that_never_waits_for_a_writer(db: Data
     assert waited < 0.1
     with db.read() as conn:  # and once committed, the reader sees it
         assert conn.execute("SELECT value FROM settings_kv").fetchone() == ("v",)
+
+
+def test_0004_adds_runs_to_a_version_3_database_with_rooms(data_dir: Path, tmp_path: Path) -> None:
+    folder = tmp_path / "v3"
+    folder.mkdir()
+    for name in ("0001_initial.sql", "0002_task_time.sql", "0003_blocks_never_reuse_ids.sql"):
+        shutil.copy(MIGRATIONS_DIR / name, folder / name)
+    db = Database.open(data_dir / "app.db")
+    migrate(db, folder)
+    with db.transaction() as conn:
+        conn.execute(
+            "INSERT INTO rooms (platform, path, module, name, task_count, mode, status,"
+            " created_at, updated_at) VALUES ('TryHackMe', '', '', 'Old room', 1, 'new', 'done',"
+            " '2026-10-01T09:00:00+00:00', '2026-10-01T09:00:00+00:00')"
+        )
+
+    assert migrate(db) == LATEST
+
+    with db.transaction() as conn:
+        conn.execute(
+            "INSERT INTO runs (id, room_id, created_at)"
+            " VALUES ('r1', 1, '2026-10-28T09:00:00+00:00')"
+        )
+    with db.read() as conn:
+        assert conn.execute("SELECT name, status FROM rooms").fetchone() == ("Old room", "done")
+        assert conn.execute("SELECT status, written FROM runs").fetchone() == ("staged", 0)
+    for bad in (
+        "INSERT INTO runs (id, room_id, created_at) VALUES ('r2', 99, 'x')",
+        "INSERT INTO runs (id, room_id, status, created_at) VALUES ('r3', 1, 'lost', 'x')",
+        "INSERT INTO runs (id, room_id, created_at) VALUES ('', 1, 'x')",
+        "UPDATE runs SET written = -1",
+    ):
+        with pytest.raises(StorageError), db.transaction() as conn:
+            conn.execute(bad)
+    db.close()

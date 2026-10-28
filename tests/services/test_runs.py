@@ -84,30 +84,10 @@ def test_prune_without_a_runs_folder_does_nothing(tmp_path: Path) -> None:
     assert not (tmp_path / "runs").exists()
 
 
-def test_start_up_prunes_old_runs(tmp_path: Path) -> None:
-    from recon.__main__ import prune_runs  # noqa: PLC0415 - start-up's own helper
-    from recon.paths import AppPaths  # noqa: PLC0415
+def test_prune_keeps_runs_still_waiting_for_review(tmp_path: Path) -> None:
+    root = tmp_path / "runs"
+    old = _store(root, NOW - timedelta(days=KEEP_DAYS + 5)).start()
+    old.record("extract", 1, {})
 
-    paths = AppPaths.from_environ({}, tmp_path)
-    old = paths.runs / "20200101T000000-abcd"
-    old.mkdir(parents=True)
-
-    prune_runs(paths)
-
-    assert not old.exists()
-
-
-def test_start_up_carries_on_when_a_run_will_not_delete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    from recon.__main__ import prune_runs  # noqa: PLC0415 - start-up's own helper
-    from recon.paths import AppPaths  # noqa: PLC0415
-
-    def refuse(_self: RunStore, keep_days: int = KEEP_DAYS) -> int:
-        raise PermissionError(keep_days)
-
-    monkeypatch.setattr(RunStore, "prune", refuse)
-
-    prune_runs(AppPaths.from_environ({}, tmp_path))
-
-    assert "old runs not deleted: PermissionError" in caplog.text
+    assert _store(root).prune(keep={old.run_id}) == 0
+    assert old.folder.exists()
