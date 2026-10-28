@@ -29,6 +29,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - Opening Recon while it's already open no longer starts a second copy that could overwrite your edits: it says "Recon is already open" and stops (audit F-10).
 - If Recon can't start (a database from a newer Recon, a database it can't open, folders it can't set up), it says why in a small window, not only in a terminal you can't see from the app menu, and the copy names the real cause (audit F-12).
+- In the Markdown export, a line of your notes starting with `<script`, `<style` or `<!--` no longer hides the rest of the note: a leading `<` is escaped, and so is any `<` in a table cell (audit F-08).
 - Every folder Recon creates is private (0700), not just the last one: `backups/` was 0755. Files and folders already there are locked down to 0600/0700 at launch, and Qt's compiled-QML cache now lives in Recon's private cache folder (audit F-09, F-22).
 - The UI thread no longer waits on storage. Reads use their own read-only connection that never waits for a write; "Not a flag, keep it" and settings saves run on workers (audit F-05).
 - Turning panel pinning on and quickly off (or the reverse) can no longer leave the wrong state in KDE: pin and unpin run in order and check the setting when they run (audit F-16).
