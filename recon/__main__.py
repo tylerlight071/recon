@@ -30,6 +30,7 @@ from recon.bridge.pinning import PinningBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
+from recon.bridge.vault import VaultBridge
 from recon.bridge.workers import SerialWorker, drain_global_pool
 from recon.config import Settings, load_settings, save_settings
 from recon.db import backup
@@ -274,6 +275,14 @@ def _room_bridges(
     finish = FinishBridge(
         (rooms, tasks, blocks, undo), settings, open_folder, submit=room_worker, parent=app
     )
+    # Create or complete the vault at start-up (task 2.1); Home shows the Obsidian step.
+    vault = VaultBridge(
+        settings,
+        lambda text: QGuiApplication.clipboard().setText(text),
+        submit=room_worker,
+        parent=app,
+    )
+    vault.setUp()
     connect_room_flow(navigation, home, start, session, focus)
     connect_finish(navigation, home, session, focus, finish)
     # In order: finish every queued job (Next, deletes, undo steps), then the last title,
@@ -289,6 +298,7 @@ def _room_bridges(
         "RoomSession": session,
         "Focus": focus,
         "Finish": finish,
+        "Vault": vault,
     }
 
 

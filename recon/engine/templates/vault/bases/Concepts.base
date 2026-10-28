@@ -1,0 +1,12 @@
+filters:
+  and:
+    - 'type == "concept"'
+views:
+  - type: table
+    name: Concepts
+    order:
+      - file.name
+      - note.topic
+      - note.seen_in
+      - note.card_count
+      - note.last_updated

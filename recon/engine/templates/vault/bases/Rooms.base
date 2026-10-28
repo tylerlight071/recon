@@ -1,0 +1,15 @@
+filters:
+  and:
+    - 'type == "room"'
+views:
+  - type: table
+    name: Rooms by path
+    groupBy:
+      property: note.path
+      direction: ASC
+    order:
+      - file.name
+      - note.module
+      - note.date_done
+      - note.time_spent
+      - note.open_flags

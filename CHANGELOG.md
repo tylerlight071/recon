@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Vault bootstrap: Recon creates `~/Cyber Vault` (or the folder in Settings) with SPEC.md's folders, a Bases `Home.md` with three dashboards, and Obsidian's settings (wikilinks, links kept up to date when notes are renamed, attachments in `Attachments/`). It never replaces a file you've changed. Home shows a one-time "Open your vault in Obsidian, once" card with Copy path and "I've done that". ADR 0006.
+
 ## [0.1.0] - 2026-10-28
 
 Phase 1, shell and capture: Home, Start a room, the room session panel with block editors, Undo, the focus timer, a temporary Finish with Markdown export, Settings and an app-menu entry. Notes autosave within half a second, and flags never reach storage. Includes every fix from the independent Phase 1 audit (`docs/audits/phase-1.md`).

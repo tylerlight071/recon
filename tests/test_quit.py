@@ -43,7 +43,8 @@ def test_title_then_next_then_quit_keeps_the_title(
     room = RoomRepository(db).create(NewRoom(name="DNS in Detail", task_count=3))
     fake = FakeApp()
     monkeypatch.setattr("recon.__main__.RoomRepository", SlowRooms)
-    bridges, _pinning = create_bridges(fake, paths, Settings(kwin_pinning="off"), db)  # type: ignore[arg-type]
+    settings = Settings(kwin_pinning="off", vault_path=str(tmp_path / "vault"))
+    bridges, _pinning = create_bridges(fake, paths, settings, db)  # type: ignore[arg-type]
     session = bridges["RoomSession"]
     assert isinstance(session, RoomSessionBridge)
     session.open(room.id)

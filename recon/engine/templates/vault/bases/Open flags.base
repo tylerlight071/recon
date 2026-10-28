@@ -1,0 +1,10 @@
+filters:
+  and:
+    - 'open_flags > 0'
+views:
+  - type: table
+    name: Something to check
+    order:
+      - file.name
+      - note.type
+      - note.open_flags

@@ -31,6 +31,7 @@ from recon.bridge.pinning import PinningBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
+from recon.bridge.vault import VaultBridge
 from recon.config import Settings
 from recon.db.connection import Database
 from recon.db.migrate import migrate
@@ -87,6 +88,8 @@ class Running:
     chimes: list[int]
     finish: FinishBridge
     opened: list[Path]
+    vault: "VaultBridge"
+    copied: list[str]
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -119,7 +122,9 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         rooms.create(room)
     owner = QObject()
     saved: list[Settings] = []
-    settings = SettingsBridge(initial, saved.append, parent=owner)
+    settings = SettingsBridge(
+        initial, saved.append, parent=owner, home=tmp_path / "home", submit=lambda job: job()
+    )
     navigation = NavigationBridge(parent=owner)
     pinner = FakePinner()
     pinning = PinningBridge(
@@ -163,6 +168,9 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         parent=owner,
     )
     connect_finish(navigation, home, session, focus, finish)
+    copied: list[str] = []
+    vault = VaultBridge(settings, copied.append, submit=lambda job: job(), parent=owner)
+    vault.setUp()
     qml = create_engine(
         {
             "AppSettings": settings,
@@ -174,6 +182,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "RoomSession": session,
             "Focus": focus,
             "Finish": finish,
+            "Vault": vault,
             "Editors": EditorsBridge(parent=owner),
         }
     )
@@ -205,6 +214,8 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         chimes,
         finish,
         opened,
+        vault,
+        copied,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -1371,3 +1382,22 @@ def test_a_later_notice_waits_for_the_delete_undo(running: Running) -> None:
     wait(20)
     assert toast.property("message") == "Flag skipped. Recon never saves flags."
     assert toast.property("actionText") == ""
+
+
+# Task 2.1: the vault and the one-time Obsidian step -------------------------------------------
+
+
+def test_home_asks_once_to_open_the_vault_in_obsidian(running: Running, tmp_path: Path) -> None:
+    card = running.find(running.main, "obsidianStep")
+    assert (tmp_path / "home" / "Cyber Vault" / "Home.md").exists()
+    assert card.property("visible") is True
+    assert "~/Cyber Vault" in running.find(running.main, "obsidianStepText").property("text")
+    assert _visible_primary_buttons(running.main.contentItem()) == ["primaryAction"]
+
+    QMetaObject.invokeMethod(running.find(running.main, "copyVaultPath"), "clicked")
+    assert running.copied == [str(tmp_path / "home" / "Cyber Vault")]
+    QMetaObject.invokeMethod(running.find(running.main, "obsidianDone"), "clicked")
+    wait(20)
+
+    assert card.property("visible") is False
+    assert running.warnings == []

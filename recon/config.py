@@ -72,6 +72,12 @@ class Settings(BaseModel):
             return ""
         return str(path)
 
+    obsidian_vault: str = ""
+    """The vault folder Tyler confirmed he opened in Obsidian once ("" until then).
+
+    Obsidian only follows obsidian:// links to vaults it knows, so "Open in
+    Obsidian" stays hidden until this matches the vault in use (task 2.1).
+    """
     accent: Accent = "violet"
     reduce_motion: bool = False
     """Make every animation instant (Theme.reduceMotion)."""

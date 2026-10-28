@@ -136,3 +136,12 @@ class AutosaveFailedError(StorageError):
         "Couldn't save your notes just now. Recon keeps trying by itself; "
         "check there's free disk space. Nothing you've typed is lost while Recon is open."
     )
+
+
+class VaultSetupError(ReconError):
+    """The vault folder couldn't be created or set up."""
+
+    user_message = (
+        "Couldn't set up your vault folder. Check it in Settings: it needs to be a folder "
+        "you own, not a file."
+    )
