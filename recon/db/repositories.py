@@ -60,6 +60,7 @@ _SELECT_WAITING_ROOMS: Final = """
     SELECT id, platform, path, module, name, task_count, mode, status,
            created_at, updated_at, time_spent_s, last_task_index
     FROM rooms WHERE status IN ('queued', 'processing') ORDER BY updated_at, id"""
+_COUNT_DONE_IN_PATH: Final = "SELECT count(*) FROM rooms WHERE status = 'done' AND path = ?"
 _INSERT_ROOM: Final = """
     INSERT INTO rooms (platform, path, module, name, task_count, mode, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
@@ -213,6 +214,12 @@ class RoomRepository:
         with self._db.read() as conn:
             row = conn.execute(_SELECT_CURRENT_ROOM).fetchone()
         return _room(row) if row else None
+
+    def done_in_path(self, path: str) -> int:
+        """How many rooms are done (applied) in a learning path ("" counts rooms with none)."""
+        with self._db.read() as conn:
+            count = conn.execute(_COUNT_DONE_IN_PATH, (path,)).fetchone()[0]
+        return int(count)
 
     def waiting(self) -> list[Room]:
         """Rooms finished but not yet processed (queued, or cut off mid-run), oldest first."""

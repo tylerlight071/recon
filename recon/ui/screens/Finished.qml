@@ -4,13 +4,17 @@ import QtQuick.Dialogs
 import "../components"
 import "../theme"
 
-// Finish (task 1.13): a calm completion moment, what was written and how long
-// it took, how processing is going (task 2.5), and "Export as Markdown".
-// "Back to the room" undoes the finish. Bridges: Finish, Processing. One accent button.
+// Finish (tasks 1.13, 2.5, 2.7): a calm completion moment, what was written and
+// how long it took, and how processing is going. The one accent button is
+// "Review notes" once the room is ready, "Done" until then (the panel can close:
+// a notification follows). "Export as Markdown" stays as a quiet extra, and
+// "Back to the room" undoes the finish. Bridges: Finish, Processing, ReviewModel.
 FocusScope {
     id: finish
 
     objectName: "finishScreen"
+
+    readonly property bool reviewReady: Processing.ready || (Finish.inReview && Processing.line === "")
 
     // The completion moment: a tick that settles in when the screen appears.
     onVisibleChanged: if (visible) settle.restart()
@@ -129,8 +133,8 @@ FocusScope {
             Button {
                 objectName: "openReview"
                 anchors.horizontalCenter: parent.horizontalCenter
-                visible: Processing.ready || (Finish.inReview && Processing.line === "")
-                variant: "secondary"
+                visible: finish.reviewReady
+                variant: "primary"
                 text: qsTr("Review notes")
                 onClicked: ReviewModel.open(Finish.roomId)
             }
@@ -146,10 +150,12 @@ FocusScope {
         }
 
         Text {
+            objectName: "finishHint"
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
-            text: qsTr("Your notes are safe in Recon. Export makes a Markdown copy you can keep anywhere.")
+            visible: !finish.reviewReady
+            text: qsTr("You can close the panel. Recon lets you know when your notes are ready to review.")
             font.family: Theme.fontUi
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.textTertiary
@@ -158,7 +164,7 @@ FocusScope {
         Button {
             objectName: "exportButton"
             anchors.horizontalCenter: parent.horizontalCenter
-            variant: "primary"
+            variant: "quiet"
             text: Finish.busy ? qsTr("Saving…") : qsTr("Export as Markdown")
             onClicked: if (!Finish.busy) folderDialog.open()
         }
@@ -202,7 +208,7 @@ FocusScope {
 
             Button {
                 objectName: "finishDone"
-                variant: "secondary"
+                variant: finish.reviewReady ? "secondary" : "primary"
                 text: qsTr("Done")
                 onClicked: Finish.close()
             }

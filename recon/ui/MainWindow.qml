@@ -23,6 +23,7 @@ Window {
         { "key": "home", "label": qsTr("Home"), "icon": "home", "file": "screens/Home.qml" },
         { "key": "start", "under": "home", "file": "screens/Start.qml" },
         { "key": "review", "under": "home", "file": "screens/Review.qml" },
+        { "key": "done", "under": "home", "file": "screens/Done.qml" },
         { "key": "settings", "label": qsTr("Settings"), "icon": "sliders", "file": "screens/Settings.qml" }
     ]
 
@@ -59,15 +60,6 @@ Window {
         function onFieldFlagSkipped(window) {
             if (window === "main")
                 toast.show(qsTr("Flag skipped. Recon never saves flags."))
-        }
-    }
-
-    Connections {
-        target: ReviewModel
-        function onApplied(roomId, written) {
-            toast.show(written === 1
-                       ? qsTr("Applied: 1 note written to your vault.")
-                       : qsTr("Applied: %1 notes written to your vault.").arg(written))
         }
     }
 

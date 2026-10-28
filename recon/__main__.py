@@ -20,6 +20,7 @@ from recon.app import (
     load_qml,
     load_windows,
 )
+from recon.bridge.done import DoneBridge
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
@@ -77,7 +78,7 @@ from recon.services.chime import Chime
 from recon.services.kwin import KWinPinning, run_command
 from recon.services.notifications import Notifications
 from recon.services.ollama import CHECK_TIMEOUT_S, OllamaService, make_client
-from recon.services.open_url import open_folder
+from recon.services.open_url import open_folder, open_in_obsidian
 from recon.services.runs import RunStore
 
 _log = logging.getLogger(__name__)
@@ -351,10 +352,18 @@ def _room_bridges(
         parent=app,
     )
     vault.setUp()
+    done = DoneBridge(
+        rooms,
+        lambda: vault_folder(settings.settings, Path.home(), paths.data),
+        open_in_obsidian,
+        vault.forgetOpened,
+        submit=room_worker,
+        parent=app,
+    )
     connect_room_flow(navigation, home, start, session, focus)
     connect_finish(navigation, home, session, focus, finish)
     connect_processing(navigation, home, finish, processing, review)
-    connect_review(navigation, home, session, processing, review)
+    connect_review(navigation, home, session, processing, review, done=done)
     # In order: finish every queued job (Next, deletes, undo steps), then the last title,
     # the last seconds and every queued keystroke, all before the database closes (F-06).
     app.aboutToQuit.connect(lambda: _drain(room_worker))
@@ -371,6 +380,7 @@ def _room_bridges(
         "Vault": vault,
         "Processing": processing,
         "ReviewModel": review,
+        "DoneModel": done,
     }
 
 

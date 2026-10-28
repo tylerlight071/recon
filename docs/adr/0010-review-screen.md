@@ -1,6 +1,6 @@
 # ADR 0010: The review screen
 
-- **Status:** Accepted
+- **Status:** Accepted (point 5's interim Apply toast replaced by the done screen, ADR 0011)
 - **Date:** 2026-10-28
 - **Context task:** 2.6 (issue #124)
 

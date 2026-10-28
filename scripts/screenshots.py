@@ -127,7 +127,7 @@ def wait_for(condition: Callable[[], bool], timeout_ms: int = 3000) -> None:
     timer.start()
     while not condition():
         if timer.elapsed() > timeout_ms:
-            fail("the review screen didn't open")
+            fail("the screen didn't open in time")
         QCoreApplication.processEvents()
 
 
@@ -188,6 +188,9 @@ def main(out: Path) -> list[str]:
         review.open(room_id)
         wait_for(lambda: navigation.property("currentScreen") == "review")
         grab(main_window, out, "review")
+        review.apply()  # into the scratch vault
+        wait_for(lambda: navigation.property("currentScreen") == "done")
+        grab(main_window, out, "done")
         session.finishRequested.emit(room_id)
         grab(panel, out, "panel-finish")
 

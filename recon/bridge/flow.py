@@ -6,6 +6,7 @@ jumping in front, so the panel and the browser stay where the user's eyes are,
 and Home keeps "Where was I?" current as the user moves through tasks.
 """
 
+from recon.bridge.done import DoneBridge
 from recon.bridge.finish import FinishBridge
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
@@ -108,22 +109,33 @@ def connect_processing(
     finish.closed.connect(lambda: processing.show(0))
     home.finishedRequested.connect(processing.show)
     processing.readyForReview.connect(lambda _room: home.refresh())
+
+    def applied(room_id: int) -> None:
+        processing.forget(room_id)
+        if finish.property("roomId") == room_id:
+            finish.hide()
+
     review.nothingToReview.connect(open_finish)
     review.recheckRequested.connect(recheck)
     review.discarded.connect(lambda _room: finish.hide())
+    review.applied.connect(lambda room, _written: applied(room))
 
 
-def connect_review(
+def connect_review(  # noqa: PLR0913 - the review hands over to each of these
     navigation: NavigationBridge,
     home: HomeBridge,
     session: RoomSessionBridge,
     processing: ProcessingBridge,
     review: ReviewBridge,
+    *,
+    done: DoneBridge,
 ) -> None:
-    """The review screen: opened from Home, the panel or a notification; Apply and Discard.
+    """The review screen and the done screen after it (tasks 2.6 and 2.7).
 
-    Apply goes Home (the done screen arrives in task 2.7). Discard reopens the
-    room in the panel, exactly as it was.
+    The review opens from Home, the panel or a notification. Apply goes to the
+    done screen (Phase 4's flashcards will come in between); a room already in
+    the vault opens there from Home too. Discard reopens the room in the panel,
+    exactly as it was.
     """
 
     def reopen(room_id: int) -> None:
@@ -136,5 +148,7 @@ def connect_review(
     processing.reviewRequested.connect(review.open)
     review.opened.connect(lambda: navigation.open("review"))
     review.applied.connect(lambda _room, _written: home.refresh())
-    review.applied.connect(lambda _room, _written: navigation.open("home"))
+    review.applied.connect(done.show)
     review.discarded.connect(reopen)
+    home.doneRequested.connect(done.show)
+    done.opened.connect(lambda: navigation.open("done"))

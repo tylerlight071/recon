@@ -158,7 +158,11 @@ class FinishBridge(QObject):
     # ---- Actions ---------------------------------------------------------------------
 
     def open(self, room_id: int) -> None:
-        """Queue the room for processing and show the Finish screen."""
+        """Queue the room for processing and show the Finish screen.
+
+        The end-of-room quiz (task 4.5) will come here, before the room is queued;
+        it never blocks finishing.
+        """
 
         def work() -> Then:
             self._rooms.update_progress(room_id, status="queued")
