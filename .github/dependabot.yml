@@ -17,6 +17,17 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # faster-whisper 1.2.1 passes an argument PyAV 19 removed (ADR 0002), and
+      # pyproject caps av<19. Lift this once a faster-whisper release has the fix.
+      - dependency-name: "av"
+        versions: [">=19"]
+      # CLAUDE.md pins PySide6 to 6.11.x. Moving the UI framework to 6.12 is a
+      # deliberate change, tested on Tyler's desktop, not a routine bump.
+      - dependency-name: "pyside6*"
+        versions: [">=6.12"]
+      - dependency-name: "shiboken6"
+        versions: [">=6.12"]
 
   - package-ecosystem: github-actions
     directory: /
