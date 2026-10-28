@@ -18,6 +18,7 @@ UI_DIR = Path(__file__).resolve().parent / "ui"
 MAIN_QML = UI_DIR / "MainWindow.qml"
 PANEL_QML = UI_DIR / "PanelWindow.qml"
 GALLERY_QML = UI_DIR / "screens" / "Gallery.qml"
+STARTUP_PROBLEM_QML = UI_DIR / "StartupProblem.qml"
 
 _log = logging.getLogger(__name__)
 

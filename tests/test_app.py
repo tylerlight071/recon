@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEvent, QObject, Signal
+from PySide6.QtCore import QCoreApplication, QEvent, QLockFile, QObject, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
@@ -15,6 +15,13 @@ from PySide6.QtQuick import QQuickWindow
 import recon.__main__ as entry
 from recon import app as recon_app
 from recon.config import APP_ID
+from recon.db.connection import Database
+from recon.errors import (
+    AlreadyRunningError,
+    DatabaseTooNewError,
+    DatabaseUnreadableError,
+    DataFolderUnusableError,
+)
 from tests.ui.qml_harness import app as qt_app
 from tests.ui.qml_harness import wait
 
@@ -42,11 +49,21 @@ class _FakeApp(QObject):
         super().__init__()
         self.ran = False
         self.open_windows: set[str] = set()
+        self.problem_title = ""
+        self.problem_message = ""
 
     def exec(self) -> int:
         # The engine only lives while main() runs, so look at the windows now.
         self.ran = True
-        self.open_windows = {w.title() for w in QGuiApplication.topLevelWindows()}
+        windows = QGuiApplication.topLevelWindows()
+        self.open_windows = {w.title() for w in windows if w.title()}
+        for window in windows:
+            title = window.findChild(QObject, "problemTitle")
+            if title is not None:
+                self.problem_title = str(title.property("text"))
+                self.problem_message = str(
+                    window.findChild(QObject, "problemMessage").property("text")
+                )
         return 0
 
 
@@ -208,8 +225,10 @@ def test_unopenable_database_stops_with_a_plain_message(
     (data / "app.db").mkdir()  # a folder where the database should be
 
     assert entry.main([]) == 1
-    assert "Couldn't save to Recon's data folder" in capsys.readouterr().err
-    assert not fake_app.ran
+    assert "Couldn't open Recon's notes database" in capsys.readouterr().err
+    # Shown in a window too, so a launch from the app menu never fails silently (F-12).
+    assert fake_app.ran
+    assert fake_app.open_windows == {"Recon"}
 
 
 def test_failed_snapshot_still_starts(
@@ -233,7 +252,7 @@ def test_failed_snapshot_still_starts(
     assert private_home.exists()
 
 
-def test_migration_failure_returns_none(
+def test_migration_failure_is_a_database_problem(
     private_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from recon.errors import StorageError  # noqa: PLC0415 - only this test raises it
@@ -248,8 +267,70 @@ def test_migration_failure_returns_none(
     paths = entry.AppPaths.from_environ(dict(os.environ), Path.home())
     paths.ensure()
 
-    assert entry.open_database(paths) is None
+    with pytest.raises(DatabaseUnreadableError):
+        entry.open_database(paths)
     # The half-opened database was closed, not leaked.
     with pytest.raises(sqlite3.ProgrammingError), seen[0]._conn:  # type: ignore[attr-defined]  # private, for this check
         pass
     assert private_home.exists()
+
+
+# Audit F-10 and F-12: start-up problems are shown, and one copy runs at a time ------------
+
+
+def _problem_text(fake_app: _FakeApp) -> tuple[str, str]:
+    return fake_app.problem_title, fake_app.problem_message
+
+
+@pytest.mark.usefixtures("private_home")
+def test_a_database_from_a_newer_recon_says_so(fake_app: _FakeApp) -> None:
+    paths = entry.AppPaths.from_environ(dict(os.environ), Path.home())
+    paths.ensure()
+    db = Database.open(paths.data / "app.db")
+    with db.writer() as conn:
+        conn.execute("PRAGMA user_version = 99")
+    db.close()
+
+    assert entry.main([]) == 1
+
+    assert _problem_text(fake_app) == ("Recon couldn't start", DatabaseTooNewError.user_message)
+
+
+def test_a_data_folder_that_is_a_file_says_so(private_home: Path, fake_app: _FakeApp) -> None:
+    (private_home / "xdg_data_home").mkdir(parents=True)
+    (private_home / "xdg_data_home" / "recon").write_text("not a folder")
+
+    assert entry.main([]) == 1
+
+    assert _problem_text(fake_app) == (
+        "Recon couldn't start",
+        DataFolderUnusableError.user_message,
+    )
+
+
+@pytest.mark.usefixtures("private_home")
+def test_a_second_copy_stops_before_touching_the_database(fake_app: _FakeApp) -> None:
+    paths = entry.AppPaths.from_environ(dict(os.environ), Path.home())
+    paths.ensure()
+    first = QLockFile(str(paths.data / entry.LOCK_FILE))
+    assert first.tryLock(0)
+    try:
+        assert entry.main([]) == 0
+    finally:
+        first.unlock()
+
+    assert _problem_text(fake_app) == (
+        "Recon is already open",
+        AlreadyRunningError.user_message,
+    )
+    assert not (paths.data / "app.db").exists()
+
+
+@pytest.mark.usefixtures("private_home", "fake_app")
+def test_the_lock_is_released_at_quit() -> None:
+    assert entry.main([]) == 0
+    paths = entry.AppPaths.from_environ(dict(os.environ), Path.home())
+
+    again = QLockFile(str(paths.data / entry.LOCK_FILE))
+    assert again.tryLock(0)
+    again.unlock()

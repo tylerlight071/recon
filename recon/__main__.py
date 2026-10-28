@@ -8,10 +8,17 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import Property, QLockFile, QObject
 from PySide6.QtGui import QGuiApplication
 
-from recon.app import GALLERY_QML, create_application, create_engine, load_qml, load_windows
+from recon.app import (
+    GALLERY_QML,
+    STARTUP_PROBLEM_QML,
+    create_application,
+    create_engine,
+    load_qml,
+    load_windows,
+)
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
@@ -36,7 +43,14 @@ from recon.db.repositories import (
     UndoRepository,
     utc_now,
 )
-from recon.errors import StorageError
+from recon.errors import (
+    AlreadyRunningError,
+    DatabaseTooNewError,
+    DatabaseUnreadableError,
+    DataFolderUnusableError,
+    ReconError,
+    StorageError,
+)
 from recon.logging_setup import configure_logging
 from recon.paths import AppPaths, ensure_private_dir
 from recon.services.chime import Chime
@@ -44,6 +58,9 @@ from recon.services.kwin import KWinPinning, run_command
 from recon.services.open_url import open_folder
 
 _log = logging.getLogger(__name__)
+
+LOCK_FILE = "recon.lock"
+"""Held while Recon runs, in the data folder: a second copy finds it and stops."""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -58,6 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run Recon.
 
+    Anything that stops start-up is shown in a small window, not just printed, so a
+    launch from the app menu never fails silently (audit F-12).
+
     Args:
         argv: Arguments without the program name; defaults to sys.argv[1:].
 
@@ -66,46 +86,102 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     args = build_parser().parse_args(sys.argv[1:] if argv is None else list(argv))
     paths = AppPaths.from_environ(dict(os.environ), Path.home())
-    paths.ensure()
-    # Qt's compiled-QML cache goes in Recon's private cache, not ~/.cache/Recon (audit F-22).
-    ensure_private_dir(paths.cache / "qmlcache")
+    try:
+        paths.ensure()
+        # Qt's compiled-QML cache goes in Recon's private cache, not ~/.cache/Recon (F-22).
+        ensure_private_dir(paths.cache / "qmlcache")
+    except ReconError as exc:
+        return show_startup_problem(exc)
+    except OSError:
+        return show_startup_problem(DataFolderUnusableError())
     os.environ["QML_DISK_CACHE_PATH"] = str(paths.cache / "qmlcache")
     configure_logging(paths.log_file)
+    # One copy at a time: two writers on one database lose edits (audit F-10).
+    lock = QLockFile(str(paths.data / LOCK_FILE))
+    if not lock.tryLock(0):
+        _log.info("another copy of recon is running")
+        return show_startup_problem(AlreadyRunningError(), code=0)
+    try:
+        return _start(args, paths)
+    finally:
+        lock.unlock()
+
+
+def _start(args: argparse.Namespace, paths: AppPaths) -> int:
     settings, problem = load_settings(paths.settings_file)
     if problem is not None:
         _log.warning("starting with default settings")
-    db = open_database(paths)
-    if db is None:
-        print(StorageError.user_message, file=sys.stderr)  # noqa: T201 - no window yet
-        return 1
+    try:
+        db = open_database(paths)
+    except ReconError as exc:
+        return show_startup_problem(exc)
     try:
         return _run(args, paths, settings, db)
     finally:
         db.close()
 
 
-def open_database(paths: AppPaths, today: dt.date | None = None) -> Database | None:
+def open_database(paths: AppPaths, today: dt.date | None = None) -> Database:
     """Open and migrate app.db, then take today's snapshot if there isn't one.
 
     A failed snapshot is logged and start-up carries on: the live data is fine.
 
-    Returns:
-        The database, or None if it couldn't be opened or migrated.
+    Raises:
+        DatabaseTooNewError: A newer Recon wrote it.
+        DatabaseUnreadableError: It couldn't be opened or brought up to date.
     """
     try:
         db = Database.open(paths.data / "app.db")
-    except StorageError:
-        return None
+    except StorageError as exc:
+        raise DatabaseUnreadableError from exc
     try:
         migrate(db)
-    except StorageError:
+    except DatabaseTooNewError:
         db.close()
-        return None
+        raise
+    except StorageError as exc:
+        db.close()
+        raise DatabaseUnreadableError from exc
     try:
         backup.snapshot_if_due(db, paths.data / "backups" / "db", today or dt.date.today())
     except StorageError:
         _log.warning("starting without today's database snapshot")
     return db
+
+
+class StartupProblem(QObject):
+    """What the start-up problem window says (exposed to QML as `Problem`)."""
+
+    def __init__(self, error: ReconError, parent: QObject | None = None) -> None:
+        """Describe `error` in its own plain words."""
+        super().__init__(parent)
+        self._title = (
+            "Recon is already open"
+            if isinstance(error, AlreadyRunningError)
+            else "Recon couldn't start"
+        )
+        self._message = error.user_message
+
+    def _get_title(self) -> str:
+        return self._title
+
+    def _get_message(self) -> str:
+        return self._message
+
+    title = Property(str, _get_title, constant=True)
+    message = Property(str, _get_message, constant=True)
+
+
+def show_startup_problem(error: ReconError, code: int = 1) -> int:
+    """Say what stopped start-up, in a small window and on stderr; returns `code`."""
+    print(error.user_message, file=sys.stderr)  # noqa: T201 - also for terminal launches
+    app = create_application(sys.argv[:1])
+    problem = StartupProblem(error)
+    qml = create_engine({"Problem": problem})
+    if load_qml(qml.engine, STARTUP_PROBLEM_QML):
+        app.exec()
+    del qml
+    return code
 
 
 def _run(args: argparse.Namespace, paths: AppPaths, settings: Settings, db: Database) -> int:

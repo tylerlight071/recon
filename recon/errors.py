@@ -94,3 +94,36 @@ class ExportFailedError(ReconError):
     user_message = (
         "Couldn't save the Markdown file. Check you can write to that folder, then try again."
     )
+
+
+class DatabaseTooNewError(StorageError):
+    """app.db was written by a newer version of Recon."""
+
+    user_message = (
+        "Your notes were saved by a newer version of Recon. "
+        "Update Recon, then open it again. Nothing was changed."
+    )
+
+
+class DatabaseUnreadableError(StorageError):
+    """app.db couldn't be opened or brought up to date."""
+
+    user_message = (
+        "Couldn't open Recon's notes database, so Recon can't start. Nothing was changed. "
+        "A copy from each day is kept in Recon's data folder, under backups/db."
+    )
+
+
+class DataFolderUnusableError(ReconError):
+    """Recon's data or config folder couldn't be created or used."""
+
+    user_message = (
+        "Recon couldn't set up its folders. Check that the recon folders in "
+        "~/.local/share and ~/.config are folders that belong to you, then open Recon again."
+    )
+
+
+class AlreadyRunningError(ReconError):
+    """Another copy of Recon is open on this profile."""
+
+    user_message = "Recon is already open. Look for its window in the taskbar."
