@@ -57,7 +57,7 @@ If this file, the build plan and the spec disagree, the spec wins on behaviour, 
 | Audio capture | `sounddevice` | 16 kHz mono |
 | Spaced repetition | `fsrs` (py-fsrs) | |
 | Global hotkey | XDG GlobalShortcuts portal via **jeepney** (blocking, on a worker thread) | Hold-to-talk via the `Activated`/`Deactivated` signals. QtDBus can't marshal `BindShortcuts`' `a(sa{sv})` from Python (ADR 0003). Call the portal directly rather than adding `global-shortcut-portal` (asyncio, which fights Qt's event loop) |
-| Notifications | freedesktop Notifications via **QtDBus** | Actions open the right screen; no extra dependency |
+| Notifications | freedesktop Notifications via **jeepney** (one private thread sends and listens) | Actions open the right screen. QtDBus can't send `Notify`'s unsigned `replaces_id` from Python (ADR 0009) |
 | Storage | SQLite (stdlib `sqlite3`), WAL mode | Migrations in `recon/db/migrations/` |
 | Images | `Pillow` | |
 | Tests | `pytest`, `pytest-qt`, `pytest-cov`, `hypothesis`, `mutmut` (3.x) | See Testing |

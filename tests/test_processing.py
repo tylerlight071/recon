@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from recon.__main__ import tidy_runs
+from recon.config import Settings
 from recon.db.connection import Database
 from recon.db.migrate import migrate
 from recon.db.models import NewRoom
@@ -115,7 +116,7 @@ def test_start_up_finishes_an_interrupted_apply_and_keeps_waiting_runs(
     expired.record("extract", 1, {})
     paths = AppPaths(data=tmp_path / "data", config=tmp_path / "config", cache=tmp_path / "cache")
 
-    tidy_runs(paths, old.vault, db)
+    tidy_runs(paths, Settings(vault_path=str(old.vault)), db)
 
     assert RoomRepository(db).get(room).status == "done"  # type: ignore[union-attr]  # exists
     assert old.records.get(crashed.run_id).status == "applied"  # type: ignore[union-attr]  # exists
@@ -134,7 +135,7 @@ def test_start_up_logs_and_carries_on_when_tidying_fails(
     monkeypatch.setattr(RunStore, "prune", refuse)
     paths = AppPaths(data=tmp_path / "data", config=tmp_path / "config", cache=tmp_path / "cache")
 
-    tidy_runs(paths, tmp_path / "vault", db)
+    tidy_runs(paths, Settings(vault_path=str(tmp_path / "vault")), db)
 
     assert "old runs not tidied: PermissionError" in caplog.text
 
@@ -151,3 +152,16 @@ def test_a_run_that_cannot_be_recovered_is_logged(
 
     assert processing.recover_runs() == 0
     assert "not recovered: StagingDamagedError" in caplog.text
+
+
+def test_back_to_the_room_discards_every_staged_run(tmp_path: Path, db: Database) -> None:
+    processing = _processing(tmp_path, db)
+    room = _room(db)
+    first, second = processing.runs.start(), processing.runs.start()
+    processing.stage_room(room, _rendered(), first)
+    processing.stage_room(room, _rendered(), second)
+    processing.discard_run(first.run_id)
+
+    assert processing.discard_room(room) == 1
+    assert not (second.folder / "staged").exists()
+    assert {r.status for r in processing.records.for_room(room)} == {"discarded"}

@@ -10,6 +10,7 @@ from recon.bridge.finish import FinishBridge
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.navigation import NavigationBridge
+from recon.bridge.processing import ProcessingBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.start import StartRoomBridge
 
@@ -66,3 +67,36 @@ def connect_finish(
     finish.reopenRequested.connect(reopen)
     finish.closed.connect(home.refresh)
     finish.closed.connect(lambda: navigation.open("home"))
+
+
+def connect_processing(
+    navigation: NavigationBridge,
+    home: HomeBridge,
+    finish: FinishBridge,
+    processing: ProcessingBridge,
+) -> None:
+    """A finished room is processed; the panel follows the room it shows.
+
+    A notification's click opens that room's Finish screen (the review screen
+    takes over in task 2.7). "Back to the room" takes it out of processing.
+    """
+
+    def process(room_id: int) -> None:
+        processing.show(room_id)
+        processing.enqueue(room_id)
+
+    def reopen(room_id: int) -> None:
+        processing.withdraw(room_id)
+        processing.show(0)
+
+    def open_room(room_id: int) -> None:
+        processing.show(room_id)
+        finish.revisit(room_id)
+        navigation.showPanel()
+
+    finish.processRequested.connect(process)
+    finish.reopenRequested.connect(reopen)
+    finish.closed.connect(lambda: processing.show(0))
+    home.finishedRequested.connect(processing.show)
+    processing.readyForReview.connect(lambda _room: home.refresh())
+    processing.reviewRequested.connect(open_room)

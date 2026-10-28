@@ -23,17 +23,23 @@ from recon.app import (
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
-from recon.bridge.flow import connect_finish, connect_room_flow
+from recon.bridge.flow import connect_finish, connect_processing, connect_room_flow
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.models import ModelsBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
+from recon.bridge.processing import ProcessingBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
 from recon.bridge.vault import VaultBridge
-from recon.bridge.workers import SerialWorker, drain_global_pool, thread_pool_submit
+from recon.bridge.workers import (
+    DaemonWorker,
+    SerialWorker,
+    drain_global_pool,
+    thread_pool_submit,
+)
 from recon.config import Settings, load_settings, save_settings, vault_folder
 from recon.db import backup
 from recon.db.autosave import AutosaveQueue
@@ -58,9 +64,11 @@ from recon.errors import (
 )
 from recon.logging_setup import Safe, configure_logging
 from recon.paths import AppPaths, ensure_private_dir
+from recon.pipeline import Pipeline
 from recon.processing import Processing
 from recon.services.chime import Chime
 from recon.services.kwin import KWinPinning, run_command
+from recon.services.notifications import Notifications
 from recon.services.ollama import CHECK_TIMEOUT_S, OllamaService, make_client
 from recon.services.open_url import open_folder
 from recon.services.runs import RunStore
@@ -246,40 +254,52 @@ def create_bridges(
         parent=app,
     )
     models.check()
-    vault = vault_folder(settings, Path.home(), paths.data)
-    thread_pool_submit(lambda: tidy_runs(paths, vault, db))
+    thread_pool_submit(lambda: tidy_runs(paths, settings, db))
     bridges: dict[str, QObject] = {
         "AppSettings": settings_bridge,
         "Navigation": navigation,
         "Pinning": pinning,
         "Editors": EditorsBridge(parent=app),
         "Models": models,
-        **_room_bridges(app, db, settings_bridge, navigation),
+        **_room_bridges(app, db, settings_bridge, navigation, paths),
     }
     return bridges, pinning
 
 
-def tidy_runs(paths: AppPaths, vault: Path, db: Database) -> None:
+def processing_for(paths: AppPaths, settings: Settings, db: Database) -> Processing:
+    """Where runs, backups and the vault are for these settings, and the records to keep."""
+    return Processing(
+        vault_folder(settings, Path.home(), paths.data),
+        RunStore(paths.runs, utc_now, lambda: secrets.token_hex(4)),
+        paths.backups,
+        RoomRepository(db),
+        RunRepository(db),
+    )
+
+
+def tidy_runs(paths: AppPaths, settings: Settings, db: Database) -> None:
     """At launch: finish any Apply a crash interrupted, then delete runs over 30 days old.
 
     Runs still waiting for Apply or Discard are kept however old, so their
     review can still be applied.
     """
     # Thread boundary: whatever fails is logged and retried next launch.
-    store = RunStore(paths.runs, utc_now, lambda: secrets.token_hex(4))
-    records = RunRepository(db)
-    processing = Processing(vault, store, paths.backups, RoomRepository(db), records)
+    processing = processing_for(paths, settings, db)
     try:
         processing.recover_runs()
-        store.prune(keep={run.id for run in records.staged()})
+        processing.runs.prune(keep={run.id for run in processing.records.staged()})
     except (OSError, ReconError) as exc:
         _log.warning("old runs not tidied: %s", Safe(type(exc).__name__))
 
 
 def _room_bridges(
-    app: QGuiApplication, db: Database, settings: SettingsBridge, navigation: NavigationBridge
+    app: QGuiApplication,
+    db: Database,
+    settings: SettingsBridge,
+    navigation: NavigationBridge,
+    paths: AppPaths,
 ) -> dict[str, QObject]:
-    """Home, Start, the room session, its timer and Finish, sharing one worker."""
+    """Home, Start, the room session, its timer and Finish (sharing one worker), and processing."""
     rooms, tasks, blocks = RoomRepository(db), TaskRepository(db), BlockRepository(db)
     undo = UndoRepository(db)
     # One serial worker for the room's writes, so saves land before anything reads them back.
@@ -307,8 +327,14 @@ def _room_bridges(
         parent=app,
     )
     finish = FinishBridge(
-        (rooms, tasks, blocks, undo), settings, open_folder, submit=room_worker, parent=app
+        (rooms, tasks, blocks, undo),
+        settings,
+        open_folder,
+        submit=room_worker,
+        discard_staged=lambda room: processing_for(paths, settings.settings, db).discard_room(room),
+        parent=app,
     )
+    processing = _processing_bridge(app, db, settings, paths)
     # Create or complete the vault at start-up (task 2.1); Home shows the Obsidian step.
     vault = VaultBridge(
         settings,
@@ -319,6 +345,7 @@ def _room_bridges(
     vault.setUp()
     connect_room_flow(navigation, home, start, session, focus)
     connect_finish(navigation, home, session, focus, finish)
+    connect_processing(navigation, home, finish, processing)
     # In order: finish every queued job (Next, deletes, undo steps), then the last title,
     # the last seconds and every queued keystroke, all before the database closes (F-06).
     app.aboutToQuit.connect(lambda: _drain(room_worker))
@@ -333,7 +360,36 @@ def _room_bridges(
         "Focus": focus,
         "Finish": finish,
         "Vault": vault,
+        "Processing": processing,
     }
+
+
+def _processing_bridge(
+    app: QGuiApplication, db: Database, settings: SettingsBridge, paths: AppPaths
+) -> ProcessingBridge:
+    """The processing queue on its own daemon thread, with desktop notifications (task 2.5)."""
+    pipeline = Pipeline(
+        RoomRepository(db),
+        TaskRepository(db),
+        BlockRepository(db),
+        lambda: settings.settings,
+        lambda current: processing_for(paths, current, db),
+        lambda host: OllamaService(make_client(host)),
+    )
+    worker = DaemonWorker("recon-processing")
+    notifications = Notifications(
+        lambda room, key: processing.action(room, key)  # noqa: PLW0108 - processing is made below
+    )
+    processing = ProcessingBridge(
+        pipeline, notifications.notify, RoomRepository(db).waiting, submit=worker, parent=app
+    )
+    notifications.start()
+    processing.resume()
+    # Stop between steps; never wait for a model call (the room stays queued for next time).
+    app.aboutToQuit.connect(processing.close)
+    app.aboutToQuit.connect(worker.close)
+    app.aboutToQuit.connect(notifications.close)
+    return processing
 
 
 def _drain(*workers: SerialWorker) -> None:

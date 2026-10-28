@@ -13,7 +13,7 @@ from recon.bridge.settings import SettingsBridge
 from recon.config import Settings
 from recon.db.connection import Database
 from recon.db.migrate import migrate
-from recon.db.models import BlockContent, NewRoom, Task
+from recon.db.models import BlockContent, NewRoom, RoomStatus, Task
 from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository, UndoRepository
 from recon.errors import ExportFolderMissingError, ReconError
 from tests.ui.qml_harness import SignalCounter, app
@@ -101,12 +101,17 @@ def test_hidden_until_a_room_finishes(setup: Setup) -> None:
     assert finish.property("folderUrl") == ""
 
 
-def test_open_marks_the_room_done_and_shows_what_was_done(setup: Setup) -> None:
+def test_open_queues_the_room_and_shows_what_was_done(setup: Setup) -> None:
+    queued: list[int] = []
+    setup.finish.processRequested.connect(queued.append)
+
     setup.finish.open(setup.room_id)
 
     room = setup.rooms.get(setup.room_id)
     assert room is not None
-    assert room.status == "done"
+    assert room.status == "queued"
+    assert queued == [setup.room_id]
+    assert setup.finish.property("statusLine") == "Waiting to be processed."
     finish = setup.finish
     assert finish.property("shown") is True
     assert finish.property("roomName") == "DNS in Detail"
@@ -203,7 +208,7 @@ def test_an_unexpected_failure_never_leaves_finish_stuck(db: Database, setup: Se
     assert finish.property("busy") is False
 
 
-def test_revisit_shows_a_done_room_without_changing_it(setup: Setup) -> None:
+def test_revisit_shows_a_finished_room_without_changing_it(setup: Setup) -> None:
     setup.finish.open(setup.room_id)
     setup.finish.close()
 
@@ -213,7 +218,30 @@ def test_revisit_shows_a_done_room_without_changing_it(setup: Setup) -> None:
     assert setup.finish.property("roomName") == "DNS in Detail"
     room = setup.rooms.get(setup.room_id)
     assert room is not None
-    assert room.status == "done"
+    assert room.status == "queued"
+
+
+@pytest.mark.parametrize(
+    ("status", "line"),
+    [("processing", "Waiting to be processed."), ("in_review", "Ready to review."), ("done", "")],
+)
+def test_the_status_line_follows_the_room(setup: Setup, status: RoomStatus, line: str) -> None:
+    setup.rooms.update_progress(setup.room_id, status=status)
+
+    setup.finish.revisit(setup.room_id)
+
+    assert setup.finish.property("statusLine") == line
+
+
+def test_back_to_the_room_discards_anything_staged(setup: Setup) -> None:
+    discarded: list[int] = []
+    setup.finish._discard_staged = discarded.append  # type: ignore[assignment]  # a recording fake
+    setup.finish.open(setup.room_id)
+
+    setup.finish.backToRoom()
+
+    assert discarded == [setup.room_id]
+    assert setup.rooms.get(setup.room_id).status == "capturing"  # type: ignore[union-attr]  # exists
 
 
 def test_revisit_ignores_a_room_that_isnt_done(setup: Setup) -> None:

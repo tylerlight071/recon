@@ -118,7 +118,7 @@ class HomeBridge(QObject):
             "when": ago(room.updated_at, now),
             "canResume": room.status == "capturing",
             # A done room opens its Finish screen again: export, or back to the room (F-11).
-            "canOpen": room.status in {"capturing", "done"},
+            "canOpen": True,
         }
 
     def _has_current(self) -> bool:
@@ -165,11 +165,11 @@ class HomeBridge(QObject):
 
     @Slot(int)
     def resume(self, room_id: int) -> None:
-        """Open a recent room: carry on capturing it, or, if it's done, its Finish screen."""
+        """Open a recent room: carry on capturing it, or, once finished, its Finish screen."""
         room = self._rooms.get(room_id)
         if room is None:
             return
         if room.status == "capturing":
             self.resumeRequested.emit(room_id)
-        elif room.status == "done":
+        else:
             self.finishedRequested.emit(room_id)
