@@ -143,4 +143,6 @@ pytest_add_cli_args_test_selection = [
     "tests/engine/test_export.py",
     "tests/engine/test_sanitise.py",
     "tests/engine/test_notes.py",
+    "tests/engine/test_stage.py",
+    "tests/engine/test_stage_crash.py",
 ]

@@ -32,6 +32,11 @@ class AppPaths:
         return self.data / "runs"
 
     @property
+    def backups(self) -> Path:
+        """Vault files Apply replaced (`backups/<run_id>/`) and database snapshots (`db/`)."""
+        return self.data / "backups"
+
+    @property
     def settings_file(self) -> Path:
         """Path of Tyler's settings (`settings.toml`)."""
         return self.config / "settings.toml"

@@ -2,7 +2,7 @@
 
 How Recon is put together. Behaviour is defined in [`SPEC.md`](SPEC.md); conventions in [`../CLAUDE.md`](../CLAUDE.md). This file is kept current in the same pull request as any change it describes.
 
-**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, and pipeline steps 1, 3 and 6 (parse, extract and render). `revision/` and the processing pipeline are still empty.
+**Built so far:** Phase 0 foundations and Phase 1 (shell and capture): the theme and components, both windows, the database layer, the flag filter, Home, Start, the room session panel and its block editors, Undo, the focus timer, Finish with Markdown export, Settings and the app-menu entry. Phase 2 so far: the vault bootstrap, the Ollama service, pipeline steps 1, 3 and 6 (parse, extract and render), and staging, Apply, Discard and backups. `revision/` and the processing pipeline are still empty.
 
 ## Layers
 
@@ -179,6 +179,33 @@ Pure Python in `engine/`. The bridge will run it on a worker in task 2.5. [ADR 0
 3. **Render** (`engine/notes.py`, templates in `engine/templates/notes/`): `render_room` returns a `Rendered` set of notes, each with a path relative to the vault, a kind (room, raw, concept or tool) and its text. Model text goes through `engine/sanitise.inline` and gets its links from the engine. Tyler's own text is escaped only where it could break structure. Generated parts are labelled, and generated sections sit between markers. Nothing is written yet: staging is task 2.4.
 
 `engine/commands.py` reads Command blocks in code: each command and its `# comment`, and the programs and flags it runs (`sudo -u root nmap -sV` runs `nmap` with `-sV`).
+
+## Staging, Apply and Discard (task 2.4)
+
+`engine/stage.py` is the only code that writes room output into the vault. [ADR 0008](adr/0008-staging-and-apply.md) records why it works this way.
+
+- **Stage:** `stage(rendered, vault, run_folder, room_id=…)` writes each note to `runs/<run id>/staged/<vault path>`. It also writes `manifest.json`, which lists each file with its action (`create`, `update`, `same` or `skip`), the target's SHA-256 when staged, and the staged content's SHA-256.
+  - An existing note is merged with `merge`: only the inside of matching `%% recon:start` sections changes, and new sections go at the end under their heading.
+  - A note whose markers are damaged, or that isn't valid UTF-8, is skipped and listed.
+  - Raw notes are never updated. A re-run's raw notes become `… (raw notes 2).md`, and the room note's link follows.
+- **Apply:** `apply(run_folder, vault, backups)` runs in this order:
+  1. It checks the staged files against the manifest.
+  2. It re-hashes every target. Any change raises `ApplyConflict` before anything is written.
+  3. It copies each file it will overwrite to `backups/<run id>/`.
+  4. It writes `apply.json` (state "applying").
+  5. It writes each note atomically: new notes are created without ever overwriting, and changed notes are replaced.
+  6. It marks the journal "applied".
+- **Recover:** `recover` finishes an Apply a crash interrupted. It writes only files still as staged and leaves hand-edited ones alone.
+- **Discard and pruning:** `discard` removes the `staged/` folder. `prune_backups` keeps the newest 20 runs' backups.
+- **Every path** goes through `inside()`, which resolves symlinks and refuses anything that lands outside its folder.
+
+`recon/processing.py` (`Processing`) ties this to `app.db`:
+- `stage_room` records the run (table `runs`, migration 0004, `db/runs.py`) and puts the room in review;
+- `apply_run` records it as applied and marks the room done;
+- `discard_run` records it as discarded and sends the room back to capturing;
+- `recover_runs` finishes interrupted Applies.
+
+At launch, `__main__.tidy_runs` runs `recover_runs` and then deletes runs over 30 days old, on the global pool. Runs still waiting for Apply or Discard are kept.
 
 ## Undo
 

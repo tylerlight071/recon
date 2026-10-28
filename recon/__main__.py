@@ -34,7 +34,7 @@ from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
 from recon.bridge.vault import VaultBridge
 from recon.bridge.workers import SerialWorker, drain_global_pool, thread_pool_submit
-from recon.config import Settings, load_settings, save_settings
+from recon.config import Settings, load_settings, save_settings, vault_folder
 from recon.db import backup
 from recon.db.autosave import AutosaveQueue
 from recon.db.connection import Database
@@ -46,6 +46,7 @@ from recon.db.repositories import (
     UndoRepository,
     utc_now,
 )
+from recon.db.runs import RunRepository
 from recon.errors import (
     AlreadyRunningError,
     AutosaveFailedError,
@@ -57,6 +58,7 @@ from recon.errors import (
 )
 from recon.logging_setup import Safe, configure_logging
 from recon.paths import AppPaths, ensure_private_dir
+from recon.processing import Processing
 from recon.services.chime import Chime
 from recon.services.kwin import KWinPinning, run_command
 from recon.services.ollama import CHECK_TIMEOUT_S, OllamaService, make_client
@@ -244,7 +246,8 @@ def create_bridges(
         parent=app,
     )
     models.check()
-    thread_pool_submit(lambda: prune_runs(paths))
+    vault = vault_folder(settings, Path.home(), paths.data)
+    thread_pool_submit(lambda: tidy_runs(paths, vault, db))
     bridges: dict[str, QObject] = {
         "AppSettings": settings_bridge,
         "Navigation": navigation,
@@ -256,13 +259,21 @@ def create_bridges(
     return bridges, pinning
 
 
-def prune_runs(paths: AppPaths) -> None:
-    """Delete run folders over 30 days old (raw model responses are kept that long only)."""
-    # Thread boundary: an old folder that won't delete is retried next launch.
+def tidy_runs(paths: AppPaths, vault: Path, db: Database) -> None:
+    """At launch: finish any Apply a crash interrupted, then delete runs over 30 days old.
+
+    Runs still waiting for Apply or Discard are kept however old, so their
+    review can still be applied.
+    """
+    # Thread boundary: whatever fails is logged and retried next launch.
+    store = RunStore(paths.runs, utc_now, lambda: secrets.token_hex(4))
+    records = RunRepository(db)
+    processing = Processing(vault, store, paths.backups, RoomRepository(db), records)
     try:
-        RunStore(paths.runs, utc_now, lambda: secrets.token_hex(4)).prune()
-    except OSError as exc:
-        _log.warning("old runs not deleted: %s", Safe(type(exc).__name__))
+        processing.recover_runs()
+        store.prune(keep={run.id for run in records.staged()})
+    except (OSError, ReconError) as exc:
+        _log.warning("old runs not tidied: %s", Safe(type(exc).__name__))
 
 
 def _room_bridges(

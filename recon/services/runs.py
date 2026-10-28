@@ -8,7 +8,7 @@ and are deleted after 30 days.
 import json
 import logging
 import shutil
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -68,14 +68,19 @@ class RunStore:
         run_id = f"{self._clock().strftime(_STAMP)}-{self._new_id()}"
         return RunLog(self.root / run_id)
 
-    def prune(self, keep_days: int = KEEP_DAYS) -> int:
-        """Delete runs older than `keep_days`; returns how many went."""
+    def prune(self, keep_days: int = KEEP_DAYS, keep: Collection[str] = ()) -> int:
+        """Delete runs older than `keep_days`, except those in `keep`; returns how many went.
+
+        `keep` holds runs still waiting for Apply or Discard: their staged notes stay.
+        """
         if not self.root.is_dir():
             return 0
         cutoff = self._clock() - timedelta(days=keep_days)
         removed = 0
         for folder in self.root.iterdir():
             started = _started(folder.name)
+            if folder.name in keep:
+                continue
             if folder.is_dir() and not folder.is_symlink() and started and started < cutoff:
                 shutil.rmtree(folder)
                 removed += 1
