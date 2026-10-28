@@ -60,6 +60,10 @@ _SELECT_WAITING_ROOMS: Final = """
     SELECT id, platform, path, module, name, task_count, mode, status,
            created_at, updated_at, time_spent_s, last_task_index
     FROM rooms WHERE status IN ('queued', 'processing') ORDER BY updated_at, id"""
+_SELECT_DONE_ROOMS: Final = """
+    SELECT id, platform, path, module, name, task_count, mode, status,
+           created_at, updated_at, time_spent_s, last_task_index
+    FROM rooms WHERE status = 'done' ORDER BY updated_at DESC, id DESC"""
 _COUNT_DONE_IN_PATH: Final = "SELECT count(*) FROM rooms WHERE status = 'done' AND path = ?"
 _INSERT_ROOM: Final = """
     INSERT INTO rooms (platform, path, module, name, task_count, mode, created_at, updated_at)
@@ -214,6 +218,12 @@ class RoomRepository:
         with self._db.read() as conn:
             row = conn.execute(_SELECT_CURRENT_ROOM).fetchone()
         return _room(row) if row else None
+
+    def in_vault(self) -> list[Room]:
+        """Rooms applied to the vault, most recently finished first."""
+        with self._db.read() as conn:
+            rows = conn.execute(_SELECT_DONE_ROOMS).fetchall()
+        return [_room(row) for row in rows]
 
     def done_in_path(self, path: str) -> int:
         """How many rooms are done (applied) in a learning path ("" counts rooms with none)."""

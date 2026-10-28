@@ -32,6 +32,7 @@ from recon.bridge.flow import (
 )
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
+from recon.bridge.library import LibraryBridge
 from recon.bridge.models import ModelsBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
@@ -57,6 +58,7 @@ from recon.pipeline import Outcome, Step
 from recon.services.ollama import OllamaService
 from tests.bridge.fakes import FakeAutosave
 from tests.bridge.test_done import Opener
+from tests.bridge.test_library import Store
 from tests.bridge.test_pinning_bridge import FakePinner
 from tests.bridge.test_processing import MANIFEST as _MANIFEST
 from tests.bridge.test_processing import FakeRunner
@@ -116,6 +118,8 @@ class Running:
     reviews: "Fakes"
     done: DoneBridge
     opener: "Opener"
+    library: LibraryBridge
+    store: "Store"
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -157,6 +161,36 @@ def _review(owner: QObject) -> tuple[ReviewBridge, Fakes]:
         parent=owner,
     )
     return review, reviews
+
+
+def _done(
+    owner: QObject, rooms: RoomRepository, settings: SettingsBridge, vault: VaultBridge
+) -> tuple[DoneBridge, Opener]:
+    opener = Opener()
+    done = DoneBridge(
+        rooms,
+        lambda: Path(str(settings.property("vaultPath"))),
+        opener.open,
+        vault.forgetOpened,
+        submit=lambda job: job(),
+        parent=owner,
+    )
+    return done, opener
+
+
+def _library(
+    owner: QObject, opener: Opener, settings: SettingsBridge
+) -> tuple[LibraryBridge, Store]:
+    store = Store()
+    library = LibraryBridge(
+        store.load,
+        store.restore,
+        lambda: Path(str(settings.property("vaultPath"))),
+        opener.open,
+        submit=lambda job: job(),
+        parent=owner,
+    )
+    return library, store
 
 
 def _seed(request: pytest.FixtureRequest, db: Database) -> tuple[Settings, RoomRepository]:
@@ -228,15 +262,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     copied: list[str] = []
     vault = VaultBridge(settings, copied.append, submit=lambda job: job(), parent=owner)
     vault.setUp()
-    opener = Opener()
-    done = DoneBridge(
-        rooms,
-        lambda: Path(str(settings.property("vaultPath"))),
-        opener.open,
-        vault.forgetOpened,
-        submit=lambda job: job(),
-        parent=owner,
-    )
+    done, opener = _done(owner, rooms, settings, vault)
     ollama = FakeClient(models=["qwen3.5:9b"])
     models = ModelsBridge(
         settings,
@@ -246,6 +272,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         parent=owner,
     )
     connect_review(navigation, home, session, processing, review, done=done)
+    library, store = _library(owner, opener, settings)
     qml = create_engine(
         {
             "AppSettings": settings,
@@ -262,6 +289,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "Processing": processing,
             "ReviewModel": review,
             "DoneModel": done,
+            "LibraryModel": library,
             "Editors": EditorsBridge(parent=owner),
         }
     )
@@ -304,6 +332,8 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         reviews,
         done,
         opener,
+        library,
+        store,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -1458,6 +1488,46 @@ def test_the_panel_offers_the_review_once_ready(running: Running) -> None:
     QMetaObject.invokeMethod(button, "clicked")
 
     assert wait_until(lambda: running.navigation.property("currentScreen") == "review")
+
+
+# Task 2.8: the Library --------------------------------------------------------------------
+
+
+def test_the_library_lists_rooms_and_tucks_history_away(running: Running) -> None:
+    QMetaObject.invokeMethod(running.find(running.main, "nav-library"), "clicked")
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "library")
+    wait(50)
+    find = running.find
+
+    assert find(running.main, "libraryRoom-3").property("title") == "DNS in Detail"
+    # Obsidian doesn't know the vault yet: say how, rather than offer a link that fails.
+    assert find(running.main, "openRoom-3").property("visible") is False
+    assert find(running.main, "openVaultFirst").property("visible") is True
+    history = find(running.main, "historySection")
+    assert history.property("expanded") is False
+    assert history.property("detail") == "1"
+    assert _visible_primary_buttons(running.main.contentItem()) == []
+
+    running.vault.confirmOpened()
+    QMetaObject.invokeMethod(find(running.main, "openRoom-3"), "clicked")
+    assert running.opener.opened[-1].name == "DNS in Detail.md"
+    assert running.warnings == []
+
+
+def test_restore_from_history_offers_undo(running: Running) -> None:
+    running.navigation.open("library")
+    wait(50)
+    QMetaObject.invokeMethod(running.find(running.main, "historySectionHeader"), "clicked")
+
+    QMetaObject.invokeMethod(running.find(running.main, "restore-r1"), "clicked")
+
+    toast = running.find(running.main, "toast")
+    assert wait_until(lambda: toast.property("shown") is True)
+    assert toast.property("message") == "Restored 2 notes in DNS in Detail to how they were."
+    assert toast.property("actionText") == "Undo"
+    QMetaObject.invokeMethod(toast, "action")
+    wait(20)
+    assert running.store.restored == ["r1", "undo-r1"]
 
 
 def test_an_open_focus_menu_closes_when_the_room_finishes(running: Running) -> None:

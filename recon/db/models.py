@@ -154,3 +154,12 @@ class Run(_Row):
     """Vault files Apply wrote."""
     backed_up: int
     """Files Apply copied to `backups/<run id>/` before overwriting them."""
+    restored_from: str | None = None
+    """For a restore from History: the run whose backup was put back."""
+
+
+class HistoryEntry(_Row):
+    """An applied run in Library's History, with its room's name."""
+
+    run: Run
+    room_name: str

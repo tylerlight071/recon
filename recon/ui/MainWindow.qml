@@ -24,6 +24,7 @@ Window {
         { "key": "start", "under": "home", "file": "screens/Start.qml" },
         { "key": "review", "under": "home", "file": "screens/Review.qml" },
         { "key": "done", "under": "home", "file": "screens/Done.qml" },
+        { "key": "library", "label": qsTr("Library"), "icon": "library", "file": "screens/Library.qml" },
         { "key": "settings", "label": qsTr("Settings"), "icon": "sliders", "file": "screens/Settings.qml" }
     ]
 
@@ -61,6 +62,27 @@ Window {
             if (window === "main")
                 toast.show(qsTr("Flag skipped. Recon never saves flags."))
         }
+    }
+
+    // A restore from History can be undone: Undo restores the restore's own backup.
+    property string undoRun: ""
+
+    Connections {
+        target: LibraryModel
+        function onRestored(message, newRunId) {
+            main.undoRun = newRunId
+            toast.show(message, qsTr("Undo"))
+        }
+    }
+
+    Connections {
+        target: toast
+        function onAction() {
+            if (main.undoRun !== "")
+                LibraryModel.restore(main.undoRun)
+            main.undoRun = ""
+        }
+        function onDismissed() { main.undoRun = "" }
     }
 
     Connections {

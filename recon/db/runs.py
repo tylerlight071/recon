@@ -9,21 +9,34 @@ from collections.abc import Sequence
 from typing import Final
 
 from recon.db.connection import Database
-from recon.db.models import Run
+from recon.db.models import HistoryEntry, Run
 from recon.db.repositories import Clock, utc_now
 from recon.errors import StorageError
 
-_FIELDS: Final = ("id", "room_id", "status", "created_at", "finished_at", "written", "backed_up")
+_FIELDS: Final = (
+    "id", "room_id", "status", "created_at", "finished_at", "written", "backed_up", "restored_from",
+)  # fmt: skip
 _SELECT_RUN: Final = """
-SELECT id, room_id, status, created_at, finished_at, written, backed_up FROM runs WHERE id = ?
+SELECT id, room_id, status, created_at, finished_at, written, backed_up, restored_from
+FROM runs WHERE id = ?
 """
 _SELECT_FOR_ROOM: Final = """
-SELECT id, room_id, status, created_at, finished_at, written, backed_up FROM runs
-WHERE room_id = ? ORDER BY created_at DESC, id DESC
+SELECT id, room_id, status, created_at, finished_at, written, backed_up, restored_from
+FROM runs WHERE room_id = ? ORDER BY created_at DESC, id DESC
 """
 _SELECT_STAGED: Final = """
-SELECT id, room_id, status, created_at, finished_at, written, backed_up FROM runs
-WHERE status = 'staged' ORDER BY created_at, id
+SELECT id, room_id, status, created_at, finished_at, written, backed_up, restored_from
+FROM runs WHERE status = 'staged' ORDER BY created_at, id
+"""
+_SELECT_HISTORY: Final = """
+SELECT r.id, r.room_id, r.status, r.created_at, r.finished_at, r.written, r.backed_up,
+       r.restored_from, rooms.name
+FROM runs AS r JOIN rooms ON rooms.id = r.room_id
+WHERE r.status = 'applied' ORDER BY r.finished_at DESC, r.id DESC LIMIT ?
+"""
+_INSERT_RESTORE: Final = """
+INSERT INTO runs (id, room_id, status, created_at, finished_at, written, backed_up, restored_from)
+VALUES (?, ?, 'applied', ?, ?, ?, ?, ?)
 """
 _INSERT_RUN: Final = "INSERT INTO runs (id, room_id, created_at) VALUES (?, ?, ?)"
 _FINISH_RUN: Final = """
@@ -64,6 +77,22 @@ class RunRepository:
         with self._db.read() as conn:
             rows = conn.execute(_SELECT_FOR_ROOM, (room_id,)).fetchall()
         return [_run(row) for row in rows]
+
+    def history(self, limit: int = 50) -> list[HistoryEntry]:
+        """Applied runs (and restores), newest first, with their rooms' names."""
+        with self._db.read() as conn:
+            rows = conn.execute(_SELECT_HISTORY, (limit,)).fetchall()
+        return [HistoryEntry(run=_run(row[:-1]), room_name=row[-1]) for row in rows]
+
+    def restored(self, run_id: str, room_id: int, from_run: str, files: int) -> Run:
+        """Record a restore from History as an applied run of its own (undo it by restoring it)."""
+        stamp = self._clock().isoformat()
+        with self._db.transaction() as conn:
+            conn.execute(_INSERT_RESTORE, (run_id, room_id, stamp, stamp, files, files, from_run))
+        run = self.get(run_id)
+        if run is None:  # just committed, so only a broken database gets here
+            raise StorageError
+        return run
 
     def staged(self) -> list[Run]:
         """Runs neither applied nor discarded, oldest first."""

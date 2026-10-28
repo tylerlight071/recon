@@ -14,6 +14,7 @@ def test_renders_every_screen(tmp_path: Path) -> None:
     assert written == [
         "done.png",
         "home.png",
+        "library.png",
         "panel-finish.png",
         "panel-session.png",
         "review.png",
