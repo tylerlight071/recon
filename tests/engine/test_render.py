@@ -116,6 +116,10 @@ def test_flags_are_stripped_on_the_way_out_except_kept_hashes() -> None:
         ("***", "\\***"),
         ("a %% b %%", "a \\%\\% b \\%\\%"),
         ("plain - text # inside", "plain - text # inside"),
+        ("<script> runs what the page reflects", "\\<script> runs what the page reflects"),
+        ("<!-- a comment in the page source -->", "\\<!-- a comment in the page source -->"),
+        ("  <style>", "  \\<style>"),
+        ("a <b> tag mid-line stays", "a <b> tag mid-line stays"),
         ("- a list item", "- a list item"),
     ],
 )
@@ -171,7 +175,7 @@ def _structure(markdown: str) -> tuple[list[str], list[str]]:
             fence = match.group(1)
         elif re.match(r"^ {0,3}#{1,6}(\s|$)", line):
             headings.append(line.split(" ")[0])
-        elif re.match(r"^ {0,3}(>|-{3,}\s*$|={3,}\s*$|%%)", line):
+        elif re.match(r"^ {0,3}(>|<[!/?a-zA-Z]|-{3,}\s*$|={3,}\s*$|%%)", line):
             stray.append(line)
     return headings, stray
 
@@ -250,3 +254,27 @@ def test_tylers_spacing_is_kept_but_blank_runs_collapse() -> None:
     text = _one(ExportBlock(type="key_idea", text="    indented on purpose\n\n\n\nlater"))
 
     assert "**Key idea**\n    indented on purpose\n\nlater" in text
+
+
+def test_html_in_tylers_text_cant_hide_later_tasks() -> None:
+    # Audit F-08: an unclosed <script> line used to swallow every task after it.
+    room = _room(
+        ExportTask(
+            index=1,
+            title="Reflected XSS",
+            status="done",
+            blocks=(ExportBlock(type="key_idea", text="<script> runs whatever is reflected."),),
+        ),
+        ExportTask(
+            index=2,
+            title="Stored XSS",
+            status="done",
+            blocks=(ExportBlock(type="table", text="payload, note\n<img src=x>, fires on load"),),
+        ),
+    )
+
+    headings, stray = _structure(render_export(room))
+
+    assert headings == ["#", "##", "##"]
+    assert stray == []
+    assert "| \\<img src=x> | fires on load |" in render_export(room)
