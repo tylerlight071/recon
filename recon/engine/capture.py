@@ -77,7 +77,7 @@ def capture_room(
     Args:
         room: The room.
         tasks: Each task with its blocks, in order.
-        finished_on: The day it was finished (The user's local date).
+        finished_on: The day it was finished (the user's local date).
 
     Returns:
         The capture, flags stripped and empty blocks left out.

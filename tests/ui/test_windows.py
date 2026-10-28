@@ -23,13 +23,19 @@ from recon.app import QmlEngine, create_engine, load_windows, root_window
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
-from recon.bridge.flow import connect_finish, connect_processing, connect_room_flow
+from recon.bridge.flow import (
+    connect_finish,
+    connect_processing,
+    connect_review,
+    connect_room_flow,
+)
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.models import ModelsBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.processing import ProcessingBridge
+from recon.bridge.review import ReviewBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
@@ -45,11 +51,14 @@ from recon.db.repositories import (
     UndoRepository,
     utc_now,
 )
+from recon.errors import ApplyConflict
 from recon.pipeline import Outcome, Step
 from recon.services.ollama import OllamaService
 from tests.bridge.fakes import FakeAutosave
 from tests.bridge.test_pinning_bridge import FakePinner
+from tests.bridge.test_processing import MANIFEST as _MANIFEST
 from tests.bridge.test_processing import FakeRunner
+from tests.bridge.test_review import REVIEW, Fakes
 from tests.services.fakes import FakeClient
 from tests.ui.qml_harness import app, wait, wait_until
 
@@ -101,6 +110,8 @@ class Running:
     processing: ProcessingBridge
     runner: "FakeRunner"
     notices: list[object]
+    review: ReviewBridge
+    reviews: "Fakes"
 
     def find(self, window: QQuickWindow, name: str) -> QObject:
         # Walk the visual tree: Repeater delegates aren't QObject children of the window.
@@ -119,13 +130,38 @@ class Running:
         return found
 
 
-def _processing(owner: QObject) -> tuple[ProcessingBridge, FakeRunner, list[object]]:
+def _processing(
+    owner: QObject,
+) -> tuple[ProcessingBridge, FakeRunner, list[object], ReviewBridge, Fakes]:
     runner = FakeRunner()
     notices: list[object] = []
     processing = ProcessingBridge(
         runner, notices.append, list, submit=lambda job: job(), parent=owner
     )
-    return processing, runner, notices
+    return processing, runner, notices, *_review(owner)
+
+
+def _review(owner: QObject) -> tuple[ReviewBridge, Fakes]:
+    reviews = Fakes()
+    reviews.loaded = None  # nothing staged until a test says so
+    review = ReviewBridge(
+        reviews.load,
+        reviews.apply,
+        reviews.discard,
+        reviews.requeue,
+        submit=lambda job: job(),
+        parent=owner,
+    )
+    return review, reviews
+
+
+def _seed(request: pytest.FixtureRequest, db: Database) -> tuple[Settings, RoomRepository]:
+    # Most tests don't want the first-launch pin question in the way.
+    param = getattr(request, "param", Settings(kwin_pinning="off"))
+    rooms = RoomRepository(db)
+    for room in param.rooms if isinstance(param, WithRooms) else ():
+        rooms.create(room)
+    return (param.settings if isinstance(param, WithRooms) else param), rooms
 
 
 @pytest.fixture
@@ -134,12 +170,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
     (tmp_path / "recon").mkdir(mode=0o700)
     db = Database.open(tmp_path / "recon" / "app.db")
     migrate(db)
-    # Most tests don't want the first-launch pin question in the way.
-    param = getattr(request, "param", Settings(kwin_pinning="off"))
-    initial = param.settings if isinstance(param, WithRooms) else param
-    rooms = RoomRepository(db)
-    for room in param.rooms if isinstance(param, WithRooms) else ():
-        rooms.create(room)
+    initial, rooms = _seed(request, db)
     owner = QObject()
     saved: list[Settings] = []
     settings = SettingsBridge(
@@ -177,7 +208,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         parent=owner,
     )
     connect_room_flow(navigation, home, start, session, focus)
-    opened: list[Path] = []
+    opened: list[Path] = []  # folders shown in the file manager
     finish = FinishBridge(
         (rooms, tasks, blocks, UndoRepository(db)),
         settings,
@@ -188,8 +219,9 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         parent=owner,
     )
     connect_finish(navigation, home, session, focus, finish)
-    processing, runner, notices = _processing(owner)
-    connect_processing(navigation, home, finish, processing)
+    processing, runner, notices, review, reviews = _processing(owner)
+    connect_processing(navigation, home, finish, processing, review)
+    connect_review(navigation, home, session, processing, review)
     copied: list[str] = []
     vault = VaultBridge(settings, copied.append, submit=lambda job: job(), parent=owner)
     vault.setUp()
@@ -215,6 +247,7 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
             "Vault": vault,
             "Models": models,
             "Processing": processing,
+            "ReviewModel": review,
             "Editors": EditorsBridge(parent=owner),
         }
     )
@@ -253,6 +286,8 @@ def running(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Running]
         processing,
         runner,
         notices,
+        review,
+        reviews,
     )
     # The engine goes first: bindings must never re-run against deleted bridges.
     for window in (main, panel):
@@ -1283,6 +1318,96 @@ def test_a_notification_click_opens_the_room_in_the_panel(running: Running) -> N
     assert running.find(running.panel, "processingLine").property("text") == (
         "Waiting to be processed."
     )
+
+
+# Task 2.6: the review screen -------------------------------------------------------------
+
+
+def _open_review(running: Running) -> int:
+    _finish_room(running)
+    room_id = running.rooms.recent(1)[0].id
+    running.reviews.loaded = (REVIEW.model_copy(update={"room_id": room_id}), "DNS in Detail")
+    running.review.open(room_id)
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "review")
+    wait(50)
+    return room_id
+
+
+def test_the_review_screen_shows_each_section_with_one_primary(running: Running) -> None:
+    _open_review(running)
+    find = running.find
+
+    assert find(running.main, "reviewTitle").property("text") == "Review: DNS in Detail"
+    assert find(running.main, "reviewIntro").property("text") == (
+        "Nothing is in your vault yet. Apply writes 3 notes, "
+        "Discard sends the room back to the panel."
+    )
+    assert find(running.main, "roomNoteText").property("text") == "# DNS\n"
+    assert find(running.main, "newNotesSection").property("detail") == "1"
+    assert find(running.main, "additionsSection").property("detail") == "1"
+    assert find(running.main, "skippedSection").property("visible") is True
+    assert find(running.main, "reviewProblem").property("visible") is False
+    assert _visible_primary_buttons(running.main.contentItem()) == ["applyReview"]
+    note = find(running.main, "newNote0")
+    assert note.property("expanded") is False
+    QMetaObject.invokeMethod(find(running.main, "newNote0Header"), "clicked")
+    assert note.property("expanded") is True
+    assert running.warnings == []
+
+
+def test_apply_goes_home_with_a_calm_toast(running: Running) -> None:
+    _open_review(running)
+
+    QMetaObject.invokeMethod(running.find(running.main, "applyReview"), "clicked")
+
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "home")
+    toast = running.find(running.main, "toast")
+    assert toast.property("message") == "Applied: 3 notes written to your vault."
+
+
+def test_a_conflict_offers_recheck_and_disables_apply(running: Running) -> None:
+    room_id = _open_review(running)
+    running.reviews.error = ApplyConflict()
+
+    QMetaObject.invokeMethod(running.find(running.main, "applyReview"), "clicked")
+    wait(20)
+
+    assert running.find(running.main, "reviewProblemText").property("text") == (
+        ApplyConflict.user_message
+    )
+    assert running.find(running.main, "applyReview").property("enabled") is False
+    QMetaObject.invokeMethod(running.find(running.main, "recheck"), "clicked")
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "home")
+    assert running.runner.rooms[-1] == room_id  # processing again
+    assert running.panel.isVisible()
+
+
+def test_discard_asks_once_then_reopens_the_room(running: Running) -> None:
+    room_id = _open_review(running)
+    running.rooms.update_progress(room_id, status="capturing")  # as Discard leaves it
+    dialog = running.find_object(running.main, "discardDialog")
+
+    QMetaObject.invokeMethod(running.find(running.main, "discardReview"), "clicked")
+    assert wait_until(lambda: dialog.property("visible") is True)
+    assert dialog.property("title") == "Discard these notes?"
+    QMetaObject.invokeMethod(dialog, "accept")
+
+    assert ("discard", REVIEW.run_id) in running.reviews.calls
+    assert wait_until(lambda: running.find(running.panel, "sessionScreen").property("visible"))
+    assert running.navigation.property("currentScreen") == "home"
+
+
+def test_the_panel_offers_the_review_once_ready(running: Running) -> None:
+    running.runner.outcome = Outcome(room="DNS in Detail", manifest=_MANIFEST)
+    _finish_room(running)
+    room_id = running.rooms.recent(1)[0].id
+    running.reviews.loaded = (REVIEW.model_copy(update={"room_id": room_id}), "DNS in Detail")
+    button = running.find(running.panel, "openReview")
+    assert button.property("visible") is True
+
+    QMetaObject.invokeMethod(button, "clicked")
+
+    assert wait_until(lambda: running.navigation.property("currentScreen") == "review")
 
 
 def test_an_open_focus_menu_closes_when_the_room_finishes(running: Running) -> None:

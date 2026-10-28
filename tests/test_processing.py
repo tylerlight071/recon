@@ -165,3 +165,31 @@ def test_back_to_the_room_discards_every_staged_run(tmp_path: Path, db: Database
     assert processing.discard_room(room) == 1
     assert not (second.folder / "staged").exists()
     assert {r.status for r in processing.records.for_room(room)} == {"discarded"}
+
+
+def test_review_reads_the_newest_staged_run(tmp_path: Path, db: Database) -> None:
+    processing = _processing(tmp_path, db)
+    room = _room(db)
+    assert processing.review(room) is None
+    run = processing.runs.start()
+    processing.stage_room(room, _rendered(), run)
+
+    review = processing.review(room)
+
+    assert review is not None
+    assert review.run_id == run.run_id
+    assert review.room is not None
+    assert review.room.title == "Number Systems"
+
+
+def test_requeue_discards_and_queues_the_room_again(tmp_path: Path, db: Database) -> None:
+    processing = _processing(tmp_path, db)
+    room = _room(db)
+    run = processing.runs.start()
+    processing.stage_room(room, _rendered(), run)
+
+    assert processing.requeue(run.run_id) == room
+
+    assert RoomRepository(db).get(room).status == "queued"  # type: ignore[union-attr]  # exists
+    assert processing.records.get(run.run_id).status == "discarded"  # type: ignore[union-attr]  # exists
+    assert processing.review(room) is None

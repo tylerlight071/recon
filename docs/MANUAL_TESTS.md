@@ -30,3 +30,6 @@ Launch Recon the way it will really be used: from the KDE app menu (`uv run pyth
 - [ ] Finish two rooms quickly: the second says it's waiting, then processes after the first.
 - [ ] Stop Ollama, finish a room: the panel says what went wrong with Retry, and a notification says so too. Start Ollama, press Retry.
 - [ ] Quit Recon mid-processing, then reopen it: the room processes again without being asked.
+- [ ] Open a room's review from the notification, from Home and from the panel. Read it top to bottom: is anything confusing, too long or missing? Fold and unfold each section from the keyboard (Tab, Space).
+- [ ] Press Discard, then "Keep reviewing": nothing changes. Press Discard again and confirm: the room reopens in the panel exactly as you left it.
+- [ ] Apply: a toast says how many notes were written, and they're in the vault.

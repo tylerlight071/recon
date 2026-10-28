@@ -14,16 +14,19 @@ Task 2.5 runs these on the processing worker; nothing here touches Qt.
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from recon.db.repositories import RoomRepository
 from recon.db.runs import RunRepository
 from recon.engine.notes import Rendered
+from recon.engine.review import Review, build_review
 from recon.engine.stage import (
+    STAGED,
     Applied,
     Manifest,
     apply,
     discard,
+    inside,
     load_manifest,
     prune_backups,
     recover,
@@ -105,6 +108,38 @@ class Processing:
                 self.records.discarded(run.id)
                 count += 1
         return count
+
+    def review(self, room_id: int) -> Review | None:
+        """The room's newest staged run, split for the review screen (None if there isn't one)."""
+        run = next((r for r in self.records.for_room(room_id) if r.status == "staged"), None)
+        if run is None:
+            return None
+        folder = self.folder(run.id)
+        manifest = load_manifest(folder)
+
+        def staged(path: str) -> str:
+            return inside(folder / STAGED, PurePosixPath(path)).read_text(encoding="utf-8")
+
+        def existing(path: str) -> str | None:
+            target = inside(self.vault, PurePosixPath(path))
+            return (
+                target.read_text(encoding="utf-8", errors="replace") if target.is_file() else None
+            )
+
+        return build_review(manifest, staged, existing)
+
+    def requeue(self, run_id: str) -> int:
+        """Throw a staged run away and queue its room to process again ("Re-check").
+
+        Returns:
+            The room's ID.
+        """
+        manifest = load_manifest(self.folder(run_id))
+        discard(self.folder(run_id))
+        self.records.discarded(run_id)
+        self.rooms.update_progress(manifest.room_id, status="queued")
+        _log.info("run %s discarded to process again", Safe(run_id))
+        return manifest.room_id
 
     def recover_runs(self) -> int:
         """Finish every Apply a crash interrupted; returns how many were finished."""

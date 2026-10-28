@@ -135,7 +135,16 @@ class FinishBridge(QObject):
     def _status_line(self) -> str:
         return _STATUS_LINES.get(self._room.status, "") if self._room else ""
 
+    def _room_id(self) -> int:
+        return self._room.id if self._room else 0
+
+    def _in_review(self) -> bool:
+        return self._room is not None and self._room.status == "in_review"
+
     shown = Property(bool, _shown, notify=changed)
+    roomId = Property(int, _room_id, notify=changed)  # noqa: N815
+    inReview = Property(bool, _in_review, notify=changed)  # noqa: N815
+    """Ready to review when this screen opened (Processing.ready covers rooms finished since)."""
     statusLine = Property(str, _status_line, notify=changed)  # noqa: N815
     """Where processing stands, from the room's status (the Processing bridge says more)."""
     roomName = Property(str, _room_name, notify=changed)  # noqa: N815
@@ -251,6 +260,10 @@ class FinishBridge(QObject):
     def _reopen(self, room_id: int) -> None:
         self._show(None, [])
         self.reopenRequested.emit(room_id)
+
+    def hide(self) -> None:
+        """Put the Finish screen away without leaving the panel (the room is reopening)."""
+        self._show(None, [])
 
     @Slot()
     def close(self) -> None:

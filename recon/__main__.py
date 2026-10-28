@@ -23,13 +23,19 @@ from recon.app import (
 from recon.bridge.editors import EditorsBridge
 from recon.bridge.finish import FinishBridge
 from recon.bridge.flags import FlagGuard
-from recon.bridge.flow import connect_finish, connect_processing, connect_room_flow
+from recon.bridge.flow import (
+    connect_finish,
+    connect_processing,
+    connect_review,
+    connect_room_flow,
+)
 from recon.bridge.focus import FocusBridge
 from recon.bridge.home import HomeBridge
 from recon.bridge.models import ModelsBridge
 from recon.bridge.navigation import NavigationBridge
 from recon.bridge.pinning import PinningBridge
 from recon.bridge.processing import ProcessingBridge
+from recon.bridge.review import ReviewBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.bridge.start import StartRoomBridge
@@ -53,6 +59,7 @@ from recon.db.repositories import (
     utc_now,
 )
 from recon.db.runs import RunRepository
+from recon.engine.review import Review
 from recon.errors import (
     AlreadyRunningError,
     AutosaveFailedError,
@@ -335,6 +342,7 @@ def _room_bridges(
         parent=app,
     )
     processing = _processing_bridge(app, db, settings, paths)
+    review = _review_bridge(app, db, settings, paths, room_worker)
     # Create or complete the vault at start-up (task 2.1); Home shows the Obsidian step.
     vault = VaultBridge(
         settings,
@@ -345,7 +353,8 @@ def _room_bridges(
     vault.setUp()
     connect_room_flow(navigation, home, start, session, focus)
     connect_finish(navigation, home, session, focus, finish)
-    connect_processing(navigation, home, finish, processing)
+    connect_processing(navigation, home, finish, processing, review)
+    connect_review(navigation, home, session, processing, review)
     # In order: finish every queued job (Next, deletes, undo steps), then the last title,
     # the last seconds and every queued keystroke, all before the database closes (F-06).
     app.aboutToQuit.connect(lambda: _drain(room_worker))
@@ -361,6 +370,7 @@ def _room_bridges(
         "Finish": finish,
         "Vault": vault,
         "Processing": processing,
+        "ReviewModel": review,
     }
 
 
@@ -390,6 +400,33 @@ def _processing_bridge(
     app.aboutToQuit.connect(worker.close)
     app.aboutToQuit.connect(notifications.close)
     return processing
+
+
+def _review_bridge(
+    app: QGuiApplication,
+    db: Database,
+    settings: SettingsBridge,
+    paths: AppPaths,
+    worker: SerialWorker,
+) -> ReviewBridge:
+    """The review screen's bridge (task 2.6), on the room worker so Apply follows every save."""
+
+    def current() -> Processing:
+        return processing_for(paths, settings.settings, db)
+
+    def load(room_id: int) -> tuple[Review, str] | None:
+        review = current().review(room_id)
+        room = RoomRepository(db).get(room_id)
+        return (review, room.name) if review and room else None
+
+    return ReviewBridge(
+        load,
+        lambda run: current().apply_run(run),
+        lambda run: current().discard_run(run),
+        lambda run: current().requeue(run),
+        submit=worker,
+        parent=app,
+    )
 
 
 def _drain(*workers: SerialWorker) -> None:

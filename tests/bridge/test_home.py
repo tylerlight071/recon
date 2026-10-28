@@ -148,13 +148,15 @@ def test_finished_rooms_are_listed_not_resumed(
         ("Linux Basics", "Pre Security · Linux · Done", False),
     ]
     finished: list[int] = []
+    reviewing: list[int] = []
     home.finishedRequested.connect(finished.append)
+    home.reviewRequested.connect(reviewing.append)
     home.resume(done.id)
     home.resume(waiting.id)
     home.resume(9999)
     assert resumed.count == 0
-    # Any finished room opens its Finish screen (audit F-11), whatever processing is doing.
-    assert finished == [done.id, waiting.id]
+    assert finished == [done.id]  # a finished room opens its Finish screen (audit F-11)
+    assert reviewing == [waiting.id]  # one ready to review opens the review
     assert [r["canOpen"] for r in home.property("recentRooms")] == [True, True]
 
 

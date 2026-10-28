@@ -35,6 +35,10 @@ DEFAULT_BODIES = {
     "Tooltip": 'Item { Tooltip { objectName: "subject"; text: "Add"; visible: true; delay: 0 } }',
     "FocusRing": 'Item { width: 10; height: 10; FocusRing { objectName: "subject" } }',
     "ListRow": 'ListRow { objectName: "subject"; title: "DNS in Detail"; detail: "Task 4 of 7" }',
+    "Disclosure": (
+        'Disclosure { objectName: "subject"; width: 400; title: "New notes"; detail: "3";'
+        ' Text { objectName: "inside"; text: "TCP" } }'
+    ),
     "TextField": 'TextField { objectName: "subject"; hint: "e.g. DNS in Detail" }',
     "Choice": 'Choice { objectName: "subject"; text: "New room"; detail: "As you go." }',
     "Toggle": 'Toggle { objectName: "subject"; text: "Reduce motion" }',
@@ -525,3 +529,21 @@ def test_choice_swatch_shows_only_when_set() -> None:
             swatches.append(item.property("visible"))
         pending.extend(item.childItems())
     assert sorted(swatches) == [False, True]
+
+
+def test_disclosure_toggles_from_the_keyboard_and_announces_its_state() -> None:
+    loaded = load(DEFAULT_BODIES["Disclosure"])
+    subject = loaded.subject
+    header = loaded.find("subjectHeader")
+    inside = loaded.find("inside")
+    assert subject.property("expanded") is False
+    assert inside.property("visible") is False
+
+    header.forceActiveFocus()
+    QTest.keyClick(loaded.window, Qt.Key.Key_Space)
+
+    assert subject.property("expanded") is True
+    assert inside.property("visible") is True
+    QMetaObject.invokeMethod(header, "clicked")
+    assert subject.property("expanded") is False
+    assert loaded.warnings == []

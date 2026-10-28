@@ -8,6 +8,8 @@ read or written. Run: `uv run python -m scripts.screenshots tests/screenshots`.
 import os
 import sys
 import tempfile
+from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import NoReturn
 
@@ -18,14 +20,20 @@ from PySide6.QtCore import QCoreApplication, QElapsedTimer, QEvent, QObject
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQuick import QQuickWindow
 
-from recon.__main__ import create_bridges, open_database
+from recon.__main__ import create_bridges, open_database, processing_for
 from recon.app import create_application, create_engine, load_windows, root_window
 from recon.bridge.navigation import NavigationBridge
+from recon.bridge.review import ReviewBridge
 from recon.bridge.session import RoomSessionBridge
 from recon.bridge.settings import SettingsBridge
 from recon.config import Settings
+from recon.db.connection import Database
 from recon.db.models import BlockContent, NewRoom
 from recon.db.repositories import BlockRepository, RoomRepository, TaskRepository
+from recon.engine.capture import capture_room
+from recon.engine.extract import check
+from recon.engine.notes import render_room
+from recon.engine.schemas import RoomExtract
 from recon.paths import AppPaths
 
 
@@ -86,6 +94,43 @@ def seed(paths: AppPaths) -> int:
     return room.id
 
 
+def stage_review(paths: AppPaths, settings: Settings, db: Database, room_id: int) -> None:
+    """Stage notes for the seeded room from an invented extract, as processing would."""
+    rooms, tasks, blocks = RoomRepository(db), TaskRepository(db), BlockRepository(db)
+    room = rooms.get(room_id)
+    if room is None:
+        fail("the seeded room is missing")
+    rows = [(task, blocks.for_task(task.id)) for task in tasks.for_room(room_id)]
+    capture = capture_room(room, rows, date(2026, 10, 28))
+    key = next(b for b in capture.blocks() if b.type == "key_idea")
+    invented = RoomExtract.model_validate(
+        {
+            "summary": [
+                "DNS turns names into addresses.",
+                "Each record type answers a different question.",
+                "dig shows the records for a name.",
+            ],
+            "tasks": [{"task": 3, "points": [{"block": key.id, "text": key.text}]}],
+            "concepts": [{"name": "Record type", "aliases": ["record"], "topic": "DNS"}],
+            "tools": [{"name": "dig", "purpose": "Looks up DNS records."}],
+            "answers": [],
+        }
+    )
+    processing = processing_for(paths, settings, db)
+    run = processing.runs.start()
+    processing.stage_room(room_id, render_room(capture, check(invented, capture)), run)
+
+
+def wait_for(condition: Callable[[], bool], timeout_ms: int = 3000) -> None:
+    """Process events until `condition` holds (the review loads on a worker)."""
+    timer = QElapsedTimer()
+    timer.start()
+    while not condition():
+        if timer.elapsed() > timeout_ms:
+            fail("the review screen didn't open")
+        QCoreApplication.processEvents()
+
+
 def grab(window: QQuickWindow, out: Path, name: str) -> None:
     """Save a window's current frame as `name`.png."""
     wait(300)
@@ -138,6 +183,11 @@ def main(out: Path) -> list[str]:
         settings.setProperty("accent", "cyan")
         grab(main_window, out, "settings-cyan")
         settings.setProperty("accent", "violet")
+        stage_review(paths, initial, db, room_id)
+        review = typed(bridges, "ReviewModel", ReviewBridge)
+        review.open(room_id)
+        wait_for(lambda: navigation.property("currentScreen") == "review")
+        grab(main_window, out, "review")
         session.finishRequested.emit(room_id)
         grab(panel, out, "panel-finish")
 

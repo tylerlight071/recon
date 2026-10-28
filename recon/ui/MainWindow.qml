@@ -22,6 +22,7 @@ Window {
     readonly property var screens: [
         { "key": "home", "label": qsTr("Home"), "icon": "home", "file": "screens/Home.qml" },
         { "key": "start", "under": "home", "file": "screens/Start.qml" },
+        { "key": "review", "under": "home", "file": "screens/Review.qml" },
         { "key": "settings", "label": qsTr("Settings"), "icon": "sliders", "file": "screens/Settings.qml" }
     ]
 
@@ -62,6 +63,15 @@ Window {
     }
 
     Connections {
+        target: ReviewModel
+        function onApplied(roomId, written) {
+            toast.show(written === 1
+                       ? qsTr("Applied: 1 note written to your vault.")
+                       : qsTr("Applied: %1 notes written to your vault.").arg(written))
+        }
+    }
+
+    Connections {
         target: Pinning
         function onPinFailed() {
             toast.show(qsTr("Couldn't pin the panel. It opens as a normal window for now. You can try again in Settings."))
@@ -72,7 +82,7 @@ Window {
     }
 
     // The theme follows Settings (one engine, so this covers the panel too).
-    // Asked once, at first launch (The user's choice), before any room starts.
+    // Asked once, at first launch, before any room starts (ADR 0004).
     Component.onCompleted: {
         Theme.accentName = Qt.binding(() => AppSettings.accent)
         Theme.reduceMotion = Qt.binding(() => AppSettings.reduceMotion)
