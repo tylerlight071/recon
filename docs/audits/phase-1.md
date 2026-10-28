@@ -357,6 +357,45 @@ The first run had 46 survivors. New tests killed every one that showed a real ga
 - **`names._cut` (4):** `"utf-8"` versus `"UTF-8"` or Python's default (the same codec), and `<=` versus `<` at exactly the limit (the slice is the whole string either way).
 - **`render.fenced` (1):** `default=0` versus `1`, since the fence is `max(3, longest + 1)` either way.
 
+## Resolution (before Gate 1)
+
+Every finding was filed as an issue. Each Critical, High and Medium finding is fixed and merged, with a regression test reproducing the audit's own scenario. Lows are fixed except two, which are left open with reasons.
+
+| Finding | Severity | Issue | Fixed in |
+| --- | --- | --- | --- |
+| F-01 delete toast's Undo after Finish destroyed the block | Critical | #81 | #107 |
+| F-02 steady title typing never saved | Critical | #82 | #108 |
+| F-03 unfinished-flag rule cut the rest of a line | High | #83 | #109 (ADR 0005 amended) |
+| F-04 reused block IDs sent Undo to the wrong block | High | #84 | #107 (migration 0003) |
+| F-05 UI thread did storage I/O | Medium | #85 | #110 |
+| F-06 queued jobs lost at quit | Medium | #86 | #108 |
+| F-07 typed hash prefix reached app.db | Medium | #87 | #109 |
+| F-08 HTML in the export hid the rest | Medium | #88 | #111 |
+| F-09 `backups/` 0755, files unchecked at launch | Medium | #89 | #112 |
+| F-10 two copies could run | Medium | #90 | #113 |
+| F-11 finished room unreachable | Medium | #91 | #114 |
+| F-12 start-up failures invisible | Medium | #92 | #113 |
+| F-13 Tab trapped in blocks | Low | #93 | #115 |
+| F-14 flags in titles and Start fields silent | Low | #94 | #109 |
+| F-15 flag lookalikes the filter misses | Low | #95 | **Open**: rare in real flags; documented in ADR 0005 |
+| F-16 pin/unpin race | Low | #96 | #110 |
+| F-17 failing save toasted every second | Low | #97 | #115 |
+| F-18 several pasted hashes can't be kept | Low | #98 | **Open**: paste one at a time for now; revisit with Phase 3's notices |
+| F-19 undo log kept old text indefinitely | Low | #99 | #107 (`sessions` noted on #99) |
+| F-20 relative vault path inside the checkout | Low | #100 | #115 |
+| F-21 later notices replaced the Undo toast | Low | #101 | #115 |
+| F-22 QML cache outside the private cache | Low | #102 | #112 |
+| F-23 installer `%` and foreign entries | Low | #103 | #115 |
+| F-24 stale docs | Low | #104 | #115 and the PRs above |
+| F-25 mutation set missed new sanitisers | Low | #105 | #106 |
+
+After the fixes, on `main` at `2de1db6`:
+
+- **Tests:** 1161 passed.
+- **Branch coverage:** 98.5%; `engine/` 99.1%, `db/` 97.9%, `services/` 100%. All gates OK.
+- **Mutation testing:** 426 of 440 caught (flags_filter 136/136, render 226/236, names 64/68); the survivors are the equivalent mutants listed above.
+- **`uv audit`:** no known vulnerabilities in 77 packages.
+
 ## Couldn't check
 
 - **On Tyler's desktop:** launch time through the app menu on Wayland with the GPU renderer, 60 fps panel animations, idle memory with the real RHI backend, the KWin rule's behaviour, and the chime through PipeWire. Headless numbers are in the table above.
