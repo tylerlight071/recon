@@ -1,5 +1,6 @@
 """SettingsBridge: clamps, notifies, and saves once after changes settle."""
 
+import threading
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 from PySide6.QtCore import QObject, QUrl
 
 from recon.bridge.settings import SAVE_DELAY_MS, SettingsBridge
+from recon.bridge.workers import SerialWorker
 from recon.config import Settings
 from tests.ui.qml_harness import SignalCounter, app, wait, wait_until
 
@@ -158,3 +160,38 @@ def test_vault_defaults_to_cyber_vault_and_can_be_chosen(
     assert bridge.property("vaultShown") == "/data/vaults/Cyber"
     assert changed.count == 1
     assert saved == [Settings(vault_path="/data/vaults/Cyber")]
+
+
+def test_timed_saves_run_off_the_ui_thread_and_flush_runs_here(saved: list[Settings]) -> None:
+    # Audit F-05: a save fsyncs, so the timed one goes to a worker.
+    app()
+    owner = QObject()
+    worker = SerialWorker(owner)
+    threads: list[int] = []
+
+    def save(settings: Settings) -> None:
+        threads.append(threading.get_ident())
+        saved.append(settings)
+
+    bridge = SettingsBridge(Settings(), save, parent=owner, submit=worker)
+    bridge.setProperty("panelWidth", 470)
+    assert wait_until(lambda: len(saved) == 1)
+    assert threads[0] != threading.get_ident()
+
+    bridge.setProperty("panelWidth", 480)
+    bridge.flush()  # at quit: here and now
+    assert threads[1] == threading.get_ident()
+    assert saved[-1].panel_width == 480
+
+
+def test_a_failed_timed_save_is_logged_not_raised(caplog: pytest.LogCaptureFixture) -> None:
+    app()
+    owner = QObject()
+
+    def save(_settings: Settings) -> None:
+        raise OSError
+
+    bridge = SettingsBridge(Settings(), save, parent=owner, submit=lambda job: job())
+    bridge.setProperty("panelWidth", 470)
+
+    assert wait_until(lambda: "settings not saved" in caplog.text)

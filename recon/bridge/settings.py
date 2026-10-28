@@ -1,11 +1,16 @@
 """Settings exposed to QML as the `AppSettings` singleton."""
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QTimer, QUrl, Signal, SignalInstance, Slot
 
+from recon.bridge.workers import Submit, thread_pool_submit
 from recon.config import ACCENTS, PINNING_CHOICES, Settings, clamp_panel_width, vault_folder
+from recon.logging_setup import Safe
+
+_log = logging.getLogger(__name__)
 
 SAVE_DELAY_MS = 500
 """Saves wait for changes to settle, e.g. while the panel is being dragged wider."""
@@ -32,6 +37,7 @@ class SettingsBridge(QObject):
         save: Callable[[Settings], None],
         parent: QObject | None = None,
         home: Path | None = None,
+        submit: Submit = thread_pool_submit,
     ) -> None:
         """Wrap `settings`; `save` is called with the new settings after changes.
 
@@ -40,14 +46,18 @@ class SettingsBridge(QObject):
             save: Persists settings (injected so tests can fake it).
             parent: Qt parent.
             home: Tyler's home folder, for ~/ paths (defaults to Path.home()).
+            submit: Runs a save off the UI thread (a serial worker, so the last change
+                wins; tests pass a synchronous one).
         """
         super().__init__(parent)
         self._settings = settings
         self._save = save
         self._home = home or Path.home()
         self._dirty = False
+        self._submit = submit
         self._timer = QTimer(self, singleShot=True, interval=SAVE_DELAY_MS)
-        self._timer.timeout.connect(self.flush)
+        # Saves fsync, so they run on a worker, never the UI thread (audit F-05).
+        self._timer.timeout.connect(self._save_soon)
 
     @property
     def settings(self) -> Settings:
@@ -162,9 +172,23 @@ class SettingsBridge(QObject):
         self._dirty = True
         self._timer.start()
 
+    def _save_soon(self) -> None:
+        if not self._dirty:
+            return
+        snapshot, save = self._settings, self._save
+        self._dirty = False
+
+        def job() -> None:
+            try:
+                save(snapshot)
+            except Exception as exc:  # thread boundary: settings stay in memory
+                _log.warning("settings not saved: %s", Safe(type(exc).__name__))
+
+        self._submit(job)
+
     @Slot()
     def flush(self) -> None:
-        """Save now if anything changed (also called when the app quits)."""
+        """Save now, on this thread, if anything is unsaved (at quit, after saves drain)."""
         self._timer.stop()
         if self._dirty:
             self._save(self._settings)

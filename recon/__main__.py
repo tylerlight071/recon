@@ -130,17 +130,26 @@ def create_bridges(
     Returns:
         The bridges, and the pinning bridge again (start-up re-applies the pin).
     """
+    # Saves and KDE commands each get a serial worker: off the UI thread (audit F-05),
+    # in order, and pin/unpin can't overtake each other (audit F-16).
+    settings_worker, pin_worker = SerialWorker(app), SerialWorker(app)
     settings_bridge = SettingsBridge(
-        settings, lambda changed: save_settings(paths.settings_file, changed), parent=app
+        settings,
+        lambda changed: save_settings(paths.settings_file, changed),
+        parent=app,
+        submit=settings_worker,
     )
     navigation = NavigationBridge(parent=app)
     pinning = PinningBridge(
         settings_bridge,
         KWinPinning(run_command, paths.data / "kwin-panel.js"),
         lambda: _screen_area(app),
+        submit=pin_worker,
         parent=app,
     )
-    # Settings save first at quit; the room's own savers follow in _room_bridges.
+    # Settings save first at quit (queued saves, then anything still unsaved);
+    # the room's own savers follow in _room_bridges.
+    app.aboutToQuit.connect(lambda: _drain(settings_worker, pin_worker))
     app.aboutToQuit.connect(settings_bridge.flush)
     bridges: dict[str, QObject] = {
         "AppSettings": settings_bridge,
@@ -160,7 +169,7 @@ def _room_bridges(
     undo = UndoRepository(db)
     # One serial worker for the room's writes, so saves land before anything reads them back.
     room_worker = SerialWorker(app)
-    flag_guard = FlagGuard(blocks.keep_lookalike, parent=app)
+    flag_guard = FlagGuard(blocks.keep_lookalike, room_worker, parent=app)
     home = HomeBridge(rooms, blocks, utc_now, parent=app)
     start = StartRoomBridge(rooms, parent=app)
     autosave = AutosaveQueue(
@@ -202,9 +211,10 @@ def _room_bridges(
     }
 
 
-def _drain(room_worker: SerialWorker) -> None:
-    """At quit: let queued room jobs and global-pool jobs finish before anything closes."""
-    if not (room_worker.drain() and drain_global_pool()):
+def _drain(*workers: SerialWorker) -> None:
+    """At quit: let queued jobs (and the global pool's) finish before anything closes."""
+    drained = [worker.drain() for worker in workers]  # every one, even after a timeout
+    if not (all(drained) and drain_global_pool()):
         _log.warning("quit before every queued save finished")
 
 
