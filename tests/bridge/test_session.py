@@ -99,7 +99,7 @@ def _world(
     rooms, tasks = RoomRepository(db, clock), TaskRepository(db, clock)
     blocks = blocks or BlockRepository(db, clock)
     autosave = FakeAutosave(blocks)
-    guard = FlagGuard(blocks.keep_lookalike)
+    guard = FlagGuard(blocks.keep_lookalike, lambda job: job())
     monotonic = Monotonic()
     session = RoomSessionBridge(
         (rooms, tasks, blocks, UndoRepository(db)),
@@ -465,7 +465,7 @@ def test_a_failed_title_save_is_reported(db: Database) -> None:
     session = RoomSessionBridge(
         (rooms, BrokenTasks(db, clock), blocks, UndoRepository(db, clock)),
         FakeAutosave(blocks),
-        FlagGuard(blocks.keep_lookalike),
+        FlagGuard(blocks.keep_lookalike, lambda job: job()),
         submit=lambda job: job(),
     )
     failures: list[str] = []

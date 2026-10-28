@@ -22,7 +22,7 @@ Rules that the structure enforces:
 
 - `engine/` never imports Qt. It takes pydantic models in and returns pydantic models out.
 - `bridge/` holds no business logic; QML never does I/O.
-- The UI thread never blocks: model calls, Whisper, embeddings and file writes run on worker threads and report plain-English progress.
+- The UI thread never blocks: model calls, Whisper, embeddings and file writes run on worker threads and report plain-English progress. Writes go to serial workers (`workers.SerialWorker`): one for the room (session, focus timer, Finish, "Not a flag, keep it"), one for settings and one for KDE pinning. Reads use a separate read-only connection that never waits for a write. The only writes on the UI thread are the final saves at quit, after every worker has drained.
 - Only `services/ollama.py` may import networking modules, and it refuses non-loopback hosts. Hugging Face libraries are allowed only in `services/whisper.py`, `subprocess` only in `services/kwin.py`, and `QDesktopServices` only in `services/open_url.py`. Dynamic imports are banned, and QML may not reference remote URLs or network APIs. `tests/test_network_imports.py` checks all of this, with self-tests for each bypass form.
 - Dependencies (Ollama client, Whisper, clock, filesystem roots, ID generation) are passed in, so tests can fake them.
 
@@ -169,7 +169,7 @@ Settings live in `settings.toml` (`recon/config.py`: a pydantic model, read with
 ## Storage
 
 `recon/db/` (task 1.5):
-- **`connection.py`:** a single `Database` connection to `app.db`, guarded by a lock so there's only ever one writer. Pragmas: WAL, `synchronous=FULL`, `foreign_keys=ON`, `secure_delete=ON`. The file is created 0600, and SQLite gives the `-wal` and `-shm` files the same mode.
+- **`connection.py`:** `Database` holds one writer connection to `app.db`, guarded by a lock so there's only ever one writer, and a second connection for reads (`query_only`, its own lock). In WAL mode a read sees the last commit without waiting for a write in progress. Migrations and checkpoints use `writer()`. Pragmas: WAL, `synchronous=FULL`, `foreign_keys=ON`, `secure_delete=ON`. The file is created 0600, and SQLite gives the `-wal` and `-shm` files the same mode.
 - **`migrate.py`:** applies `migrations/NNNN_name.sql` in order, tracked in `PRAGMA user_version`. Each migration runs in one transaction with its version bump. A database from a newer Recon is refused.
 - **`0001_initial.sql`:** the Phase 1 tables as STRICT tables, with CHECK constraints on every enum, JSON-validated `content`, cascading deletes, and one task per index per room.
 - **`models.py` and `repositories.py`:** rooms, tasks and blocks go in and out as pydantic models through literal, parameterised SQL. Every change bumps the room's `updated_at`; block positions stay 0..n-1; `ensure_starter_block` places the empty Key idea block.

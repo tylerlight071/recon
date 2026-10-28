@@ -92,6 +92,9 @@ class PinningBridge(QObject):
         self._settings.setProperty("pinning", "off")
 
         def job() -> None:
+            # Pinned again before this ran? Then the rule stays (audit F-16).
+            if self._settings.settings.kwin_pinning == "on":
+                return
             if not self._pinner.unpin():
                 self._unpin_failed.emit()
 
@@ -105,7 +108,14 @@ class PinningBridge(QObject):
         geometry = PanelGeometry.right_edge(
             self._screen_area(), int(self._settings.property("panelWidth"))
         )
-        self._submit(lambda: self._finished.emit(self._pinner.pin(geometry)))
+
+        def job() -> None:
+            # Unpinned before this ran? Then don't write the rule (audit F-16).
+            if self._settings.settings.kwin_pinning != "on":
+                return
+            self._finished.emit(self._pinner.pin(geometry))
+
+        self._submit(job)
 
     def _on_width_changed(self) -> None:
         if self._settings.property("pinning") == "on":
