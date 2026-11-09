@@ -10,8 +10,8 @@ dependencies = [
     "numpy>=2.5",
     "ollama>=0.6.3",
     "pillow>=13",
-    "pydantic>=2.14",
-    "pyside6>=6.11.2,<6.12",
+    "pydantic>=2.14.2",
+    "pyside6>=6.11.3,<6.12",
     "tomli-w>=1.2",
 ]
 
@@ -21,21 +21,21 @@ voice = [
     # removed. Fixed upstream (SYSTRAN/faster-whisper#1589) but not released;
     # drop this cap once a faster-whisper release includes the fix.
     "av>=11,<19",
-    "ctranslate2>=4.6.3",
+    "ctranslate2>=4.8.5",
     "faster-whisper>=1.2.1",
-    "nvidia-cublas-cu12>=12.8",
+    "nvidia-cublas-cu12>=12.9.3.13",
 ]
 
 [dependency-groups]
 dev = [
-    "hypothesis>=6.170.8",
-    "mutmut>=3.8,<4",
-    "mypy>=2.4.0",
+    "hypothesis>=6.170.14",
+    "mutmut>=3.8.1,<4",
+    "mypy>=2.4.1",
     "pre-commit>=4.7.0",
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "pytest-qt>=4.5",
-    "ruff>=0.17.2",
+    "ruff>=0.17.3",
 ]
 
 [tool.uv]
